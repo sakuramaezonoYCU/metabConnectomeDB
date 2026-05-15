@@ -6,8 +6,12 @@ import csv
 import numpy as np
 from collections import defaultdict
 
-base_dir = '/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/input/databases'
-out_dir = os.path.abspath(os.path.join(base_dir, '../../output'))
+# Dynamic path resolution relative to this script
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+base_dir = os.path.join(PROJECT_ROOT, 'input', 'databases')
+out_dir = os.path.join(PROJECT_ROOT, 'output')
+
 os.makedirs(out_dir, exist_ok=True)
 os.chdir(base_dir)
 

@@ -21,8 +21,11 @@ Note: This script is standalone and does not modify generate_final_outputs.py,
 import os
 import pandas as pd
 
-# BASE_DIR = '/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/input/databases'
-# os.chdir(BASE_DIR)
+# Dynamic path resolution relative to this script
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+db_dir = os.path.join(PROJECT_ROOT, 'input', 'databases')
+out_dir = os.path.join(PROJECT_ROOT, 'output')
 
 # ------------------------------------------------------------------
 # 1. Load reference files
@@ -30,7 +33,8 @@ import pandas as pd
 print("Loading HMDB reference files...")
 
 # Full HMDB annotations (primary source — 248k entries)
-df_hmdb = pd.read_csv('HMDB_metabolites', sep=',')
+hmdb_path = os.path.join(db_dir, 'HMDB_metabolites')
+df_hmdb = pd.read_csv(hmdb_path, sep=',')
 df_hmdb = df_hmdb.rename(columns={'NAME': 'HMDB_Name'})
 print(f"  HMDB annotations: {len(df_hmdb):,} entries | cols: {df_hmdb.columns.tolist()}")
 
@@ -123,10 +127,14 @@ def process_species(species: str, in_file):
 # Run for both species
 # ------------------------------------------------------------------
 
-for sp in ['human', 'mouse']:
-    in_file = f'{sp}_database_merge_unique_metab.csv'
-    process_species(sp, in_file)
-    in_file = f'{sp}_database_merge_unique_metab_target_pairs.csv'
-    process_species(sp, in_file)
+if __name__ == "__main__":
+    for sp in ['human', 'mouse']:
+        # 1. Unique metabolites
+        in_file = os.path.join(out_dir, f'{sp}_database_merge_unique_metab.csv')
+        process_species(sp, in_file)
+        
+        # 2. Target pairs
+        in_file = os.path.join(out_dir, f'{sp}_database_merge_unique_metab_target_pairs.csv')
+        process_species(sp, in_file)
 
-print("\nDone.")
+    print("\nDone.")
