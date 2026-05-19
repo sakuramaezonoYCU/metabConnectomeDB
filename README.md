@@ -12,8 +12,8 @@ metabConnectomeDB/
 │   ├── merge_dbs.py
 │   ├── merge_dbs_claude.py
 │   ├── merge_simplify_annotate.sh
-│   ├── unique_metabolite_data_exploration.ipynb   # Unique metabolite EDA
-│   └── metabolite_targetPair_analysis.ipynb       # Metabolite-Target pair analysis
+│   ├── unique_metab_data_exploration.ipynb        # Unique metabolite EDA
+│   └── metab_targetPair_analysis.ipynb            # Metabolite-Target pair analysis
 ├── input/                              # Main data directory
 │   └── databases/                      # Raw database sources
 ├── output/                             # Consolidated output CSV files
@@ -87,13 +87,13 @@ The following details the relationship between scripts, their inputs, internal p
   - `{species}_database_merge_unique_metab_with_HMDB_Info.csv`
   - `{species}_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv`
 
-### `unique_metabolite_data_exploration.ipynb`
+### `unique_metab_data_exploration.ipynb`
 
 - **Role:** Exploratory data analysis focused on unique metabolites across all integrated databases.
 - **Input:** `output/human_database_merge_unique_metab_with_HMDB_Info.csv`
 - **Functionality:** Generates summary statistics and plots for database distribution, exclusive metabolite analysis, and HMDB annotation coverage.
 
-### `metabolite_targetPair_analysis.ipynb`
+### `metab_targetPair_analysis.ipynb`
 
 - **Role:** Analysis of metabolite-target (Receptor/Enzyme/Transporter) pairs and their annotations.
 - **Input:** `output/human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv`
