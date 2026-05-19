@@ -51,7 +51,7 @@ for root, dirs, files in os.walk(base_dir):
             if f.startswith('human_') or f.startswith('mouse_') or f.startswith('merged_'):
                 continue
             
-        if not (f.endswith('.csv') or f.endswith('.txt') or f.endswith('.tsv') or f.endswith('.xlsx')):
+        if not (f.endswith('.csv') or f.endswith('.txt') or f.endswith('.tsv')):
             continue
             
         filepath = os.path.join(root, f)
@@ -588,6 +588,7 @@ rename_map = {
     'Protein_name': 'Protein_Name',
 
     'uniprot': 'Uniprot',
+    'version': 'CellphoneDB_ver',
 }
 
 # ── Populated later by audit_and_standardize_headers ───────────────────────
@@ -920,7 +921,62 @@ def save_per_database(df_list, mol_type, species_prefix):
     # (same key values, but fewer columns filled in). Keep the richer row,
     # coalescing any unique non-null values from the sparser one into it.
     full_df = deduplicate_keep_most_info(full_df)
+
+    # ── Column normalisation & Coalescing ─────────────────────────────────────
+    # 1. Coalesce Super Class columns into a single 'Super_Class' and standardize values
+    _sc_cols = [c for c in ['super_class', 'Super Class', 'SuperClass'] if c in full_df.columns]
+    if _sc_cols:
+        full_df['Super_Class'] = full_df[_sc_cols[0]].copy()
+        for _c in _sc_cols[1:]:
+            full_df['Super_Class'] = full_df['Super_Class'].fillna(full_df[_c])
+        full_df = full_df.drop(columns=_sc_cols)
+        
+        # Standardize categories to match HMDB and ClassyFire sentence-case standards
+        from standardize_categories import standardize_superclass
+        full_df['Super_Class'] = full_df['Super_Class'].apply(standardize_superclass)
+
+    # 2. Coalesce Sub Class columns into a single 'Sub_Class' and standardize values
+    _subc_cols = [c for c in ['sub_class', 'Sub Class', 'SubClass'] if c in full_df.columns]
+    if _subc_cols:
+        full_df['Sub_Class'] = full_df[_subc_cols[0]].copy()
+        for _c in _subc_cols[1:]:
+            full_df['Sub_Class'] = full_df['Sub_Class'].fillna(full_df[_c])
+        full_df = full_df.drop(columns=_subc_cols)
+        
+        # Standardize categories to match HMDB and ClassyFire sentence-case standards
+        from standardize_categories import standardize_subclass
+        full_df['Sub_Class'] = full_df['Sub_Class'].apply(standardize_subclass)
+
+    # 3. Coalesce Class columns into a single 'Class'
+    _class_cols = [c for c in ['class', 'Class'] if c in full_df.columns]
+    if len(_class_cols) > 1:
+        full_df['Class'] = full_df[_class_cols[0]].copy()
+        for _c in _class_cols[1:]:
+            full_df['Class'] = full_df['Class'].fillna(full_df[_c])
+        if 'class' in full_df.columns:
+            full_df = full_df.drop(columns=['class'])
+
+    # 4. Coalesce synonym columns (MEBOCOST → synonyms_name, MetaLigand → Synonyms)
+    if 'synonyms_name' in full_df.columns and 'Synonyms' in full_df.columns:
+        full_df['Synonyms'] = full_df['Synonyms'].fillna(full_df['synonyms_name'])
+        full_df = full_df.drop(columns=['synonyms_name'])
+    elif 'synonyms_name' in full_df.columns:
+        full_df = full_df.rename(columns={'synonyms_name': 'Synonyms'})
+
+    # 5. Simple renames for clarity
+    _col_renames = {
+        'ENZYME_NAME':          'Enzyme_Full_Name',
+        'HAMDBP_ID':            'HMDB_Protein_ID',
+        'UNIPROT_ID':           'Protein_Uniprot',
+        'Gene_Name':            'Target_Gene',
+        'Transporter_genes':    'Metaligand_transporter_genes_out',
+        'Transporter_genes_in': 'Metaligand_transporter_genes_in',
+    }
+    full_df = full_df.rename(columns={k: v for k, v in _col_renames.items() if k in full_df.columns})
+
     if 'Metabolite_Name' in full_df.columns:
+        full_df['Metabolite_Name'] = full_df['Metabolite_Name'].str.replace(r"(?i)SEROTONIN\s+DOPAMIN", "SEROTONIN;DOPAMINE", regex=True)
+        full_df['Metabolite_Name'] = full_df['Metabolite_Name'].str.replace(r"(?i)ALDOSTERONE\s+CORTICOSTERONE", "ALDOSTERONE;CORTICOSTERONE", regex=True)
     # to make separation of metabolite by ";" consistently
         mask = full_df['database'] == "MetaLigand"
         
@@ -930,20 +986,56 @@ def save_per_database(df_list, mol_type, species_prefix):
         )
     full_df['Metabolite_Name'] = full_df['Metabolite_Name'].str.replace(r"(\salpha\b|alpha\b|-a\b)", "a", regex=True)
     full_df['Metabolite_Name'] = full_df['Metabolite_Name'].str.replace(r"(\sbeta\b|beta\b|-b\b)", "b", regex=True)
-    full_df['Metabolite_Name'] = full_df['Metabolite_Name'].str.replace(r"(5-SHp ETE|5SHp ETE|5SHpETE|5s-hpete|5S-HPETE)\s*", "5(S)-hydroperoxyeicosatetraenoic acid", regex=True)
+    full_df['Metabolite_Name'] = full_df['Metabolite_Name'].str.replace(r"(?i)(5-SHp ETE|5SHp ETE|5SHpETE|5s-hpete|5S-HPETE)\s*", "5(S)-hydroperoxyeicosatetraenoic acid", regex=True)
+    
+    # Load metab_dict.csv
     metab_dict = pd.read_csv("metab_dict.csv")
-    lookup = {k.lower(): v for k, v in zip(metab_dict["metabolite_acronym"], metab_dict["Metabolite_Name"])}
-    
-    # Build pattern from all keys, longest first to avoid partial matches
-    pattern = '|'.join(re.escape(k) for k in sorted(lookup.keys(), key=len, reverse=True))
-    
+    lookup = {k.lower(): v.lower() for k, v in zip(metab_dict["metabolite_acronym"], metab_dict["Metabolite_Name"])}
+
+    # --- Strict exact-match pass (metab_dict_strict.csv) ---
+    # These entries require a full case-insensitive exact match on the entire
+    # Metabolite_Name value (or sub-value if separated by ';') — no partial/substring substitution.
+    if os.path.exists("metab_dict_strict.csv"):
+        metab_dict_strict = pd.read_csv("metab_dict_strict.csv")
+        strict_lookup = {
+            k.lower().strip(): v.lower().strip()
+            for k, v in zip(metab_dict_strict["metabolite_acronym"], metab_dict_strict["Metabolite_Name"])
+        }
+        if 'Metabolite_Name' in full_df.columns:
+            def apply_strict(name):
+                if not isinstance(name, str):
+                    return name
+                parts = str(name).split(';')
+                mapped = []
+                for p in parts:
+                    clean_p = p.strip()
+                    mapped.append(strict_lookup.get(clean_p.lower(), clean_p))
+                return ';'.join(mapped)
+            full_df['Metabolite_Name'] = full_df['Metabolite_Name'].apply(apply_strict)
+
     if 'Metabolite_Name' in full_df.columns:
-        full_df['Metabolite_Name'] = full_df['Metabolite_Name'].str.replace(
-            pattern,
-            lambda m: lookup[m.group(0).lower()],  # normalize match to lowercase for lookup
-            regex=True,
-            case=False
-        )
+        def apply_metab_lookup(name):
+            if not isinstance(name, str):
+                return name
+            # Apply longest-key-first to avoid partial matches on shorter substrings.
+            for key in sorted(lookup.keys(), key=len, reverse=True):
+                canonical = lookup[key]
+                # For entries that add an 'l-' prefix (bare amino acid → l-amino acid),
+                # use a stricter lookbehind: (?<!l-)(?<!\w) — this prevents re-matching
+                # 'histidine' inside an already-correct 'l-histidine' (l-l- problem),
+                # but still blocks digit-hyphen prefixes too (e.g. '5-histidine' is fine).
+                # For all other entries (acronyms, acid→anion, etc.) only (?<!\w) is used,
+                # so '5-hete', '12-hpete', etc. still match after their digit-hyphen prefix.
+                if re.match(r'^[a-zA-Z]-', canonical) and not re.match(r'^[a-zA-Z]-', key):
+                    pat = r'(?<![a-zA-Z]-)(?<!\w)' + re.escape(key) + r'(?!\w)'
+                else:
+                    pat = r'(?<!\w)' + re.escape(key) + r'(?!\w)'
+                replaced = re.sub(pat, canonical, name, flags=re.IGNORECASE)
+                if replaced != name:
+                    name = replaced
+            return name
+
+        full_df['Metabolite_Name'] = full_df['Metabolite_Name'].apply(apply_metab_lookup)
 
     for db_name, group in full_df.groupby('database'):
         folder_to_save = db_name.split('/')[0] if '/' in db_name else db_name

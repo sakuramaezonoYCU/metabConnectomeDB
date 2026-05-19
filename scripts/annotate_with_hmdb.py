@@ -35,7 +35,11 @@ print("Loading HMDB reference files...")
 # Full HMDB annotations (primary source — 248k entries)
 hmdb_path = os.path.join(db_dir, 'HMDB_metabolites')
 df_hmdb = pd.read_csv(hmdb_path, sep=',')
-df_hmdb = df_hmdb.rename(columns={'NAME': 'HMDB_Name'})
+df_hmdb = df_hmdb.rename(columns={
+    'NAME': 'HMDB_Name',
+    'SuperClass': 'Super_Class',
+    'SubClass': 'Sub_Class'
+})
 print(f"  HMDB annotations: {len(df_hmdb):,} entries | cols: {df_hmdb.columns.tolist()}")
 
 # Build a normalised (lowercase, stripped) name → HMDB_ID map from HMDB_metabolites
@@ -111,10 +115,45 @@ def process_species(species: str, in_file):
     # ------------------------------------------------------------------
     # Step 3 — Left-join full HMDB annotations by HMDB_ID
     # ------------------------------------------------------------------
+    # Identify overlapping columns (excluding the join key) to prevent duplicates/suffixes
+    overlapping_cols = [c for c in df_hmdb.columns if c in df.columns and c != 'HMDB_ID']
+    
     df = df.merge(df_hmdb, on='HMDB_ID', how='left')
-    print(f"  After HMDB annotation join: {len(df):,} rows")
+    
+    # Surgical coalescing of any duplicate column suffixes (e.g. SMILES, Super_Class, Class)
+    for c in overlapping_cols:
+        x_col = f"{c}_x"
+        y_col = f"{c}_y"
+        if x_col in df.columns and y_col in df.columns:
+            df[c] = df[x_col].fillna(df[y_col])
+            df = df.drop(columns=[x_col, y_col])
+            
+    print(f"  After HMDB annotation join and coalescing: {len(df):,} rows")
     matched = df['HMDB_Name'].notna().sum()
     print(f"  Rows with matched HMDB_Name: {matched:,}")
+
+    # Map Super_Class and Sub_Class from target pairs for the unique metabolite file
+    if "target_pairs" not in in_file:
+        pair_file = in_file.replace("_unique_metab.csv", "_unique_metab_target_pairs.csv")
+        if os.path.exists(pair_file):
+            print(f"  Mapping Super_Class and Sub_Class from {os.path.basename(pair_file)}...")
+            df_pair = pd.read_csv(pair_file)
+            if 'Super_Class' in df_pair.columns:
+                sc_map = df_pair.dropna(subset=['Super_Class']).drop_duplicates(subset='Metabolite_Name').set_index('Metabolite_Name')['Super_Class'].to_dict()
+                df['Super_Class'] = df['Metabolite_Name'].map(sc_map)
+            if 'Sub_Class' in df_pair.columns:
+                sub_map = df_pair.dropna(subset=['Sub_Class']).drop_duplicates(subset='Metabolite_Name').set_index('Metabolite_Name')['Sub_Class'].to_dict()
+                df['Sub_Class'] = df['Metabolite_Name'].map(sub_map)
+
+    # Ensure Super_Class is standardized to ClassyFire standard
+    if 'Super_Class' in df.columns:
+        from standardize_categories import standardize_superclass
+        df['Super_Class'] = df['Super_Class'].apply(standardize_superclass)
+
+    # Ensure Sub_Class is standardized to ClassyFire standard
+    if 'Sub_Class' in df.columns:
+        from standardize_categories import standardize_subclass
+        df['Sub_Class'] = df['Sub_Class'].apply(standardize_subclass)
 
     # ------------------------------------------------------------------
     # Step 4 — Save

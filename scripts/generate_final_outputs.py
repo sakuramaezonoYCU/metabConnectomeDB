@@ -195,6 +195,7 @@ def process_species(species, out_dir):
     # One-liner mapping (case-insensitive)
     df_met_db['HMDB_ID'] = df_met_db['Metabolite_Name'].map(
         HMDB_dict.assign(Metabolite_Name=HMDB_dict['Metabolite_Name'].str.lower())
+                 .drop_duplicates(subset=['Metabolite_Name'])
                  .set_index('Metabolite_Name')['HMDB_ID']
     )
     
