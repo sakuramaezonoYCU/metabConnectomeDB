@@ -2,8 +2,8 @@
 """Generate cancer_cellxgene_integration.ipynb notebook programmatically."""
 import json, os
 
-def md(source): return {"cell_type":"markdown","metadata":{},"source":[source]}
-def code(source): return {"cell_type":"code","execution_count":None,"metadata":{},"outputs":[],"source":[source]}
+def md(source): return {"cell_type":"markdown","metadata":{},"source":source.splitlines(keepends=True)}
+def code(source): return {"cell_type":"code","execution_count":None,"metadata":{},"outputs":[],"source":source.splitlines(keepends=True)}
 
 cells = []
 
@@ -53,6 +53,27 @@ DOWNLOAD_MODE = "whole_transcriptome"  # "whole_transcriptome" or "target_only"
 MAX_CELLS      = 10000 if DOWNLOAD_MODE == "whole_transcriptome" else 50000
 CENSUS_VERSION = "stable"              # "stable" or specific date string
 
+# Helper to construct a dynamic, parameter-dependent filename for caching
+import re, hashlib
+def get_cache_filename(diseases, tissue, max_cells, download_mode, census_version):
+    def slugify(text):
+        if not text:
+            return "all"
+        if isinstance(text, list):
+            return "_".join(slugify(t) for t in text)
+        return re.sub(r'[^a-z0-9]+', '-', str(text).lower()).strip('-')
+    
+    disease_slug = slugify(diseases)
+    if len(disease_slug) > 100:
+        h = hashlib.md5("_".join(diseases).encode('utf-8')).hexdigest()[:6]
+        disease_slug = f"{disease_slug[:90]}-{h}"
+    tissue_slug = slugify(tissue) if tissue else "all"
+    cells_str = f"{max_cells//1000}k" if max_cells >= 1000 else str(max_cells)
+    return f"cancer_{disease_slug}_{tissue_slug}_{cells_str}_{download_mode}_{census_version}.h5ad"
+
+h5ad_filename = get_cache_filename(DISEASE_FILTER, TISSUE_FILTER, MAX_CELLS, DOWNLOAD_MODE, CENSUS_VERSION)
+h5ad_path = os.path.join(output_dir, h5ad_filename)
+
 # Plot style
 %matplotlib inline
 import matplotlib.pyplot as plt
@@ -65,7 +86,8 @@ print(f"   Organism:  {ORGANISM}")
 print(f"   Diseases:  {DISEASE_FILTER}")
 print(f"   Tissues:   {TISSUE_FILTER or 'all'}")
 print(f"   Download Mode: {DOWNLOAD_MODE}")
-print(f"   Max cells: {MAX_CELLS:,}")"""))
+print(f"   Max cells: {MAX_CELLS:,}")
+print(f"   Cache path: {h5ad_path}")"""))
 
 cells.append(code("""# Dependency check
 import importlib, sys
@@ -150,7 +172,6 @@ import os
 import anndata as ad
 output_dir = os.path.join('..', 'output')
 os.makedirs(output_dir, exist_ok=True)
-h5ad_path = os.path.join(output_dir, "cancer_50k_metabolic_target_cells.h5ad")
 LOAD_FROM_CACHE = os.path.exists(h5ad_path)
 
 if LOAD_FROM_CACHE:
@@ -336,7 +357,6 @@ else:
 # 3. Load from local cache if present, otherwise download cell expression data using high-speed SOMA coordinate streaming
 import time
 adata = None
-h5ad_path = os.path.join(output_dir, "cancer_50k_metabolic_target_cells.h5ad")
 
 if os.path.exists(h5ad_path):
     print(f"✅ Local AnnData cache found at: {h5ad_path}")
