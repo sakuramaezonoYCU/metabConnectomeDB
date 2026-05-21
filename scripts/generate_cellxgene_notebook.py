@@ -49,13 +49,19 @@ TISSUE_FILTER  = None                  # None = all tissues; or e.g. ["lung"]
 # - "target_only": Downloads 50,000 cells for ONLY the ~500 target genes (faster query but restricted to target genes).
 DOWNLOAD_MODE = "whole_transcriptome"  # "whole_transcriptome" or "target_only"
 
-# Cap cells dynamically to manage memory based on mode
-MAX_CELLS      = 10000 if DOWNLOAD_MODE == "whole_transcriptome" else 50000
+# Set CAP to an integer to cap cells (e.g. 10000), or None to query ALL available cells
+# Can be overridden dynamically via CELLXGENE_CAP environment variable
+CAP = os.environ.get("CELLXGENE_CAP", None)
+if CAP is not None:
+    try:
+        CAP = int(CAP)
+    except ValueError:
+        pass
 CENSUS_VERSION = "stable"              # "stable" or specific date string
 
 # Helper to construct a dynamic, parameter-dependent filename for caching
 import re, hashlib
-def get_cache_filename(diseases, tissue, max_cells, download_mode, census_version):
+def get_cache_filename(diseases, tissue, cap, download_mode, census_version):
     def slugify(text):
         if not text:
             return "all"
@@ -68,10 +74,10 @@ def get_cache_filename(diseases, tissue, max_cells, download_mode, census_versio
         h = hashlib.md5("_".join(diseases).encode('utf-8')).hexdigest()[:6]
         disease_slug = f"{disease_slug[:90]}-{h}"
     tissue_slug = slugify(tissue) if tissue else "all"
-    cells_str = f"{max_cells//1000}k" if max_cells >= 1000 else str(max_cells)
+    cells_str = f"{cap//1000}k" if (cap is not None and cap >= 1000) else (str(cap) if cap is not None else "all")
     return f"cancer_{disease_slug}_{tissue_slug}_{cells_str}_{download_mode}_{census_version}.h5ad"
 
-h5ad_filename = get_cache_filename(DISEASE_FILTER, TISSUE_FILTER, MAX_CELLS, DOWNLOAD_MODE, CENSUS_VERSION)
+h5ad_filename = get_cache_filename(DISEASE_FILTER, TISSUE_FILTER, CAP, DOWNLOAD_MODE, CENSUS_VERSION)
 h5ad_path = os.path.join(output_dir, h5ad_filename)
 
 # Plot style
@@ -86,7 +92,7 @@ print(f"   Organism:  {ORGANISM}")
 print(f"   Diseases:  {DISEASE_FILTER}")
 print(f"   Tissues:   {TISSUE_FILTER or 'all'}")
 print(f"   Download Mode: {DOWNLOAD_MODE}")
-print(f"   Max cells: {MAX_CELLS:,}")
+print(f"   Cap:       {CAP if CAP is not None else 'None (All cells)'}")
 print(f"   Cache path: {h5ad_path}")"""))
 
 cells.append(code("""# Dependency check
@@ -165,7 +171,7 @@ Before downloading expression data (which can be large), we first query only the
 ### How to Interpret
 - The **disease** table shows which cancer types are available and how many cells each has
 - The **cell type** breakdown reveals the cellular composition of the TME
-- Large datasets (>100k cells) may require the `MAX_CELLS` cap"""))
+- Large datasets (>100k cells) may require the `CAP` parameter to cap cell counts for speed/memory"""))
 
 cells.append(code("""import cellxgene_census
 import os
@@ -237,7 +243,7 @@ Now we download the actual gene expression matrix, but **only for our target gen
 ### Methodology
 - `cellxgene_census.get_anndata()` returns a standard AnnData object compatible with scanpy
 - We filter to `is_primary_data == True` to avoid duplicate cells across datasets
-- The `MAX_CELLS` parameter provides a safety cap
+- The `CAP` parameter provides a safety cap to downsample the dataset if specified
 
 ### How to Interpret
 - The AnnData `.obs` contains cell metadata (cell type, disease, tissue)
@@ -252,10 +258,11 @@ import anndata as ad
 
 # 1. Subsample cell IDs FIRST to select a CONTIGUOUS range of cells (prevents remote seek lag)
 obs_df_sorted = obs_df.sort_values('soma_joinid')
-if len(obs_df_sorted) > MAX_CELLS:
-    print(f"⚠️  Downsampling metadata from {len(obs_df_sorted):,} to {MAX_CELLS:,} cells (contiguous slice)...")
-    obs_df_sub = obs_df_sorted.head(MAX_CELLS)
+if CAP is not None and len(obs_df_sorted) > CAP:
+    print(f"⚠️  Downsampling metadata from {len(obs_df_sorted):,} to {CAP:,} cells (contiguous slice)...")
+    obs_df_sub = obs_df_sorted.head(CAP)
 else:
+    print(f"✅ Downloading all available cells ({len(obs_df_sorted):,})...")
     obs_df_sub = obs_df_sorted.copy()
 
 target_cell_ids = obs_df_sub['soma_joinid'].tolist()
