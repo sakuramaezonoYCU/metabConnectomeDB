@@ -65,52 +65,90 @@ def process_species(species: str, in_file):
         return
 
     df = pd.read_csv(in_file)
-        # ------------------------------------------------------------------
-    # Step 1 — Fill missing HMDB_ID via name lookup (for within file)
-    # ------------------------------------------------------------------
-    # --- build mapping from valid rows ---
-    mapping_df = df[['Metabolite_Name', 'HMDB_ID']].dropna()
-
-    # ensure unique mapping (drop duplicates if any)
-    mapping_df = mapping_df.drop_duplicates(subset='Metabolite_Name')
-
-    name_to_hmdb = dict(zip(mapping_df['Metabolite_Name'],
-                            mapping_df['HMDB_ID']))
-
-    # --- fill missing HMDB_ID using Metabolite_Name ---
-    mask = df['HMDB_ID'].isna() & df['Metabolite_Name'].notna()
-
-    df.loc[mask, 'HMDB_ID'] = df.loc[mask, 'Metabolite_Name'].map(name_to_hmdb)
-   # ------------------------------------------------------------------
-
-    
-    print(f"\n--- {species.capitalize()} ---")
+    print(f"\n--- {species.capitalize()} ({'Target Pairs' if 'target_pairs' in in_file else 'Unique Metabolites'}) ---")
     print(f"  Input rows: {len(df):,} | Missing HMDB_ID: {df['HMDB_ID'].isna().sum()}")
 
-    # ------------------------------------------------------------------
-    # Step 1 — Fill missing HMDB_ID via name lookup
-    # ------------------------------------------------------------------
-    def fill_hmdb_id(row):
-        if pd.notna(row['HMDB_ID']):
-            return row['HMDB_ID']
-        key = str(row['Metabolite_Name']).lower().strip()
-        return lookup_map.get(key, None)
+    # Normalize Metabolite_Name
+    if 'Metabolite_Name' in df.columns:
+        df['Metabolite_Name'] = df['Metabolite_Name'].astype(str).str.strip().str.lower()
 
-    df['HMDB_ID'] = df.apply(fill_hmdb_id, axis=1)
-    still_missing = df['HMDB_ID'].isna().sum()
-    filled = df['HMDB_ID'].notna().sum()
-    print(f"  After name-match fill → {filled:,} with HMDB_ID, {still_missing:,} still missing")
+    if "target_pairs" in in_file:
+        # Load the completed unique metabolite reference file (which was processed first)
+        ref_file = in_file.replace("_unique_metab_target_pairs.csv", "_unique_metab_with_HMDB_Info.csv")
+        if os.path.exists(ref_file):
+            print(f"  Mapping HMDB_IDs directly from clean reference file: {os.path.basename(ref_file)}...")
+            df_ref = pd.read_csv(ref_file)
+            df_ref['clean_name'] = df_ref['Metabolite_Name'].astype(str).str.lower().str.strip()
+            
+            # Map each clean name to its list of HMDB_IDs from the reference
+            ref_map = df_ref.dropna(subset=['HMDB_ID']).groupby('clean_name')['HMDB_ID'].apply(lambda x: sorted(list(set(x)))).to_dict()
+            
+            # Clean up target pair names and map
+            df['clean_name'] = df['Metabolite_Name'].astype(str).str.lower().str.strip()
+            df['HMDB_ID'] = df['clean_name'].map(ref_map)
+            
+            # For any missing/unmapped, fall back to lookup_map
+            def fallback_id(row):
+                val = row['HMDB_ID']
+                if isinstance(val, list) and len(val) > 0:
+                    return val
+                lk = lookup_map.get(row['clean_name'])
+                if lk:
+                    # Clean/split pipe or commas
+                    cleaned_lk = [h.strip() for h in str(lk).replace('|', ',').split(',') if h.strip() and h.strip() != 'nan']
+                    return cleaned_lk if cleaned_lk else [None]
+                return [None]
+                
+            df['HMDB_ID'] = df.apply(fallback_id, axis=1)
+            df = df.explode('HMDB_ID').reset_index(drop=True)
+            df = df.drop(columns=['clean_name'])
+            print(f"  After mapping and exploding target pair HMDB_IDs: {len(df):,} rows")
+        else:
+            print("  [WARNING] Reference file not found. Running fallback name-match explode...")
+            # Original name-match fill
+            def fill_hmdb_id(row):
+                if pd.notna(row['HMDB_ID']):
+                    # clean any pipe characters
+                    return str(row['HMDB_ID']).replace('|', ',')
+                key = str(row['Metabolite_Name']).lower().strip()
+                return lookup_map.get(key, None)
 
-    # ------------------------------------------------------------------
-    # Step 2 — Explode rows with multiple comma-separated HMDB_IDs
-    # ------------------------------------------------------------------
-    df['HMDB_ID'] = df['HMDB_ID'].apply(
-        lambda x: [h.strip() for h in str(x).split(',') if h.strip() != 'nan'] if pd.notna(x) else [None]
-    )
-    df = df.explode('HMDB_ID').reset_index(drop=True)
-    # Normalise empty strings back to NaN
+            df['HMDB_ID'] = df.apply(fill_hmdb_id, axis=1)
+            df['HMDB_ID'] = df['HMDB_ID'].apply(
+                lambda x: [h.strip() for h in str(x).replace('|', ',').split(',') if h.strip() != 'nan'] if pd.notna(x) else [None]
+            )
+            df = df.explode('HMDB_ID').reset_index(drop=True)
+    else:
+        # 1. Fill missing HMDB_ID using Metabolite_Name from name_to_hmdb within the file itself
+        mapping_df = df[['Metabolite_Name', 'HMDB_ID']].dropna()
+        mapping_df = mapping_df.drop_duplicates(subset='Metabolite_Name')
+        name_to_hmdb = dict(zip(mapping_df['Metabolite_Name'].astype(str).str.lower().str.strip(),
+                                mapping_df['HMDB_ID']))
+
+        mask = df['HMDB_ID'].isna() & df['Metabolite_Name'].notna()
+        df.loc[mask, 'HMDB_ID'] = df.loc[mask, 'Metabolite_Name'].map(name_to_hmdb)
+
+        # 2. Fill remaining via name lookup (lookup_map)
+        def fill_hmdb_id(row):
+            if pd.notna(row['HMDB_ID']):
+                return str(row['HMDB_ID']).replace('|', ',')
+            key = str(row['Metabolite_Name']).lower().strip()
+            return lookup_map.get(key, None)
+
+        df['HMDB_ID'] = df.apply(fill_hmdb_id, axis=1)
+        still_missing = df['HMDB_ID'].isna().sum()
+        filled = df['HMDB_ID'].notna().sum()
+        print(f"  After name-match fill → {filled:,} with HMDB_ID, {still_missing:,} still missing")
+
+        # 3. Explode rows with multiple comma-separated HMDB_IDs
+        df['HMDB_ID'] = df['HMDB_ID'].apply(
+            lambda x: [h.strip() for h in str(x).replace('|', ',').split(',') if h.strip() != 'nan'] if pd.notna(x) else [None]
+        )
+        df = df.explode('HMDB_ID').reset_index(drop=True)
+
+    # Normalize empty strings back to NaN
     df['HMDB_ID'] = df['HMDB_ID'].replace('', None)
-    print(f"  After HMDB_ID explode: {len(df):,} rows")
+    print(f"  After HMDB_ID clean/explode: {len(df):,} rows")
 
     # ------------------------------------------------------------------
     # Step 3 — Left-join full HMDB annotations by HMDB_ID

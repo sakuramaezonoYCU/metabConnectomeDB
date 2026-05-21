@@ -3,3 +3,9 @@ numpy
 matplotlib
 seaborn
 ipykernel
+scanpy
+anndata
+cellxgene-census
+liana
+ipywidgets
+plotly

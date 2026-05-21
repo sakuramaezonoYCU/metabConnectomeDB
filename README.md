@@ -8,15 +8,20 @@ This repository processes and merges multiple metabolite and protein databases (
 metabConnectomeDB/
 ├── scripts/                            # Pipeline scripts and utilities
 │   ├── annotate_with_hmdb.py
+│   ├── execute_and_export_notebooks.py # Exports notebooks to styled HTML reports
+│   ├── generate_cellxgene_notebook.py  # Dynamically generates the CellxGene notebook
 │   ├── generate_final_outputs.py
-│   ├── merge_dbs.py
 │   ├── merge_dbs_claude.py
 │   ├── merge_simplify_annotate.sh
+│   ├── standardize_categories.py       # Standardizes metabolite classifications
 │   ├── unique_metab_data_exploration.ipynb        # Unique metabolite EDA
-│   └── metab_targetPair_analysis.ipynb            # Metabolite-Target pair analysis
+│   ├── metab_targetPair_analysis.ipynb            # Metabolite-Target pair analysis
+│   └── cancer_cellxgene_integration.ipynb         # CellxGene cancer scRNA-seq integration
 ├── input/                              # Main data directory
-│   └── databases/                      # Raw database sources
-├── output/                             # Consolidated output CSV files
+│   ├── databases/                      # Raw database sources
+│   ├── subclass_mapping.csv            # Mapping dictionary for metabolite subclasses
+│   └── superclass_mapping.csv          # Mapping dictionary for metabolite superclasses
+├── output/                             # Consolidated output CSV files and HTML reports
 ├── environment.yml                     # Conda environment definition
 ├── requirements.txt                    # Pip requirements definition
 └── README.md                           # This documentation
@@ -40,6 +45,16 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
+
+**⚠️ Environment Troubleshooting (Miniconda):**
+
+If you encounter a `ModuleNotFoundError: No module named 'encodings'` error when using Miniconda, your Python installation may be corrupted. Fix with:
+
+```bash
+conda install --force-reinstall python=3.12
+```
+
+Or reinstall Miniconda entirely. The `venv` approach above is a reliable alternative.
 
 ## 📜 Scripts Overview
 
@@ -99,6 +114,20 @@ The following details the relationship between scripts, their inputs, internal p
 - **Input:** `output/human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv`
 - **Functionality:** Investigates the interactions and provides a provenance breakdown of annotations like Disease and Cell Type (primarily from MRCLinkDB).
 
+### `cancer_cellxgene_integration.ipynb`
+
+- **Role:** Bridges MetabConnectomeDB metabolite-target gene pairs with cancer scRNA-seq data from [CellxGene Census](https://cellxgene.cziscience.com/datasets).
+- **Input:** `output/human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv`
+- **Dependencies:** `cellxgene-census`, `scanpy`, `anndata`, `liana` (install via `pip install -r requirements.txt`)
+- **Functionality:**
+  - Parameterized filtering by disease, tissue, and organism (`DISEASE_FILTER`, `TISSUE_FILTER`, `ORGANISM`)
+  - CellxGene Census metadata exploration & scRNA-seq data retrieval
+  - Cell-type-resolved target gene expression analysis
+  - Metabolite-target communication potential mapping
+  - Intercellular signaling network inference using **LIANA+** (ligand-receptor analysis framework)
+  - Cancer pathway-level analysis (IDO1/Kynurenine, xCT/Glutamate, CD73/Adenosine, etc.)
+  - All analysis sections include interpretive markdown cells linking findings to cancer biology
+
 ### `merge_dbs.py`, `test_merge.py`, `test_script.py`
 
 - **Role:** Legacy scripts or scratchpads used for testing specific functionality.
@@ -115,8 +144,8 @@ A critical aspect of this unified database is the tracking of metadata provenanc
 
 The repository is configured to exclude large data directories:
 
-- `input/`: Contains raw database files.
-- `output/`: Contains generated CSV results.
+- `input/`: Contains raw database files (CSVs tracked explicitly).
+- `output/`: Contains generated CSV results (ignored) and rendered HTML reports (tracked).
 - `venv/`, `__pycache__/`, `.ipynb_checkpoints/`: Local environment artifacts.
 
 Ensure that the `input/` directory is populated locally before running the pipeline.

@@ -32,26 +32,26 @@ def simple_markdown_to_html(md_text):
             if in_list:
                 html_lines.append('</ul>')
                 in_list = False
-            html_lines.append(f'<h3 style="color:#93c5fd;font-size:1.4rem;margin-top:20px;font-weight:600;">{stripped[3:].strip()}</h3>')
+            html_lines.append(f'<h3 style="color:#0f172a;font-size:1.3rem;margin-top:20px;font-weight:600;">{stripped[3:].strip()}</h3>')
         elif stripped.startswith('##'):
             if in_list:
                 html_lines.append('</ul>')
                 in_list = False
-            html_lines.append(f'<h2 style="color:#60a5fa;font-size:1.8rem;margin-top:30px;border-bottom:1px solid #334155;padding-bottom:8px;font-weight:600;">{stripped[2:].strip()}</h2>')
+            html_lines.append(f'<h2 style="color:#1e293b;font-size:1.6rem;margin-top:30px;border-bottom:1px solid #e2e8f0;padding-bottom:8px;font-weight:600;">{stripped[2:].strip()}</h2>')
         elif stripped.startswith('#'):
             if in_list:
                 html_lines.append('</ul>')
                 in_list = False
-            html_lines.append(f'<h1 style="color:#3b82f6;font-size:2.2rem;margin-top:40px;margin-bottom:15px;font-weight:700;">{stripped[1:].strip()}</h1>')
+            html_lines.append(f'<h1 style="color:#0f172a;font-size:2.0rem;margin-top:40px;margin-bottom:15px;font-weight:700;">{stripped[1:].strip()}</h1>')
         # Lists
         elif stripped.startswith('-') or stripped.startswith('*'):
             if not in_list:
-                html_lines.append('<ul style="margin-left:20px;padding-left:10px;line-height:1.7;color:#d1d5db;">')
+                html_lines.append('<ul style="margin-left:20px;padding-left:10px;line-height:1.7;color:#334155;">')
                 in_list = True
             # Parse list item bold and inline code
             item_text = stripped[1:].strip()
             item_text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', item_text)
-            item_text = re.sub(r'`(.*?)`', r'<code style="background:#1e293b;padding:2px 5px;border-radius:4px;font-family:\'Fira Code\',monospace;font-size:0.9em;color:#f43f5e;">\1</code>', item_text)
+            item_text = re.sub(r'`(.*?)`', r'<code style="background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 5px;border-radius:4px;font-family:\'Fira Code\',monospace;font-size:0.9em;color:#b91c1c;">\1</code>', item_text)
             html_lines.append(f'<li style="margin-bottom:6px;">{item_text}</li>')
         else:
             if in_list:
@@ -62,8 +62,8 @@ def simple_markdown_to_html(md_text):
                 # Regular paragraph text
                 item_text = line
                 item_text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', item_text)
-                item_text = re.sub(r'`(.*?)`', r'<code style="background:#1e293b;padding:2px 5px;border-radius:4px;font-family:\'Fira Code\',monospace;font-size:0.9em;color:#f43f5e;">\1</code>', item_text)
-                html_lines.append(f'<p style="margin-bottom:15px;color:#d1d5db;line-height:1.7;">{item_text}</p>')
+                item_text = re.sub(r'`(.*?)`', r'<code style="background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 5px;border-radius:4px;font-family:\'Fira Code\',monospace;font-size:0.9em;color:#b91c1c;">\1</code>', item_text)
+                html_lines.append(f'<p style="margin-bottom:15px;color:#334155;line-height:1.7;">{item_text}</p>')
             else:
                 html_lines.append('<div style="height:10px;"></div>')
                 
@@ -78,83 +78,75 @@ def export_to_gorgeous_html(nb, html_path, title_text):
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title_text} - Premium Report</title>
+    <title>{title_text} - Standard Report</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <style>
         body {{
             font-family: 'Inter', sans-serif;
             line-height: 1.6;
-            color: #e2e8f0;
-            background-color: #0f172a;
+            color: #334155;
+            background-color: #f8fafc;
             margin: 0;
             padding: 0;
         }}
         .container {{
-            max-width: 1200px;
+            max-width: 1100px;
             margin: 0 auto;
             padding: 40px 20px;
         }}
         .header {{
-            border-bottom: 1px solid #334155;
+            border-bottom: 1px solid #e2e8f0;
             padding-bottom: 30px;
             margin-bottom: 40px;
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            background: #ffffff;
             padding: 30px;
-            border-radius: 16px;
-            border: 1px solid #334155;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }}
         .header h1 {{
-            font-size: 2.8rem;
-            color: #3b82f6;
+            font-size: 2.4rem;
+            color: #0f172a;
             margin: 0 0 12px 0;
             font-weight: 800;
             letter-spacing: -0.025em;
         }}
         .header p {{
-            font-size: 1.2rem;
-            color: #94a3b8;
+            font-size: 1.1rem;
+            color: #64748b;
             margin: 0 0 15px 0;
         }}
         .badge {{
             display: inline-block;
-            background: rgba(59, 130, 246, 0.2);
-            color: #60a5fa;
+            background: #eff6ff;
+            color: #1d4ed8;
             padding: 6px 14px;
             border-radius: 9999px;
             font-size: 0.85rem;
             font-weight: 600;
-            border: 1px solid rgba(59, 130, 246, 0.3);
+            border: 1px solid #bfdbfe;
         }}
         .cell {{
-            background: #1e293b;
-            border-radius: 16px;
-            padding: 28px;
-            margin-bottom: 35px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            border: 1px solid #334155;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }}
-        .cell:hover {{
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 30px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
         }}
         .cell.markdown {{
             background: transparent;
             border: none;
             box-shadow: none;
             padding: 0 12px;
-            margin-bottom: 25px;
-        }}
-        .cell.markdown:hover {{
-            transform: none;
-            box-shadow: none;
+            margin-bottom: 20px;
         }}
         pre.code-block {{
-            background: #090d16;
-            padding: 20px;
-            border-radius: 10px;
+            background: #f8fafc;
+            padding: 16px;
+            border-radius: 8px;
             overflow-x: auto;
-            border: 1px solid #1e293b;
+            border: 1px solid #e2e8f0;
             margin: 0 0 20px 0;
             position: relative;
         }}
@@ -164,18 +156,18 @@ def export_to_gorgeous_html(nb, html_path, title_text):
             top: 8px;
             right: 12px;
             font-size: 0.7rem;
-            color: #475569;
+            color: #94a3b8;
             font-weight: 700;
             letter-spacing: 0.05em;
         }}
         code.python {{
             font-family: 'Fira Code', monospace;
             font-size: 0.95rem;
-            color: #38bdf8;
+            color: #0f172a;
         }}
         .output-container {{
             margin-top: 20px;
-            border-top: 1px solid #334155;
+            border-top: 1px solid #e2e8f0;
             padding-top: 20px;
         }}
         .output-title {{
@@ -187,19 +179,20 @@ def export_to_gorgeous_html(nb, html_path, title_text):
             font-weight: 700;
         }}
         .output-stream {{
-            background: #020617;
-            padding: 18px;
+            background: #f8fafc;
+            padding: 16px;
             border-radius: 8px;
             font-family: 'Fira Code', monospace;
             font-size: 0.9rem;
-            color: #10b981;
+            color: #0f172a;
             white-space: pre-wrap;
             border-left: 4px solid #10b981;
             margin-bottom: 15px;
-            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+            border: 1px solid #e2e8f0;
+            border-left-width: 4px;
         }}
         .output-stderr {{
-            background: #1c0e15;
+            background: #fef2f2;
             color: #ef4444;
             border-left-color: #ef4444;
         }}
@@ -207,43 +200,43 @@ def export_to_gorgeous_html(nb, html_path, title_text):
             text-align: center;
             margin: 25px 0;
             padding: 15px;
-            background: #0f172a;
+            background: #ffffff;
             border-radius: 12px;
-            border: 1px solid #1e293b;
+            border: 1px solid #e2e8f0;
         }}
         .output-image img {{
             max-width: 100%;
             border-radius: 8px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }}
         .output-html {{
             overflow-x: auto;
             margin: 15px 0;
-            background: #0f172a;
+            background: #ffffff;
             padding: 10px;
             border-radius: 8px;
-            border: 1px solid #334155;
+            border: 1px solid #e2e8f0;
         }}
         table.dataframe {{
             width: 100%;
             border-collapse: collapse;
             font-size: 0.9rem;
             min-width: 400px;
-            color: #cbd5e1;
+            color: #334155;
         }}
         table.dataframe th, table.dataframe td {{
             padding: 12px 16px;
             text-align: left;
-            border-bottom: 1px solid #1e293b;
+            border-bottom: 1px solid #e2e8f0;
         }}
         table.dataframe th {{
-            background-color: #1e293b;
-            color: #60a5fa;
+            background-color: #f1f5f9;
+            color: #0f172a;
             font-weight: 600;
-            border-bottom: 2px solid #334155;
+            border-bottom: 2px solid #cbd5e1;
         }}
         table.dataframe tr:hover {{
-            background-color: #1e293b;
+            background-color: #f8fafc;
         }}
     </style>
 </head>
@@ -306,14 +299,22 @@ def export_to_gorgeous_html(nb, html_path, title_text):
         f.write(html_content)
 
 def execute_and_export(notebook_path, html_path, title_text):
+    notebook_path = os.path.abspath(notebook_path)
+    html_path = os.path.abspath(html_path)
     print(f"🚀 Running execution and report generation for {os.path.basename(notebook_path)}...")
     
     with open(notebook_path, 'r', encoding='utf-8') as f:
         nb = json.load(f)
         
+    try:
+        from IPython.display import display
+    except ImportError:
+        display = print
+
     global_dict = {
         '__name__': '__main__',
         'plt': plt,
+        'display': display,
         'SAVE_AS_HTML': False, # Avoid nested nbconvert subprocess calls!
     }
     
@@ -414,9 +415,22 @@ def execute_and_export(notebook_path, html_path, title_text):
         with open(notebook_path, 'w', encoding='utf-8') as f:
             json.dump(nb, f, indent=1)
             
-        # Export report to gorgeous, style-preserved premium HTML
-        export_to_gorgeous_html(nb, html_path, title_text)
-        print(f"🎉 Successfully saved and exported {os.path.basename(notebook_path)} to {html_path}\n")
+        # Export report
+        # First, try to use standard jupyter nbconvert subprocess to get native Jupyter-style HTML
+        import subprocess
+        print(f"Trying to export {os.path.basename(notebook_path)} using standard jupyter nbconvert...")
+        cmd_html = [
+            'jupyter', 'nbconvert', '--to', 'html', 
+            notebook_path, '--output', html_path
+        ]
+        res_html = subprocess.run(cmd_html, capture_output=True, text=True)
+        if res_html.returncode == 0:
+            print(f"🎉 SUCCESS: Standard jupyter nbconvert successfully exported the report!")
+        else:
+            print(f"⚠️ Standard jupyter nbconvert export failed (likely due to environment/sandbox restrictions).")
+            print(f"   Falling back to clean, standard-styled manual HTML export...")
+            export_to_gorgeous_html(nb, html_path, title_text)
+            print(f"🎉 Successfully saved and exported {os.path.basename(notebook_path)} to {html_path}\n")
         
     finally:
         os.chdir(original_dir)
@@ -431,3 +445,8 @@ if __name__ == '__main__':
     pair_analysis_nb = os.path.join(script_dir, "metab_targetPair_analysis.ipynb")
     pair_analysis_html = os.path.join(os.path.dirname(script_dir), "output", "metab_targetPair_analysis_full_report.html")
     execute_and_export(pair_analysis_nb, pair_analysis_html, "Metabolite-Target Interaction Pair Analysis")
+
+    cellxgene_nb = os.path.join(script_dir, "cancer_cellxgene_integration.ipynb")
+    cellxgene_html = os.path.join(os.path.dirname(script_dir), "output", "cancer_cellxgene_integration_full_report.html")
+    execute_and_export(cellxgene_nb, cellxgene_html, "CellxGene Single-Cell Integration Analysis")
+    

@@ -12,7 +12,7 @@ import numpy as np
 
 # Dynamically load the mapping dictionary for Super_Class
 SUPERCLASS_UNIFICATION_MAP = {}
-superclass_csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'superclass_mapping.csv')
+superclass_csv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'input', 'superclass_mapping.csv')
 
 try:
     if os.path.exists(superclass_csv_path):
@@ -30,7 +30,7 @@ except Exception as e:
 
 # Dynamically load the mapping dictionary for Sub_Class
 SUBCLASS_UNIFICATION_MAP = {}
-subclass_csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'subclass_mapping.csv')
+subclass_csv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'input', 'subclass_mapping.csv')
 
 try:
     if os.path.exists(subclass_csv_path):
