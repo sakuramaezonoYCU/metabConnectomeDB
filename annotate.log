@@ -1,0 +1,166 @@
+================================================================================
+🧬 Starting metabConnectomeDB Annotation Enrichment Pipeline (Enhanced Version)...
+================================================================================
+-> Using cached Guide to Pharmacology mapping at 'input/GtP_to_HGNC_mapping.csv'.
+-> Using cached Guide to Pharmacology targets at 'input/guidetopharmacology_targets.json'.
+-> Using cached HGNC Approved genes at 'input/hgnc_approved_genes.json'.
+Scanning master target-pair files to extract unique target symbols...
+  Reading symbols from: 'input/databases/human_database_merge_unique_metab_target_pairs.csv'
+  Reading symbols from: 'input/databases/human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'
+  Reading symbols from: 'input/databases/mouse_database_merge_unique_metab_target_pairs.csv'
+  Reading symbols from: 'input/databases/mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'
+  Reading symbols from: 'output/human_database_merge_unique_metab_target_pairs.csv'
+  Reading symbols from: 'output/human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'
+  Reading symbols from: 'output/mouse_database_merge_unique_metab_target_pairs.csv'
+  Reading symbols from: 'output/mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'
+-> Extracted 2,044 unique individual target gene symbols.
+Loaded existing UniProt cache with 2,099 gene records.
+-> All target gene symbols are already cached in UniProt cache!
+Loading database lookup mappings...
+  Loaded Guide to Pharmacology target lookups for 2,979 symbols.
+  Loaded Guide to Pharmacology interactions for 2,044 symbols.
+  Loaded HGNC Approved gene lookups for 44,989 symbols.
+Running Rhea enzyme product/substrate enrichment pipeline...
+================================================================================
+🧪 Starting Rhea + UniProt Enzyme Product/Substrate Enrichment Pipeline...
+================================================================================
+
+📊 Step 0: Scanning all target-pair files for unique identifiers...
+  Found 487 unique HMDB IDs and 4035 unique targets across 8 files.
+
+🔗 Step 1: Building HMDB → ChEBI mapping via BridgeDb...
+  -> All 487 HMDB IDs already cached in ChEBI mapping.
+
+🧬 Step 2: Fetching UniProt catalytic activities...
+  1756/4035 targets have UniProt accessions cached.
+  -> All 1756 symbols already cached in catalytic activity cache.
+
+⚗️ Step 3: Resolving Rhea reaction directionality...
+  Found 903 unique Rhea reaction IDs to resolve.
+  -> All 903 Rhea reactions already cached.
+
+🎯 Step 4: Applying Rhea enzyme product/substrate annotations...
+
+  Processing: 'human_database_merge_unique_metab_target_pairs.csv' (Homo sapiens)...
+    -> Rhea annotations: 29/8373 pairs (0.35%)
+
+  Processing: 'human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv' (Homo sapiens)...
+    -> Rhea annotations: 54/9079 pairs (0.59%)
+
+  Processing: 'mouse_database_merge_unique_metab_target_pairs.csv' (Mus musculus)...
+    -> Rhea annotations: 29/8336 pairs (0.35%)
+
+  Processing: 'mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv' (Mus musculus)...
+    -> Rhea annotations: 53/9150 pairs (0.58%)
+
+  Processing: 'human_database_merge_unique_metab_target_pairs.csv' (Homo sapiens)...
+    -> Rhea annotations: 29/8534 pairs (0.34%)
+
+  Processing: 'human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv' (Homo sapiens)...
+    -> Rhea annotations: 54/8596 pairs (0.63%)
+
+  Processing: 'mouse_database_merge_unique_metab_target_pairs.csv' (Mus musculus)...
+    -> Rhea annotations: 0/8491 pairs (0.00%)
+
+  Processing: 'mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv' (Mus musculus)...
+    -> Rhea annotations: 0/8550 pairs (0.00%)
+
+================================================================================
+🎉 Rhea enrichment pipeline complete!
+================================================================================
+Running KEGG enzyme product/substrate enrichment pipeline...
+================================================================================
+🧪 Starting KEGG Enzyme Product/Substrate Enrichment Pipeline...
+================================================================================
+\n📊 Step 1: Loading required caches...
+\n🔗 Step 2: Loading KEGG bulk mappings...
+    Reading /Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/input/databases/kegg_hsa_uniprot.txt...
+    Reading /Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/input/databases/kegg_mmu_uniprot.txt...
+    Reading /Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/input/databases/kegg_hsa_ec.txt...
+    Reading /Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/input/databases/kegg_mmu_ec.txt...
+    Reading /Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/input/databases/kegg_ec_rn.txt...
+    Reading /Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/input/databases/kegg_cpd_chebi.txt...
+\n🧬 Step 3: Mapping Target Symbols to KEGG Reactions...
+  Mapped 0 target symbols to 0 unique KEGG reactions.
+\n⚗️ Step 4: Fetching KEGG Reaction definitions...
+  -> All KEGG reactions already cached.
+\n🎯 Step 5: Applying KEGG enzyme product/substrate annotations...
+\n  Processing: 'human_database_merge_unique_metab_target_pairs.csv'...
+/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/scripts/annotate_enzyme_kegg.py:210: DtypeWarning: Columns (26,27,28,29,30,31,32,33,35,36,37,38,43,44,50,82) have mixed types. Specify dtype option on import or set low_memory=False.
+  df = pd.read_csv(fpath)
+\n  Processing: 'human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'...
+/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/scripts/annotate_enzyme_kegg.py:210: DtypeWarning: Columns (30,36,37,44,50) have mixed types. Specify dtype option on import or set low_memory=False.
+  df = pd.read_csv(fpath)
+\n  Processing: 'mouse_database_merge_unique_metab_target_pairs.csv'...
+/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/scripts/annotate_enzyme_kegg.py:210: DtypeWarning: Columns (27,28,35) have mixed types. Specify dtype option on import or set low_memory=False.
+  df = pd.read_csv(fpath)
+\n  Processing: 'mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'...
+/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/scripts/annotate_enzyme_kegg.py:210: DtypeWarning: Columns (28,35) have mixed types. Specify dtype option on import or set low_memory=False.
+  df = pd.read_csv(fpath)
+\n  Processing: 'human_database_merge_unique_metab_target_pairs.csv'...
+/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/scripts/annotate_enzyme_kegg.py:210: DtypeWarning: Columns (37,39,40,45,46,47,54,55,56,61,94) have mixed types. Specify dtype option on import or set low_memory=False.
+  df = pd.read_csv(fpath)
+\n  Processing: 'human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'...
+/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/scripts/annotate_enzyme_kegg.py:210: DtypeWarning: Columns (37,39,40,45,46,47,54,56,61,100) have mixed types. Specify dtype option on import or set low_memory=False.
+  df = pd.read_csv(fpath)
+\n  Processing: 'mouse_database_merge_unique_metab_target_pairs.csv'...
+/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/scripts/annotate_enzyme_kegg.py:210: DtypeWarning: Columns (3,5,6,9,10,11,12,13,14,15,18,19,20,28,30,31,37,38,40,41,42,43,44,45,46,47,48,49,50,59,65,67) have mixed types. Specify dtype option on import or set low_memory=False.
+  df = pd.read_csv(fpath)
+\n  Processing: 'mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'...
+/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/scripts/annotate_enzyme_kegg.py:210: DtypeWarning: Columns (28,31,37) have mixed types. Specify dtype option on import or set low_memory=False.
+  df = pd.read_csv(fpath)
+\n================================================================================
+🎉 KEGG enrichment pipeline complete!
+================================================================================
+Processing and overwriting master datasets...
+Enriching master dataset: 'input/databases/human_database_merge_unique_metab_target_pairs.csv'...
+  Annotation Coverage stats:
+    Unified Sensor_Type: 7469/8373 (89.20%)
+    Unified enzyme: 647/8373 (7.73%)
+    Unified Interaction: 744/8373 (8.89%)
+  Successfully overwrote: 'input/databases/human_database_merge_unique_metab_target_pairs.csv'
+Enriching master dataset: 'input/databases/human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'...
+  Annotation Coverage stats:
+    Unified Sensor_Type: 8059/9079 (88.77%)
+    Unified enzyme: 672/9079 (7.40%)
+    Unified Interaction: 747/9079 (8.23%)
+  Successfully overwrote: 'input/databases/human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'
+Enriching master dataset: 'input/databases/mouse_database_merge_unique_metab_target_pairs.csv'...
+  Annotation Coverage stats:
+    Unified Sensor_Type: 6880/8336 (82.53%)
+    Unified enzyme: 520/8336 (6.24%)
+    Unified Interaction: 746/8336 (8.95%)
+  Successfully overwrote: 'input/databases/mouse_database_merge_unique_metab_target_pairs.csv'
+Enriching master dataset: 'input/databases/mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'...
+  Annotation Coverage stats:
+    Unified Sensor_Type: 7444/9150 (81.36%)
+    Unified enzyme: 544/9150 (5.95%)
+    Unified Interaction: 749/9150 (8.19%)
+  Successfully overwrote: 'input/databases/mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'
+Enriching master dataset: 'output/human_database_merge_unique_metab_target_pairs.csv'...
+  Annotation Coverage stats:
+    Unified Sensor_Type: 7628/8534 (89.38%)
+    Unified enzyme: 647/8534 (7.58%)
+    Unified Interaction: 814/8534 (9.54%)
+  Successfully overwrote: 'output/human_database_merge_unique_metab_target_pairs.csv'
+Enriching master dataset: 'output/human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'...
+  Annotation Coverage stats:
+    Unified Sensor_Type: 7676/8596 (89.30%)
+    Unified enzyme: 680/8596 (7.91%)
+    Unified Interaction: 823/8596 (9.57%)
+  Successfully overwrote: 'output/human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'
+Enriching master dataset: 'output/mouse_database_merge_unique_metab_target_pairs.csv'...
+  Annotation Coverage stats:
+    Unified Sensor_Type: 7035/8491 (82.85%)
+    Unified enzyme: 507/8491 (5.97%)
+    Unified Interaction: 782/8491 (9.21%)
+  Successfully overwrote: 'output/mouse_database_merge_unique_metab_target_pairs.csv'
+Enriching master dataset: 'output/mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'...
+  Annotation Coverage stats:
+    Unified Sensor_Type: 7089/8550 (82.91%)
+    Unified enzyme: 511/8550 (5.98%)
+    Unified Interaction: 791/8550 (9.25%)
+  Successfully overwrote: 'output/mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'
+================================================================================
+🎉 metabConnectomeDB target-pair databases successfully enriched!
+================================================================================

@@ -16,7 +16,7 @@ Based on the recent pipeline expansion, particularly the development of the mult
 
 Based on the multi-modal pipeline (scRNA-seq, LIANA+, metabolic databases) and the analytic framework you have developed, here are high-impact research questions you are uniquely positioned to answer:
 
-1. **Can metabolic "dark matter" interactions predict immune evasion across tumor types?**
+1. **Can orphan metabolic interactions predict immune evasion across tumor types?**
    *Approach:* Systematically cross-reference the ~8,000 "Tier 2/3" (computationally predicted, literature-sparse) metabolic pairs against the CD8+ T-cell and Regulatory B-cell subsets in your LIANA+ networks.
    *Goal:* Identify whether metastatic tumors consistently upregulate uncharacterized metabolic ligands to silence specific immune populations, revealing novel, unpatented immune-checkpoints.
 
@@ -47,7 +47,7 @@ Based on a comprehensive review of your generated outputs and the pipeline archi
 ### 1. NOVEL FINDINGS
 Identifying what extends, contradicts, or represents new discoveries in cancer metabolism literature.
 
-The "Dark Matter" of Metabolic Communication: The most striking finding is your PubMed/literature temporal analysis. Out of the 8,596 unique metabolite-target interaction pairs you consolidated, only 6.10% (524 pairs) have explicit literature evidence. The literature heavily biases toward "Tier 1" canonical axes (e.g., PGE2-EP receptors, Adenosine-A2AR, Kynurenine-AhR). This means your database has isolated over 8,000 computationally predicted, under-explored metabolic interactions in the TME, representing a massive reservoir of novel therapeutic targets.
+The "Orphan Metabolic Interactions" of Metabolic Communication: The most striking finding is your PubMed/literature temporal analysis. Out of the 8,596 unique metabolite-target interaction pairs you consolidated, only 6.10% (524 pairs) have explicit literature evidence. The literature heavily biases toward "Tier 1" canonical axes (e.g., PGE2-EP receptors, Adenosine-A2AR, Kynurenine-AhR). This means your database has isolated over 8,000 computationally predicted, under-explored metabolic interactions in the TME, representing a massive reservoir of novel therapeutic targets.
 
 Repurposing LIANA+ for Metabolomics: Traditional cell-cell communication (CCC) tools like CellPhoneDB and LIANA+ are exclusively designed for protein-protein (peptide ligand-receptor) interactions. By injecting your unified metabConnectomeDB target dictionary into LIANA+, you have successfully built a pipeline that infers metabolite-mediated intercellular communication directly from scRNA-seq data. This is a highly novel methodological leap that bridges spatial metabolomics and transcriptomics.
 
@@ -63,7 +63,7 @@ The "Directionality" Blind Spot: Your analysis revealed that 92% of enzyme-metab
 ### 2. CLINICAL IMPLICATIONS & NEXT STEPS
 How to translate these findings into actionable oncology research.
 
-Exploit the "Tier 2 & 3" Dark Matter: The 552 "Tier 2" pairs supported by 2-3 databases but lacking PubMed evidence are your lowest-hanging fruit. Cross-reference these specific pairs against your LIANA+ output for Lung and Breast cancer. If LIANA+ predicts a strong, highly specific signaling axis (e.g., Tumor -> Macrophage) utilizing a Tier 2 metabolite, you have identified a prime candidate for wet-lab validation or novel patenting.
+Exploit the "Tier 2 & 3" Orphan Metabolic Interactions: The 552 "Tier 2" pairs supported by 2-3 databases but lacking PubMed evidence are your lowest-hanging fruit. Cross-reference these specific pairs against your LIANA+ output for Lung and Breast cancer. If LIANA+ predicts a strong, highly specific signaling axis (e.g., Tumor -> Macrophage) utilizing a Tier 2 metabolite, you have identified a prime candidate for wet-lab validation or novel patenting.
 
 Integrate Spatial Transcriptomics: Because metabolite diffusion is strictly limited by mass and the extracellular matrix (as you identified in your MW analysis), standard scRNA-seq loses the spatial gradient. Your next step should be projecting these target genes onto spatial transcriptomic datasets (e.g., 10x Visium or Xenium) to see if the receptor expression physically correlates with necrotic cores (hypoxia/lactate) or the invasive margin.
 
