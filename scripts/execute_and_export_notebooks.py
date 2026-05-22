@@ -12,7 +12,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
-warnings.filterwarnings("ignore", category=UserWarning, message=".*FigureCanvasAgg is non-interactive.*")
+import warnings
+warnings.filterwarnings("ignore")
 
 
 def escape_html(text):
@@ -323,8 +324,8 @@ def execute_and_export(notebook_path, html_path, title_text):
     original_dir = os.getcwd()
     os.chdir(notebook_dir)
     
-    # Prepend venv/bin to PATH so execution contexts locate files properly
-    venv_bin = os.path.join(os.path.dirname(notebook_dir), 'venv', 'bin')
+    # Prepend active virtual environment bin directory to PATH so execution contexts locate files properly
+    venv_bin = os.path.dirname(sys.executable)
     if os.path.exists(venv_bin):
         os.environ['PATH'] = venv_bin + os.pathsep + os.environ.get('PATH', '')
         
@@ -340,6 +341,9 @@ def execute_and_export(notebook_path, html_path, title_text):
                     cleaned_lines.append(line)
                 
                 code = "".join(cleaned_lines)
+                # Force SAVE_AS_HTML to False during automated headless execution
+                # to prevent nested/redundant jupyter nbconvert subprocess calls.
+                code = re.sub(r'SAVE_AS_HTML\s*=\s*True', 'SAVE_AS_HTML = False', code)
                 if not code.strip():
                     cell['outputs'] = []
                     new_cells.append(cell)
@@ -415,14 +419,31 @@ def execute_and_export(notebook_path, html_path, title_text):
         with open(notebook_path, 'w', encoding='utf-8') as f:
             json.dump(nb, f, indent=1)
             
+        # Check if the notebook dynamically generated an h5ad_path we should base the HTML output on
+        if 'h5ad_path' in global_dict:
+            resolved_h5ad = global_dict['h5ad_path']
+            if not os.path.isabs(resolved_h5ad):
+                resolved_h5ad = os.path.abspath(os.path.join(notebook_dir, resolved_h5ad))
+            else:
+                resolved_h5ad = os.path.abspath(resolved_h5ad)
+            html_path = resolved_h5ad.replace('.h5ad', '.html')
+            print(f"💡 Dynamic h5ad_path detected: {global_dict['h5ad_path']}")
+            print(f"   Exporting HTML report to dynamic path: {html_path}")
+            
         # Export report
         # First, try to use standard jupyter nbconvert subprocess to get native Jupyter-style HTML
         import subprocess
         print(f"Trying to export {os.path.basename(notebook_path)} using standard jupyter nbconvert...")
+        # Construct path to the active virtual environment's jupyter binary
+        jupyter_bin = os.path.join(os.path.dirname(sys.executable), 'jupyter')
+        if not os.path.exists(jupyter_bin):
+            jupyter_bin = 'jupyter' # fallback to system path
+            
         cmd_html = [
-            'jupyter', 'nbconvert', '--to', 'html', 
+            jupyter_bin, 'nbconvert', '--to', 'html', 
             notebook_path, '--output', html_path
         ]
+
         res_html = subprocess.run(cmd_html, capture_output=True, text=True)
         if res_html.returncode == 0:
             print(f"🎉 SUCCESS: Standard jupyter nbconvert successfully exported the report!")
@@ -446,7 +467,8 @@ if __name__ == '__main__':
     pair_analysis_html = os.path.join(os.path.dirname(script_dir), "output", "metab_targetPair_analysis_full_report.html")
     execute_and_export(pair_analysis_nb, pair_analysis_html, "Metabolite-Target Interaction Pair Analysis")
 
-    cellxgene_nb = os.path.join(script_dir, "cancer_cellxgene_integration.ipynb")
-    cellxgene_html = os.path.join(os.path.dirname(script_dir), "output", "cancer_cellxgene_integration_full_report.html")
-    execute_and_export(cellxgene_nb, cellxgene_html, "CellxGene Single-Cell Integration Analysis")
+    # cellxgene_nb = os.path.join(script_dir, "cancer_cellxgene_integration.ipynb")
+    # cellxgene_html = os.path.join(os.path.dirname(script_dir), "output", "cancer_cellxgene_integration_full_report.html")
+    # execute_and_export(cellxgene_nb, cellxgene_html, "CellxGene Single-Cell Integration Analysis")
+
     

@@ -69,10 +69,12 @@ python -m ipykernel install --user --name metabConnectomeDB --display-name "Pyth
 To help manage your workflow, scripts are divided into **One-Time/Cached** (infrequently run) and **Recurring** (frequently run) categories.
 
 **One-Time / Cached Setup Scripts (Infrequent Execution):**
+
 - `annotate_enzyme_rhea.py`: Handles UniProt API lookups and Rhea SPARQL queries for enzyme product/substrate enrichment. Because it relies heavily on external APIs, it incrementally saves results to local JSON caches in the `input/` directory. Once the caches are built, this script finishes in seconds. You only need to manually delete the caches and re-run this completely if a massive new batch of target genes is introduced or if UniProt/Rhea data drastically updates.
 
 **Recurring Pipeline Scripts (Frequent Execution):**
 These scripts should be re-run whenever your raw input datasets change or when you tweak the database merging logic.
+
 - `merge_simplify_annotate.sh`: The master execution wrapper that sequentially runs the data processing steps.
 - `merge_dbs_claude.py`: Re-run whenever raw `.csv`/`.txt` data in `input/databases/` is added or modified.
 - `generate_final_outputs.py`: Re-run whenever the dataset filtering logic changes.
