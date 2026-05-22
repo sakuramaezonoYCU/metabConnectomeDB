@@ -16,7 +16,8 @@ metabConnectomeDB/
 │   ├── standardize_categories.py       # Standardizes metabolite classifications
 │   ├── unique_metab_data_exploration.ipynb        # Unique metabolite EDA
 │   ├── metab_targetPair_analysis.ipynb            # Metabolite-Target pair analysis
-│   └── cancer_cellxgene_integration.ipynb         # CellxGene cancer scRNA-seq integration
+│   ├── cancer_cellxgene_integration.ipynb         # CellxGene cancer scRNA-seq integration
+│   └── primary_vs_metastasis_comparison.ipynb     # Primary vs metastatic DE & signaling comparison
 ├── input/                              # Main data directory
 │   ├── databases/                      # Raw database sources
 │   ├── subclass_mapping.csv            # Mapping dictionary for metabolite subclasses
@@ -29,34 +30,57 @@ metabConnectomeDB/
 
 ## 🛠 Environment Setup
 
-To ensure reproducibility, you can set up the required Python environment using either Conda or `venv`.
+To ensure reproducibility and avoid issues with dependencies (like `cellxgene-census` which requires Python < 3.13) and cloud syncing, follow these setup guidelines:
 
-**Using Conda (Recommended):**
+> [!IMPORTANT]
+> **OneDrive Sync Warning:** Avoid creating your virtual environment (`venv`) inside the project folder if it is synced with OneDrive. Cloud storage providers intercept thousands of small Python library files, causing Jupyter Lab and scripts to hang indefinitely. Always create virtual environments in a local, unsynced folder like `~/venvs/`.
+
+**Using venv (Recommended - Python 3.12):**
+
+Since `cellxgene-census` requires Python 3.10–3.12, create the environment using a Python 3.12 executable (e.g., from Miniconda or Homebrew):
+
+```bash
+# Create the environment in a local unsynced folder
+python3.12 -m venv ~/venvs/metabConnectomeDB
+
+# Activate it
+source ~/venvs/metabConnectomeDB/bin/activate
+
+# Install requirements
+pip install --upgrade pip
+pip install -r requirements.txt
+pip install jupyterlab ipykernel
+
+# Register the kernel for Jupyter
+python -m ipykernel install --user --name metabConnectomeDB --display-name "Python 3.12 (metabConnectomeDB)"
+```
+
+**Using Conda:**
 
 ```bash
 conda env create -f environment.yml
 conda activate metabconnectome
+# Register the kernel for Jupyter
+python -m ipykernel install --user --name metabConnectomeDB --display-name "Python 3.12 (metabConnectomeDB)"
 ```
 
-**Using venv:**
+## ⏳ Pipeline Scripts & Execution Frequency
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+To help manage your workflow, scripts are divided into **One-Time/Cached** (infrequently run) and **Recurring** (frequently run) categories.
 
-**⚠️ Environment Troubleshooting (Miniconda):**
+**One-Time / Cached Setup Scripts (Infrequent Execution):**
+- `annotate_enzyme_rhea.py`: Handles UniProt API lookups and Rhea SPARQL queries for enzyme product/substrate enrichment. Because it relies heavily on external APIs, it incrementally saves results to local JSON caches in the `input/` directory. Once the caches are built, this script finishes in seconds. You only need to manually delete the caches and re-run this completely if a massive new batch of target genes is introduced or if UniProt/Rhea data drastically updates.
 
-If you encounter a `ModuleNotFoundError: No module named 'encodings'` error when using Miniconda, your Python installation may be corrupted. Fix with:
+**Recurring Pipeline Scripts (Frequent Execution):**
+These scripts should be re-run whenever your raw input datasets change or when you tweak the database merging logic.
+- `merge_simplify_annotate.sh`: The master execution wrapper that sequentially runs the data processing steps.
+- `merge_dbs_claude.py`: Re-run whenever raw `.csv`/`.txt` data in `input/databases/` is added or modified.
+- `generate_final_outputs.py`: Re-run whenever the dataset filtering logic changes.
+- `annotate_with_hmdb.py`: Re-run if you update the `HMDB_metabolites` reference dictionary.
+- `annotate_with_databases.py`: The final consolidation step. It rapidly triggers the Rhea enrichment (using the caches) and merges `OtherDB`, `Reactions`, `Rhea`, and `Guide to Pharmacology` into the final master CSV outputs. Re-run this whenever any upstream pipeline script changes the dataset.
+- `execute_and_export_notebooks.py`: Run at the very end of your workflow to automatically execute the Jupyter notebooks and export the updated `.html` reports to the `output/` folder.
 
-```bash
-conda install --force-reinstall python=3.12
-```
-
-Or reinstall Miniconda entirely. The `venv` approach above is a reliable alternative.
-
-## 📜 Scripts Overview
+## 📜 Detailed Scripts Overview
 
 The following details the relationship between scripts, their inputs, internal parameters, and expected outputs.
 
@@ -127,6 +151,23 @@ The following details the relationship between scripts, their inputs, internal p
   - Intercellular signaling network inference using **LIANA+** (ligand-receptor analysis framework)
   - Cancer pathway-level analysis (IDO1/Kynurenine, xCT/Glutamate, CD73/Adenosine, etc.)
   - All analysis sections include interpretive markdown cells linking findings to cancer biology
+
+### `primary_vs_metastasis_comparison.ipynb`
+
+- **Role:** Directly compares metabolic signaling targets between primary tumors and metastatic sites across different cancer types.
+- **Input:**
+  - `output/{PRIMARY_PREFIX}.h5ad`
+  - `output/{META_PREFIX}.h5ad`
+  - `output/{PRIMARY_PREFIX}_cellxgene_liana_results.csv`
+  - `output/{META_PREFIX}_cellxgene_liana_results.csv`
+  - `output/human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv`
+- **Dependencies:** Requires that `cancer_cellxgene_integration.ipynb` is run first for both primary and metastatic sites to generate the `.h5ad` and specific LIANA+ CSV outputs.
+- **Functionality:**
+  - Merges primary and metastatic scRNA-seq datasets.
+  - Performs Differential Expression (DE) analysis specifically on the unified `MetabConnectomeDB` vocabulary.
+  - Generates interactive Plotly and static Seaborn Volcano Plots mapping Log2 Fold Change against Adjusted P-Values.
+  - Integrates LIANA+ output to tag whether enriched targets are actively mediating cell-cell communication (CCC) specifically in primary, metastatic, or both sites.
+  - Dynamically exports a cancer-specific final table (e.g., `primary_vs_metastasis_{cancer_type}_DE_metabolic_targets.csv`) detailing targeting metabolites and HMDB IDs.
 
 ### `merge_dbs.py`, `test_merge.py`, `test_script.py`
 
