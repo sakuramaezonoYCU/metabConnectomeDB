@@ -5,3 +5,5 @@ venv/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+test_*.py
+fix_*.py

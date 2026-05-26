@@ -1,0 +1,68 @@
+Running pipeline TEST live...
+/Users/sakuramaezono/.matplotlib is not a writable directory
+Matplotlib created a temporary cache directory at /var/folders/r4/pjgb1k_x7fv9xgcb_dg70bnm0000gn/T/matplotlib-c3emvno4 because there was an issue with the default path (/UOMP: Info #276: omp_set_nested routine deprecated, please use omp_set_max_active_levels instead.
+iable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
+Matplotlib is building the font cache; this may take a moment.
+Traceback (most recent call last):
+  File "/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/scripts/run_cancer_pipeline.py", line 495, in execute_and_export
+    exec(code, global_dict)
+  File "<string>", line 3, in <module>
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/cellxgene_census/_open.py", line 227, in open_soma
+    mirrors = _get_census_mirrors()
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/cellxgene_census/_release_directory.py", line 435, in _get_census_mirrors
+    response = requests.get(CELL_CENSUS_MIRRORS_DIRECTORY_URL, headers={"User-Agent": _user_agent()})
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/requests/api.py", line 87, in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/requests/api.py", line 71, in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/requests/sessions.py", line 651, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/requests/sessions.py", line 784, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/requests/adapters.py", line 668, in send
+    self.cert_verify(conn, request.url, verify, cert)
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/requests/adapters.py", line 332, in cert_verify
+    raise OSError(
+OSError: Could not find a suitable TLS CA certificate bundle, invalid path: /var/folders/r4/pjgb1k_x7fv9xgcb_dg70bnm0000gn/T/agy-cert-3257346289.crt
+Initializing pipeline run for Disease: ['lung adenocarcinoma'] | Tissue: ['lung', 'brain', 'bone', 'liver', 'adrenal gland'] | Primary: ['lung']
+🚀 Running execution and report generation for cancer_cellxgene_integration.ipynb...
+❌ Error executing cell 1: Could not find a suitable TLS CA certificate bundle, invalid path: /var/folders/r4/pjgb1k_x7fv9xgcb_dg70bnm0000gn/T/agy-cert-3257346289.crt
+Traceback (most recent call last):
+  File "/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/scripts/run_cancer_pipeline.py", line 662, in <module>
+    generated_h5ad = execute_and_export(cellxgene_nb, cellxgene_html, f"CellxGene Integration: {disease_filter_str}", inject_globals, skip_if_exists=True)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/scripts/run_cancer_pipeline.py", line 559, in execute_and_export
+    raise e
+  File "/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/scripts/run_cancer_pipeline.py", line 495, in execute_and_export
+    exec(code, global_dict)
+  File "<string>", line 3, in <module>
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/cellxgene_census/_open.py", line 227, in open_soma
+    mirrors = _get_census_mirrors()
+              ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/cellxgene_census/_release_directory.py", line 435, in _get_census_mirrors
+    response = requests.get(CELL_CENSUS_MIRRORS_DIRECTORY_URL, headers={"User-Agent": _user_agent()})
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/requests/api.py", line 87, in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/requests/api.py", line 71, in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/requests/sessions.py", line 651, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/requests/sessions.py", line 784, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/requests/adapters.py", line 668, in send
+    self.cert_verify(conn, request.url, verify, cert)
+  File "/Users/sakuramaezono/venvs/metabConnectomeDB/lib/python3.12/site-packages/requests/adapters.py", line 332, in cert_verify
+    raise OSError(
+OSError: Could not find a suitable TLS CA certificate bundle, invalid path: /var/folders/r4/pjgb1k_x7fv9xgcb_dg70bnm0000gn/T/agy-cert-3257346289.crt
+FAILED
