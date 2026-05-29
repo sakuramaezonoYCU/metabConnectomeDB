@@ -43,8 +43,6 @@ META_RESULTS_DIR = os.path.join(OUTPUT_DIR, 'pan_cancer_meta_results')
 **Underlying Data (CSVs):**
 - **UpSet Plot Data:** `output/pan_cancer_meta_results/upset_plot_data.csv` (contains the raw mapping of which gene belongs to which cancer's Up-Regulated set).
 - **The 23 Pan-Cancer Genes:** `output/pan_cancer_meta_results/pan_cancer_23_genes.csv` (contains the final intersected list).
-
-**Interpretation:** The size of the intersections reveals how much of the metastatic metabolic program is shared. A core set of 23 genes strictly conserved across all 5 cancers points to universal metabolic bottlenecks required for metastasis.
 """))
 
     code_upset = """# 1. Pan-Cancer Overlap (UpSet Plot)
@@ -69,8 +67,6 @@ else:
 
 **Underlying Data (CSV):**
 - **Network Edges:** `output/pan_cancer_meta_results/metabolite_target_network_edges.csv` (contains the raw Source-Target edges used to build this visualization).
-
-**Interpretation:** Highly connected nodes in this bipartite network highlight critical metabolites (e.g., specific lipids, amino acids) that interact with multiple conserved targets, offering promising targets for broad-spectrum anti-metastatic therapeutic strategies.
 """))
 
     code_network = """# 2. Metabolite-Target Network
@@ -93,8 +89,6 @@ else:
 - **Gene Set:** The 23 Pan-Cancer Genes (`output/pan_cancer_meta_results/pan_cancer_23_genes.csv`).
 - **Algorithm:** `scanpy.tl.score_genes()` computes the average expression of the 23 genes subtracted by the average expression of a reference set of randomly sampled genes.
 - **Data sources:** The 100k-cell `.h5ad` file for each cancer, explicitly filtered to `cell_type == 'malignant cell'` and subset to the primary tumor `tissue_general`.
-
-**Interpretation:** A distinct bimodal or right-skewed distribution indicates that a specific subset of primary tumor cells has already adopted the metastatic metabolic program prior to dissemination. This supports the clinical development of this 23-gene signature as a predictive biomarker assay for metastasis risk.
 """))
 
     cancers = [
