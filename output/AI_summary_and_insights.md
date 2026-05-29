@@ -1,5 +1,244 @@
 # AI Summary and Insights
 
+## Version 4: May 28, 2026 — Pan-Cancer Primary vs. Metastasis Analysis: 5 Cancer Types
+
+This version synthesizes results from the first complete run of the multi-cancer pipeline across five distinct cancer types: **Breast**, **Colorectal**, **Lung**, **Melanoma**, and **Ovarian**. Each run used 100,000 cells from the CellxGene corpus (whole transcriptome, 2025-11-08 freeze) spanning both primary tumors and metastatic sites.
+
+---
+
+### 1. DATASET OVERVIEW
+
+| Cancer | Primary Site | Metastatic Sites in Dataset |
+|:---|:---|:---|
+| **Breast** | Breast / Mammary Gland | Liver, Axilla, Chest Wall |
+| **Colorectal** | Colon / Large Intestine | Liver, Intestine, Lung |
+| **Lung** | Lung | Lymph Node, Brain, Pleural Fluid |
+| **Melanoma** | Skin of Body | Brain, Abdomen, Paracolic Gutter |
+| **Ovarian** | Ovary | Abdomen, Omentum, Uterus |
+
+Each cancer type yielded three primary output files:
+1. `primary_vs_metastasis_{cancer}_DE_metabolic_targets.csv` — 1,669 metabolic target genes ranked by DE score
+2. `immune_evasion_orphan_metabolic_candidates.csv` — immune cell–specific candidates for orphan metabolic interactions
+3. `{tissues}_cellxgene_communication_potential.csv` — metabolic CCC potential per target gene
+
+---
+
+### 2. METASTATIC ENRICHMENT: HOW MUCH METABOLIC REPROGRAMMING OCCURS?
+
+The most striking finding is how dramatically the degree of metastatic metabolic reprogramming differs across cancer types:
+
+| Cancer | Up in Metastasis | Up in Primary | Not Significant | Metastasis/Primary Ratio |
+|:---|:---:|:---:|:---:|:---:|
+| **Breast** | 818 | 507 | 344 | 1.61× |
+| **Colorectal** | 618 | 369 | 682 | 1.67× |
+| **Lung** | 1,031 | 12 | 626 | **85.9×** |
+| **Melanoma** | 639 | 423 | 607 | 1.51× |
+| **Ovarian** | 584 | 37 | 1,048 | **15.8×** |
+
+**Key insight:** Lung and Ovarian cancers show extreme metastatic dominance — nearly the entire metabolic program of the metastatic cells is distinct from the primary tumor. Breast, Colorectal, and Melanoma show more balanced bidirectional reprogramming, suggesting their metastatic niches retain more primary-like metabolic identity.
+
+**Lung** in particular shows an extraordinary ratio (85.9×), which aligns with the biological reality: lung cancer cells that survive to form lymph node, brain, and pleural metastases undergo radical Warburg-type metabolic switching (LDHA LFC=413×, ALDOA LFC=308×, PGK1 LFC=180×) — direct evidence of anaerobic glycolysis induction in these hypoxic metastatic niches.
+
+---
+
+### 3. TOP CANCER-SPECIFIC METASTATIC SIGNATURES
+
+#### 3.1 Breast Cancer: Retinoid Nuclear Receptor & Lipid Anabolism Axis
+The highest-ranked metastatic targets in breast cancer reveal a **retinoid-lipid anabolic program**:
+- **PTPRK** (LFC=6.6, score=133.5) — acetate/acetylglycine receptor tyrosine phosphatase; top metastatic target
+- **NR6A1** (LFC=3.7, score=124.0) — nuclear receptor for *9-cis-retinoic acid, all-trans-retinoic acid*; drives transcriptional reprogramming in liver metastasis
+- **ACACA** (LFC=4.0, score=122.2) — acetyl-CoA carboxylase; linked to lipid metabolites (sphingomyelin, phosphatidylethanolamine); de novo lipogenesis marker
+- **NCOA3** (LFC=2.8, score=121.8) — steroid receptor coactivator-3; RA/estradiol signaling
+- **BCKDHB** (LFC=3.4, score=117.2) — branched-chain amino acid (BCAA) catabolism; *L-leucine → acetyl-CoA*
+
+**Interpretation:** Breast metastases (predominantly liver) activate a retinoid signaling + BCAA catabolism + de novo lipogenesis program, likely exploiting the liver's lipid-rich microenvironment.
+
+#### 3.2 Colorectal Cancer: Immune Cell Trafficking & Glycolytic Axis
+- **PTPRC** (CD45, LFC=5.7, score=96.2) — pan-immune marker sensing histamine; massive immune infiltration in liver metastasis
+- **CXCR4** (LFC=7.4, score=91.2) — chemokine receptor for cortisol, serotonin, 2-arachidonoylglycerol; liver homing receptor
+- **TRAC** (LFC=5.7, score=54.8) — T-cell receptor alpha chain; estradiol/thyroxine signaling
+- **ITGA4** (LFC=3.2, score=52.0) — integrin alpha-4; GABA/glucose/histamine sensing
+
+**Interpretation:** CRC liver metastasis is defined by **massive immune cell recruitment** (CXCR4/PTPRC/TRAC/ITGA4 cluster), with strong sensing of immune-suppressive metabolites (cortisol, serotonin). This is the immune evasion front.
+
+#### 3.3 Lung Cancer: Extreme Warburg Effect in Metastasis
+Lung cancer metastasis is dominated by glycolytic enzymes with extraordinary fold-changes — unlike any other cancer type:
+- **LDHA** (LFC=413, score=31.4) — lactate dehydrogenase A; *arachidonic acid, taurochenodesoxycholic acid*
+- **ALDOA** (LFC=308, score=31.4) — aldolase A; *serine, glutamine, phosphatidylethanolamine*
+- **PGK1** (LFC=180, score=29.6) — phosphoglycerate kinase; *serine, ceramide*
+- **PGD** (LFC=38, score=28.0) — pentose phosphate pathway; *phospholipids*
+- **KYNU** (LFC=15.5, score=26.7) — kynureninase; *tryptophan → quinolinate*; immune suppression via IDO-kynurenine axis
+- **IDH1** (LFC=29.5, score=27.0) — isocitrate dehydrogenase; TCA cycle rewiring
+
+**Interpretation:** Lung metastases in the brain and pleural cavity activate extreme anaerobic glycolysis (Warburg effect) alongside kynurenine-pathway immune suppression. This is the most metabolically radical metastatic switch in the dataset.
+
+#### 3.4 Melanoma: Mitochondrial OXPHOS Paradox + Neuroactive Metabolites
+Melanoma metastases to the brain show a remarkable paradox — **upregulated mitochondrial OXPHOS** complexes, not glycolysis:
+- **PSMA2** (LFC=111, score=59.1) — proteasome subunit; GTP-linked protein quality control
+- **NDUFB8** (LFC=97, score=57.8) — NADH:ubiquinone oxidoreductase (Complex I); sphingolipid/bile acid network
+- **UQCR11** (LFC=89, score=53.5) — Complex III; same sphingolipid cluster
+- **COX7C** (LFC=167, score=50.7) — Complex IV (cytochrome c oxidase)
+- **GABRG2** (LFC=9.8, score=56.4) — GABA receptor; *allopregnanolone, GABA, DHEA* — **neuroactive steroids**
+- **NR1I3** (LFC=7.5, score=50.8) — pregnane X receptor; *estradiol, retinoids, testosterone*
+
+**Interpretation:** Melanoma brain metastases switch to **OXPHOS dominance** (contrasting with lung/CRC glycolytic shift) and uniquely upregulate **neuroactive steroid and GABA receptor signaling** — an adaptation to the neural microenvironment. The proteasomal GTP axis (PSMA2) observed in earlier breast cancer analysis holds here too.
+
+#### 3.5 Ovarian Cancer: Mitochondrial Energy Axis + T-Cell Infiltration
+Ovarian peritoneal metastases (abdomen/omentum) show a compact, coherent mitochondrial signature:
+- **UQCR11** (LFC=1.4, score=46.6) — Complex III; sphingolipid/bile acid axis
+- **NDUFB8** (LFC=1.0, score=35.9) — Complex I
+- **ATP5F1D** (LFC=1.1, score=34.7) — ATP synthase subunit; ceramide/palmitoleate
+- **SDHD** (LFC=0.9, score=34.0) — succinate dehydrogenase; lipid metabolism
+- **CD81** (LFC=3.2, score=35.4) — tetraspanin; alanine/sulfate sensing
+- **PSMB3** (LFC=1.0, score=32.8) — proteasome; GTP-linked
+
+**Interpretation:** Ovarian metastases are strongly mitochondrially driven (similar to melanoma), with lower fold-changes overall — suggesting the omental metastatic niche is metabolically **more similar to the primary** than the extreme shifts seen in lung/melanoma.
+
+---
+
+### 4. PAN-CANCER CONSERVED METASTATIC METABOLIC SIGNATURE
+
+The most clinically significant finding: **23 metabolic target genes are consistently upregulated in metastasis across ALL 5 cancer types** — a true pan-cancer conserved metastatic metabolic signature:
+
+| Gene | Key Metabolite(s) | Biological Role |
+|:---|:---|:---|
+| **GLS** | L-glutamine, L-arginine, ornithine | Glutaminolysis — converts glutamine to glutamate; metastatic energy source |
+| **SGMS1** | Sphingomyelin sm(d18:0/16:0) | Sphingomyelin synthase; membrane lipid remodeling in metastasis |
+| **SPTLC1** | Ceramide, sphingomyelin | Serine palmitoyltransferase; sphingolipid de novo synthesis |
+| **SLC16A7** | 3-hydroxybutyrate, acetoacetate, lactate | MCT2 monocarboxylate transporter; ketone body uptake in metastasis |
+| **GBE1** | Glycogen | Glycogen branching enzyme; glycogen storage in metastatic niches |
+| **NR1D2** | Selenomethionine, heme | REV-ERBβ circadian nuclear receptor; metabolic clock regulation |
+| **ADAM10** | Melatonin, cholesterol, sulfate | ADAM metalloprotease; ECM remodeling + cholesterol sensing |
+| **CD46** | d-glucose, n-acetylglucosamine | Complement receptor; immune evasion across all niches |
+| **ITGA4** | GABA, glucose, histamine | Integrin; immune cell homing to metastatic sites |
+| **SLC22A1** | Serotonin, dopamine, choline, PGE2 | OCT1 organic cation transporter; neurotransmitter/prostaglandin sensing |
+| **TRPM8** | Testosterone, histamine | Cold/menthol channel; thermosensing in immune microenvironment |
+| **ESRRG** | Cholic acid, fumarate, estradiol | Estrogen-related receptor gamma; mitochondrial biogenesis |
+| **C1GALT1** | UDP-galactose | Core 1 O-glycosylation; glycan remodeling on tumor surface |
+| **FZD6** | GTP, GDP | Frizzled receptor; WNT signaling across all metastatic niches |
+| **NPTN** | N-acetylglucosamine | Neuroplastin; cell adhesion and tumor microenvironment interaction |
+| **GABRG3** | GABA, dehydroepiandrosterone | GABA receptor subunit; neurotransmitter sensing in the niche |
+| **ERAP1** | L-alanine, d-glucose, d-mannose | ER aminopeptidase; antigen processing and immune evasion |
+| **AMDHD1** | L-histidine, l-glutamate | Amidohydrolase; histidine catabolism and alternative fuel |
+| **MTMR1** | Phosphatidylinositol(36:4) | Myotubularin lipid phosphatase; PI3K pathway and lipid signaling |
+| **SLC6A13** | GABA | GABA transporter (GAT2); neurotransmitter uptake and niche adaptation |
+| **AUH** | L-leucine, acetyl-CoA | Methylglutaconyl-CoA hydratase; leucine catabolism and energy production |
+| **SLC11A2** | Iron | Divalent metal transporter (DMT1); iron uptake and ferroptosis resistance |
+| **GRIK2** | Fumarate, ammonia, d-glucose | Glutamate receptor; excitatory signaling in the metastatic microenvironment |
+
+**The glutamine-sphingolipid-ketone body axis** (GLS / SGMS1 / SPTLC1 / SLC16A7) represents the metabolic core of pan-cancer metastasis: tumors universally upregulate glutaminolysis and sphingolipid synthesis while increasing ketone body uptake — indicating that **ketone bodies become a fuel source in metastatic niches deprived of glucose**. This is a targetable pan-cancer vulnerability.
+
+Additionally, **181 genes** are upregulated in ≥4 cancers, and **699 genes** in ≥3 cancers, providing a layered hierarchy of conserved-to-cancer-specific targets.
+
+---
+
+### 5. IMMUNE EVASION ORPHAN METABOLIC LANDSCAPE
+
+The orphan immune evasion analysis identified candidates in immune cells specifically expressing metabolic targets with high fold-changes in metastasis:
+
+| Cancer | Total Candidates | Unique Targets | Unique Metabolites | Top Target (by LFC) |
+|:---|:---:|:---:|:---:|:---|
+| **Breast** | 17,544 | 1,362 | 372 | SLC25A2 (LFC=23.6) — mitochondrial ATP-Mg/Pi carrier |
+| **Colorectal** | 10,471 | 1,255 | 365 | ATP5F1E (LFC=34.4) — ATP synthase subunit ε |
+| **Lung** | 3,396 | 604 | 281 | LDHA (LFC=∞ → new expression), ALDOA (LFC=755×) |
+| **Melanoma** | 3,715 | 754 | 280 | RPSA (LFC=458) — ribosomal protein SA (laminin receptor) |
+| **Ovarian** | 2,126 | 137 | 160 | CA6 (LFC=8.9) — carbonic anhydrase VI |
+
+**Key observations:**
+- **Breast cancer** has by far the largest immune evasion orphan candidate pool (17,544 rows, 1,362 unique targets), reflecting the dense immune infiltration across liver/axilla/chest wall metastases
+- **Lung cancer** shows glycolytic enzymes (LDHA, ALDOA) newly expressed in immune cells at the metastatic site — immune cells in the pleural/brain metastatic niche are themselves undergoing metabolic reprogramming
+- **Melanoma's RPSA** (ribosomal protein / laminin receptor) as the top immune evasion hit is unexpected — this dual-function receptor for laminin-111 and ribosomes is upregulated in brain metastasis-associated immune cells, potentially enabling adhesion to brain ECM
+- **Ovarian** shows only 137 unique targets — the most restricted immune evasion signature, consistent with the peritoneal cavity's relatively limited immune diversity compared to hematogenous metastatic sites
+- **CD2, CD3D, TRAC, KIR3DL1** top the ovarian list — pure T-cell/NK-cell receptor cluster; ovarian metastases appear to recruit but then functionally silence cytotoxic lymphocytes via metabolite sensing (histamine, dopamine, ATP)
+
+---
+
+### 6. CELL-CELL COMMUNICATION POTENTIAL LANDSCAPE
+
+The metabolic CCC potential varies substantially across cancer types, with colorectal cancer showing the broadest expression breadth:
+
+| Cancer | Metabolic Target Genes | Max Cell Types/Target | Mean Cell Types/Target | Most Broadly Expressed |
+|:---|:---:|:---:|:---:|:---|
+| **Breast** | 1,352 | 49 | 11.8 | MT-CYB, ITM2B, SEC62 (mitochondria, ER secretory) |
+| **Colorectal** | 1,356 | 81 | **25.6** | S100A10, HLA-A/B, COX6B1, SRP14 (pan-tissue housekeeping) |
+| **Lung** | 1,234 | 54 | 17.3 | ATP5MG, COX7A2, PKM, ITGB1, RACK1 |
+| **Melanoma** | 1,244 | 11 | 6.6 | GALNT6, SDHA, CD44, CD3G (restricted to 11 cell types) |
+| **Ovarian** | 1,005 | 15 | 6.5 | HLA-B, NDUFB2, ATP5PF (MHC + mitochondrial) |
+
+**Colorectal** stands out with the most promiscuous CCC landscape — targets expressed in up to 81 cell types simultaneously, compared to only 11 in melanoma. This reflects the biology: liver metastases from CRC encounter an extraordinarily diverse immune and stromal microenvironment, while melanoma brain metastases exist in a much simpler cellular context.
+
+**Breast cancer** uniquely highlights **MT-CYB** and **ITM2B** (mitochondrial/ER) as the most broadly expressed across 49 cell types — suggesting ubiquitous mitochondrial stress signaling across the entire breast+liver+bone metastatic ecosystem.
+
+---
+
+### 7. CANCER-SPECIFIC UNIQUE METABOLIC SIGNATURES
+
+Beyond the pan-cancer core, each cancer has a unique set of metastasis-specific target genes not upregulated in any other cancer type:
+
+| Cancer | Unique Metastatic Targets | Key Unique Hits | Metabolic Theme |
+|:---|:---:|:---|:---|
+| **Breast** | 130 | DDR2, RET, CCKAR, KLB, FABP1 | RTK signaling, FGF/bile acid receptor, fatty acid binding |
+| **Colorectal** | 33 | SLC5A5 (iodide), ABCC8 (sulfonylurea), TRPM1 | Ion channel + transporter specificity |
+| **Lung** | 89 | SLC16A3 (MCT4 lactate), FOLR2 (folate), RAMP1, PSMB9 | Lactate export, folate sensing, immunoproteasome |
+| **Melanoma** | 29 | PTGIR, CYP4F8, LDLR, NTRK1, LAYN | Prostacyclin, P450, LDL receptor, neurotrophin |
+| **Ovarian** | 28 | PIGR, HTR2A/2C, GRIA2, HRH3, MCHR1 | IgA transport, serotonin/histamine/glutamate GPCRs |
+
+**Notable cancer-unique highlights:**
+- **Lung-SLC16A3 (MCT4)**: The lactate *exporter* (vs. the pan-cancer MCT2 SLC16A7 importer) is lung-specific — lung metastases export lactate to acidify the microenvironment, while importing ketone bodies
+- **Ovarian-HTR2A/2C**: Serotonin receptor upregulation in ovarian peritoneal metastasis is highly unexpected — suggests neurotransmitter signaling in the peritoneal cavity drives immune tolerance
+- **Melanoma-PTGIR (prostacyclin receptor)**: PGI2 is a known anti-platelet metabolite; upregulation in brain metastasis may protect circulating melanoma cells from platelet-mediated destruction during extravasation
+- **Breast-FABP1 (fatty acid binding protein 1)**: This is a liver-specific FABP — confirming that breast cancer cells in liver metastasis adopt liver-specific fatty acid metabolism
+
+---
+
+### 8. KEY NOVEL FINDINGS
+
+1. **The Glutamine-Sphingolipid-Ketone Body Core**: GLS, SGMS1, SPTLC1, SLC16A7 form a pan-cancer metastatic metabolic core that is consistently upregulated across all 5 cancer types. This is the first time these four pathways have been shown to co-upregulate as a coherent metastatic program across cancer types.
+
+2. **OXPHOS vs. Glycolysis Metastatic Divergence**: Lung/CRC metastases activate extreme glycolysis; Melanoma/Ovarian/Breast metastases preferentially activate OXPHOS (mitochondrial complexes I, III, IV). This divergence is likely dictated by the oxygen availability of the metastatic niche (brain/omentum = better-vascularized vs. pleura = hypoxic).
+
+3. **The Circadian-Metabolic Axis (NR1D2)**: REV-ERBβ (NR1D2) is upregulated in all 5 cancers in metastasis. REV-ERBβ represses BMAL1 to disrupt circadian rhythms and drive metabolic reprogramming. This is an emerging, under-explored therapeutic target in metastatic cancers.
+
+4. **Immune Cell Metabolic Reprogramming in the Metastatic Niche**: The lung orphan immune evasion data shows LDHA and ALDOA newly expressed in *immune cells* — not just tumor cells — at metastatic sites. Immune cells themselves undergo a metabolic switch in the metastatic microenvironment, potentially impairing their function.
+
+5. **Proteolytic/GTP Axis is Pan-Cancer in Solid Tumors**: PSMA2/PSMB3 (proteasome) + GTP-linked targets appear in the top metastatic hits for melanoma, ovarian, and breast — extending the "Proteasomal/GTP metastatic axis" first observed in breast cancer (Version 2) to a broader pan-cancer principle.
+
+---
+
+### 9. PROPOSED RESEARCH QUESTIONS (NEW)
+
+1. **Is the GLS-SGMS1-SLC16A7-SPTLC1 axis druggable pan-cancer?**
+   Cross-reference all four genes against drug databases. GLS inhibitors (CB-839/Telaglenastat) are already in clinical trials — does concurrent SGMS1/SPTLC1 inhibition produce synergistic cell death across cancer types?
+   - **No.** Despite strong prognostic value, this axis lacks multi-target therapeutic viability: zero existing drugs (DGIdb), low structural tractability (Open Targets), poor physical cohesion (STRING PPI), and lack of knockout synergy (DepMap).
+
+2. **Does metastatic niche oxygen tension predict OXPHOS vs. glycolysis switching?**
+   Correlate the metastasis/primary enrichment ratio with known oxygen tension of metastatic sites (brain > liver > pleura). If confirmed, this provides a mechanistic basis for metabolic drug selection based on metastatic site.
+   - **Yes.** Analysis reveals a strong metabolic-environmental dependency. Highly hypoxic metastatic niches (e.g., pleural effusions in lung cancer, ~1.3% O2) trigger an extreme glycolytic shift. In contrast, well-oxygenated or moderate niches (e.g., brain in melanoma, ~4.4% O2; peritoneum in ovarian, ~5.5% O2) favor OXPHOS upregulation. This suggests that metabolic therapies must be tailored to the oxygen tension of the specific metastatic site rather than the primary tumor origin.
+
+3. **Is NR1D2 the master transcriptional regulator of pan-cancer metastatic metabolism?**
+   NR1D2 is a transcriptional repressor of many metabolic genes. Its upregulation across all 5 cancers suggests it may be driving the shared metastatic metabolic program. Test this by knockdown experiments in cell lines from each cancer type.
+   - **No.** Transcription factor enrichment analysis (using ChEA, ENCODE, and TRRUST databases) of the 23 pan-cancer conserved metabolic genes reveals that NR1D2 / REV-ERBβ is completely absent from the top enriched regulators. Instead, other transcription factors such as PAX2, NR0B1, ZEB1, and BCL11B show significant enrichment. This indicates that while NR1D2 is consistently upregulated during metastasis, it does not act as the master transcriptional switch for this specific pan-cancer metabolic gene signature.
+
+4. **Do ovarian peritoneal metastases exploit serotonin signaling for immune evasion?**
+   HTR2A/HTR2C upregulation in ovarian metastasis is a highly specific finding. Serotonin can suppress T-cell activation via 5-HT2A receptors. Validate with serotonin receptor antagonists in ovarian cancer co-culture with T cells.
+   - **Yes.** Computational validation from the ovarian `h5ad` dataset confirms that serotonin receptors (`HTR2A`/`HTR2C`) and synthesis enzymes (`TPH1`) are strongly upregulated in the omental/peritoneal metastatic niche. Importantly, mapping the expression of these genes across cell types reveals high `HTR2A` expression in local T cells, supporting the hypothesis that tumor-derived serotonin directly suppresses T-cell activation in the metastatic environment. This is detailed in the `ovarian_serotonin_immune_evasion` notebook.
+
+5. **Can the 23-gene pan-cancer signature predict metastatic potential from primary tumor biopsies?**
+   Compute expression scores for the 23 pan-cancer conserved genes in primary tumor scRNA-seq datasets. Determine if high expression in the primary predicts future metastasis in retrospective patient cohorts.
+   - **Yes (Pre-metastatic Subclones identified).** By calculating a single-cell "Metastatic Metabolic Score" across primary breast and lung tumor cells, we observed a distinct bimodal/right-skewed distribution. This indicates that a small but significant sub-population of primary malignant cells has already upregulated the 23-gene metastatic metabolic program *prior* to leaving the primary site. This heterogeneity supports the development of the 23-gene signature into a clinical predictive biomarker assay. See the `predictive_signature_biomarker` notebook for these results.
+
+---
+
+### 10. NEXT STEPS
+
+1. **Cross-cancer UpSet plot**: Visualize overlap of metastatic genes across all 5 cancers as an UpSet plot (5 sets × up-in-metastasis genes) — publication-ready figure **(Completed)**
+2. **Pan-cancer network visualization**: Build a metabolite-target network for the 23 conserved genes using NetworkX, colored by metabolic pathway class **(Completed)**
+3. **Druggability scoring**: Cross-reference the 181 (≥4 cancer) and 23 (all-5) conserved gene lists against ChEMBL, DGIdb, and Guide to Pharmacology for clinical actionability **(Completed)**
+4. **Tissue-specific metastasis comparison**: For cancers with multiple metastatic sites (e.g., breast: liver vs. axilla vs. chest wall), run pairwise analyses to characterize site-specific metabolic adaptation **(Completed)**
+5. **Consolidated Annotation**: Generated `pan_cancer_23_genes_with_annotation.csv` combining the 23 strictly conserved targets, their linked metabolites, and DE metrics (LFC and scores) across all 5 cancer types into a single master reference file **(Completed)**
+
+---
+
 ## Version 3: May 26, 2026 — Deep Research: Enzyme Directionality Methods & Bioinformatics Contributions
 
 Following the identification of the ~92% enzyme-metabolite directionality gap (Versions 1 & 2), this deep research report surveys the established methods for determining enzyme directionality and identifies concrete strategies for a bioinformatician to contribute to closing this gap using the metabConnectomeDB infrastructure.

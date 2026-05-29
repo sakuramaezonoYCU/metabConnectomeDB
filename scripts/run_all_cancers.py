@@ -9,17 +9,20 @@ DEFAULT_CAP = "100000"
 os.environ.setdefault('CELLXGENE_CAP', DEFAULT_CAP)
 
 cancer_to_primary = {
+    'colorectal cancer, colorectal carcinoma || metastatic malignant neoplasm': ['colon', 'large intestine'],
+    'lung cancer, lung adenocarcinoma': ['lung'],
     'breast cancer': ['breast', 'mammary gland'],
-    'colorectal cancer': ['colon', 'large intestine'],
-    'melanoma': ['skin'],
-    'lung adenocarcinoma': ['lung'],
-    'ovarian cancer': ['ovary']
+    'melanoma, metastatic melanoma': ['skin of body'],
+    'ovarian cancer, malignant ovarian serous tumor': ['ovary']
 }
+
 
 print("Querying CellxGene Census for the Top 3 Metastatic Tissues...")
 
 with cellxgene_census.open_soma(census_version="2025-11-08") as census:
-    df = cellxgene_census.get_obs(census, "homo_sapiens", column_names=["disease", "tissue"])
+    # Query is_primary_data to avoid duplicate/redundant cells, and use tissue_general
+    df = cellxgene_census.get_obs(census, "homo_sapiens", column_names=["disease", "tissue_general", "is_primary_data"])
+    df = df[df["is_primary_data"] == True]
 
 # For testing, we will only run the first cancer
 test_mode = False
@@ -34,14 +37,15 @@ script_path = os.path.join("scripts", "run_cancer_pipeline.py")
 for cancer in cancers_to_run:
     primary_tissues = cancer_to_primary[cancer]
     
-    # Filter df for this cancer
-    df_cancer = df[df["disease"] == cancer]
+    # Filter df for this cancer (supports multiple comma-separated diseases)
+    diseases = [d.strip() for d in cancer.split(',')]
+    df_cancer = df[df["disease"].isin(diseases)]
     
     # Filter OUT primary tissues to find metastasis
-    df_meta = df_cancer[~df_cancer["tissue"].isin(primary_tissues)]
+    df_meta = df_cancer[~df_cancer["tissue_general"].isin(primary_tissues)]
     
-    # Get Primary + top 3 metastatic tissues by cell count
-    top_3_meta = df_meta["tissue"].value_counts().head(4).index.tolist()
+    # Get top 3 metastatic tissues by cell count
+    top_3_meta = df_meta["tissue_general"].value_counts().head(3).index.tolist()
     
     print(f"\n--- {cancer.upper()} ---")
     print(f"Primary Tissues: {primary_tissues}")

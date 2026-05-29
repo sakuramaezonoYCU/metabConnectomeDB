@@ -471,4 +471,11 @@ if __name__ == '__main__':
     # cellxgene_html = os.path.join(os.path.dirname(script_dir), "output", "cancer_cellxgene_integration_full_report.html")
     # execute_and_export(cellxgene_nb, cellxgene_html, "CellxGene Single-Cell Integration Analysis")
 
-    
+    # Add Druggability Axis Analysis
+    druggability_nb = os.path.join(script_dir, "druggability_axis_analysis.ipynb")
+    # We dynamically read the config to get the correct output path with suffix
+    import sys
+    sys.path.insert(0, script_dir)
+    from druggability_config import OUTPUT_BASENAME
+    druggability_html = os.path.join(os.path.dirname(script_dir), "output", "druggability", f"{OUTPUT_BASENAME}.html")
+    execute_and_export(druggability_nb, druggability_html, "Druggability Axis Analysis")

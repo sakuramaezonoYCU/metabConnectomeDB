@@ -488,6 +488,24 @@ except Exception:
                     h5_json = json.dumps(global_dict['h5ad_path'])
                     code = re.sub(r'^h5ad_path\s*=.*$', f'h5ad_path = {h5_json}', code, flags=re.MULTILINE)
                     original_code = re.sub(r'^h5ad_path\s*=.*$', f'h5ad_path = {h5_json}', original_code, flags=re.MULTILINE)
+
+                    # If this cell uses the old separate primary/meta h5ad loading pattern,
+                    # replace it entirely with unified h5ad loading from h5ad_path.
+                    # This avoids needing to correctly reconstruct PRIMARY_PREFIX/META_PREFIX filenames.
+                    if 'sc.read_h5ad(primary_h5ad_file)' in code or 'sc.read_h5ad(meta_h5ad_file)' in code:
+                        pt = global_dict.get('PRIMARY_TISSUES', ['breast'])
+                        pt_json = json.dumps(pt)
+                        code = f"""# Pipeline mode: load unified h5ad and split by PRIMARY_TISSUES
+import scanpy as sc, numpy as np
+adata = sc.read_h5ad(h5ad_path)
+primary_list = globals().get('PRIMARY_TISSUES', {pt_json})
+primary_name = primary_list[0].capitalize() if primary_list else 'Primary'
+adata.obs['site'] = np.where(adata.obs['tissue_general'].isin(primary_list), primary_name, 'Metastasis')
+adata_meta = adata[adata.obs['site'] == 'Metastasis'].copy()
+adata_prim = adata[adata.obs['site'] == primary_name].copy()
+print(f"Loaded combined dataset: {{adata.shape}}")
+print(adata.obs['site'].value_counts())
+"""
                     
                 if 'PRIMARY_TISSUES' in global_dict:
                     pt_json = json.dumps(global_dict['PRIMARY_TISSUES'])
@@ -718,7 +736,7 @@ if __name__ == '__main__':
         except:
             cap_str = str(cap_val)
     
-    cancer_name_safe = f"{disease_filter_str.split()[0].lower()}_results"
+    cancer_name_safe = f"{disease_filter[0].split()[0].lower()}_results"
     cancer_output_dir = os.path.abspath(os.path.join(os.path.dirname(script_dir), "output", cancer_name_safe))
     os.makedirs(cancer_output_dir, exist_ok=True)
     
