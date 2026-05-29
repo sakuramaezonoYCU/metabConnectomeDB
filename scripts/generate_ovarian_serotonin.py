@@ -109,7 +109,7 @@ os.makedirs(output_dir, exist_ok=True)
 jupyter_bin = os.path.join(os.path.dirname(sys.executable), 'jupyter')
 if not os.path.exists(jupyter_bin): jupyter_bin = 'jupyter'
 
-cmd_html = [jupyter_bin, "nbconvert", "--to", "html", notebook_filename, "--output-dir", output_dir, "--output", output_base]
+cmd_html = [jupyter_bin, "nbconvert", "--to", "html", "--execute", notebook_filename, "--output-dir", output_dir, "--output", output_base]
 res_html = subprocess.run(cmd_html, capture_output=True, text=True)
 
 if res_html.returncode == 0:
@@ -120,10 +120,13 @@ else:
 """
     nb.cells.append(nbf.v4.new_code_cell(export_code))
 
-    with open(os.path.join(BASE_DIR, 'ovarian_serotonin_immune_evasion.ipynb'), 'w', encoding='utf-8') as f:
-        nbf.write(nb, f)
-        
-    print("Created ovarian_serotonin_immune_evasion.ipynb")
+    out_path = os.path.join(BASE_DIR, 'ovarian_serotonin_immune_evasion.ipynb')
+    if os.path.exists(out_path):
+        print(f"⚠️ {out_path} already exists. Skipping overwrite to protect user edits.")
+    else:
+        with open(out_path, 'w', encoding='utf-8') as f:
+            nbf.write(nb, f)
+        print(f"Created {out_path}")
 
 if __name__ == '__main__':
     create_notebook()

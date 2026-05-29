@@ -1,3 +1,6 @@
+import sys
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX
 import nbformat as nbf
 import os
 import sys
@@ -13,7 +16,7 @@ META_RESULTS_DIR = os.path.join(OUTPUT_DIR, 'pan_cancer_meta_results')
 os.makedirs(META_RESULTS_DIR, exist_ok=True)
 
 def run_analysis_and_plot():
-    genes_23_path = os.path.join(META_RESULTS_DIR, 'pan_cancer_23_genes.csv')
+    genes_23_path = os.path.join(META_RESULTS_DIR, f'pan_cancer_conserved_genes{ANALYSIS_SUFFIX}.csv')
     if os.path.exists(genes_23_path):
         df_23 = pd.read_csv(genes_23_path)
         signature_genes = df_23['Strictly_Conserved_Gene'].unique().tolist()

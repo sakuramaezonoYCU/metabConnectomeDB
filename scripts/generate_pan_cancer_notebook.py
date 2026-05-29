@@ -40,7 +40,7 @@ plt.axis('off')
 plt.show()"""
     cell_upset = nbf.v4.new_code_cell(code_upset)
     
-    upset_path = '../output/pan_cancer_meta_results/upset_plot.png'
+    upset_path = f'../output/pan_cancer_meta_results/upset_plot{ANALYSIS_SUFFIX}.png'
     if os.path.exists(upset_path):
         with open(upset_path, 'rb') as f:
             png_data = base64.b64encode(f.read()).decode('utf-8')
@@ -54,12 +54,12 @@ plt.show()"""
     code_network = """# Generating Metabolite-Target Network for the 23 Conserved Genes
 # (Code simulated for notebook display)
 plt.figure(figsize=(14, 10))
-plt.title('Pan-Cancer 23-Gene Conserved Target-Metabolite Network', size=16)
+plt.title('Pan-Cancer Conserved Target-Metabolite Network', size=16)
 plt.axis('off')
 plt.show()"""
     cell_network = nbf.v4.new_code_cell(code_network)
     
-    network_path = '../output/pan_cancer_meta_results/metabolite_target_network.png'
+    network_path = f'../output/pan_cancer_meta_results/metabolite_target_network{ANALYSIS_SUFFIX}.png'
     if os.path.exists(network_path):
         with open(network_path, 'rb') as f:
             png_data = base64.b64encode(f.read()).decode('utf-8')
@@ -73,7 +73,9 @@ plt.show()"""
     nb.cells.append(nbf.v4.new_code_cell("""import subprocess
 import sys
 
-ANALYSIS_SUFFIX = '_5MetCan_100k'
+import sys
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX
 notebook_filename = 'pan_cancer_meta_analysis.ipynb'
 output_base = 'pan_cancer_meta_analysis' + ANALYSIS_SUFFIX
 output_dir = os.path.join(OUTPUT_DIR, 'pan_cancer_meta_results')
@@ -82,7 +84,7 @@ os.makedirs(output_dir, exist_ok=True)
 jupyter_bin = os.path.join(os.path.dirname(sys.executable), 'jupyter')
 if not os.path.exists(jupyter_bin): jupyter_bin = 'jupyter'
 
-cmd_html = [jupyter_bin, "nbconvert", "--to", "html", notebook_filename, "--output-dir", output_dir, "--output", output_base]
+cmd_html = [jupyter_bin, "nbconvert", "--to", "html", "--execute", notebook_filename, "--output-dir", output_dir, "--output", output_base]
 res_html = subprocess.run(cmd_html, capture_output=True, text=True)
 
 if res_html.returncode == 0:
@@ -91,10 +93,13 @@ else:
     print("❌ HTML export failed.")
 """))
 
-    with open('pan_cancer_meta_analysis.ipynb', 'w', encoding='utf-8') as f:
-        nbf.write(nb, f)
-        
-    print("Created notebook pan_cancer_meta_analysis.ipynb with embedded outputs!")
+    out_path = 'pan_cancer_meta_analysis.ipynb'
+    if os.path.exists(out_path):
+        print(f"⚠️ {out_path} already exists. Skipping overwrite to protect user edits.")
+    else:
+        with open(out_path, 'w', encoding='utf-8') as f:
+            nbf.write(nb, f)
+        print(f"Created notebook {out_path} with embedded outputs!")
 
 if __name__ == '__main__':
     create_notebook()

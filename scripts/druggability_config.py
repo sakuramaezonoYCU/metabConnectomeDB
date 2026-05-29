@@ -26,7 +26,9 @@ TARGET_GENES = [
 
 # Analysis suffix used for file naming and tracking
 # Change this parameter to create distinct output HTMLs
-ANALYSIS_SUFFIX = "_5MetCan_100k"
+import sys
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX
 
 # ---------------------------------------------------------
 # API CONFIGURATION

@@ -410,6 +410,20 @@ except Exception:
 """
     exec(patch_code, global_dict)
     
+    # ── Sampling fix ─────────────────────────────────────────────────────────
+    # The notebook's original stratified sampler divides CAP equally across all
+    # tissues regardless of their available cell counts, causing primary tissues
+    # (which typically have fewer cells) to be overrepresented.
+    # We replace it at execution time with a proportional sampler.
+    BIASED_SAMPLER   = "obs_df.groupby('tissue_general', group_keys=False).apply(lambda x: x.sample(n=min(len(x), CAP // len(obs_df['tissue_general'].unique())), random_state=42))"
+    BALANCED_SAMPLER = (
+        "obs_df.groupby('tissue_general', group_keys=False).apply("
+        "lambda x: x.sample("
+        "n=min(len(x), max(1, round(CAP * len(x) / len(obs_df)))), "
+        "random_state=42))"
+    )
+    # ─────────────────────────────────────────────────────────────────────────
+    
     new_cells = []
     notebook_dir = os.path.dirname(os.path.abspath(notebook_path))
     original_dir = os.getcwd()
@@ -560,6 +574,17 @@ print(adata.obs['site'].value_counts())
                     else:
                         code = re.sub(r'^CAP\s*=\s*.*$', f"CAP = {global_dict['CAP']}", code, flags=re.MULTILINE)
                         original_code = re.sub(r'^CAP\s*=\s*.*$', f"CAP = {global_dict['CAP']}", original_code, flags=re.MULTILINE)
+
+                if 'cap_str' in global_dict:
+                    cs_json = json.dumps(global_dict['cap_str'])
+                    code = re.sub(r'^cap_str\s*=.*$', f'cap_str = {cs_json}', code, flags=re.MULTILINE)
+                    original_code = re.sub(r'^cap_str\s*=.*$', f'cap_str = {cs_json}', original_code, flags=re.MULTILINE)
+
+                # Apply proportional sampling fix: replaces equal-per-tissue splitter with
+                # a proportional splitter that respects each tissue's true cell availability.
+                if BIASED_SAMPLER in code:
+                    code = code.replace(BIASED_SAMPLER, BALANCED_SAMPLER)
+                    original_code = original_code.replace(BIASED_SAMPLER, BALANCED_SAMPLER)
 
                 # Update the cell's source code so the HTML display shows the injected parameters!
                 cell['source'] = [original_code]
@@ -741,6 +766,8 @@ if __name__ == '__main__':
     os.makedirs(cancer_output_dir, exist_ok=True)
     
     cellxgene_nb = os.path.join(script_dir, "cancer_cellxgene_integration.ipynb")
+    # HTML name includes tissue slug so runs with the same cap but different tissue sets don't collide
+    # (placeholder slug used here; actual slug is refined after h5ad is known below)
     cellxgene_html = os.path.join(cancer_output_dir, f"cancer_cellxgene_integration_{cap_str}.html")
     
     try:
@@ -775,10 +802,13 @@ if __name__ == '__main__':
                                      f"{all_slug}_{cap_str}_whole_transcriptome_2025-11-08.h5ad")
         print(f"DEBUG tissue_filter={tissue_filter} primary_tissues={primary_tissues}")
         print(f"DEBUG combined_h5ad={combined_h5ad}")
+        # Build the tissue slug from all_tissues to make output filenames unique per tissue combination
         pvsm_nb = os.path.join(script_dir, "primary_vs_metastasis_comparison.ipynb")
-        pvsm_html = os.path.join(cancer_output_dir, f"primary_vs_metastasis_{cap_str}.html")
+        pvsm_html = os.path.join(cancer_output_dir, f"primary_vs_metastasis_{all_slug}_{cap_str}.html")
         project_root = os.path.dirname(script_dir)
         metab_db_path = os.path.join(project_root, 'output', 'human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv')
+        # Update the cellxgene HTML to include the tissue slug too (now that we have all_slug)
+        cellxgene_html = os.path.join(cancer_output_dir, f"cancer_cellxgene_integration_{all_slug}_{cap_str}.html")
         pvsm_globals = {
             'h5ad_path': combined_h5ad,
             'PRIMARY_TISSUES': primary_tissues,
@@ -786,22 +816,22 @@ if __name__ == '__main__':
             'OUTPUT_DIR': cancer_output_dir,
             'PRIMARY_PREFIX': primary_prefix,
             'META_PREFIX': meta_prefix,
-            'metab_db_path': metab_db_path
+            'metab_db_path': metab_db_path,
+            'cap_str': cap_str  # Passed so notebooks can include it in output filenames
         }
         execute_and_export(pvsm_nb, pvsm_html, f"Primary vs Metastasis: {disease_filter_str}", pvsm_globals, skip_if_exists=True)
         
         orphan_nb = os.path.join(script_dir, "orphan_metabolic_immune_evasion.ipynb")
-        orphan_html = os.path.join(cancer_output_dir, f"orphan_immune_{cap_str}.html")
+        orphan_html = os.path.join(cancer_output_dir, f"orphan_immune_{all_slug}_{cap_str}.html")
+        # Orphan CSV is uniquely named per tissue-combination and cell count to prevent overwrites
+        orphan_csv = os.path.join(cancer_output_dir, f"immune_evasion_orphan_metabolic_candidates_{all_slug}_{cap_str}.csv")
         orphan_globals = {
             'h5ad_path': pvsm_globals['h5ad_path'],
             'PRIMARY_TISSUES': primary_tissues,
-            'output_csv': os.path.join(cancer_output_dir, f"primary_vs_metastasis_{cancer_name_safe}_DE_metabolic_targets.csv"),
+            'output_csv': orphan_csv,
             'CANCER_TYPE_NAME': cancer_name_safe,
             'OUTPUT_DIR': cancer_output_dir,
             'PRIMARY_PREFIX': primary_prefix,
-            'META_PREFIX': meta_prefix,
-            'metab_db_path': metab_db_path
+            'META_PREFIX': meta_prefix
         }
         execute_and_export(orphan_nb, orphan_html, f"Orphan Metabolic Targets: {disease_filter_str}", orphan_globals, skip_if_exists=True)
-
-

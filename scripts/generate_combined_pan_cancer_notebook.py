@@ -32,21 +32,21 @@ META_RESULTS_DIR = os.path.join(OUTPUT_DIR, 'pan_cancer_meta_results')
 **Purpose:** To identify strictly conserved genes that form a core "pan-cancer metastatic metabolic signature," independent of the primary tumor's tissue of origin.
 
 **Inputs / Parameters:**
-- **Breast:** `output/breast_results/primary_vs_metastasis_breast_results_DE_metabolic_targets.csv`
-- **Colorectal:** `output/colorectal_results/primary_vs_metastasis_colorectal_results_DE_metabolic_targets.csv`
-- **Lung:** `output/lung_results/primary_vs_metastasis_lung_results_DE_metabolic_targets.csv`
-- **Melanoma:** `output/melanoma_results/primary_vs_metastasis_melanoma_results_DE_metabolic_targets.csv`
-- **Ovarian:** `output/ovarian_results/primary_vs_metastasis_ovarian_results_DE_metabolic_targets.csv`
+- **Breast:** `output/breast_results/primary_vs_metastasis_breast_results_DE_metabolic_targets_{cancer_suffix}.csv`
+- **Colorectal:** `output/colorectal_results/primary_vs_metastasis_colorectal_results_DE_metabolic_targets_{cancer_suffix}.csv`
+- **Lung:** `output/lung_results/primary_vs_metastasis_lung_results_DE_metabolic_targets_{cancer_suffix}.csv`
+- **Melanoma:** `output/melanoma_results/primary_vs_metastasis_melanoma_results_DE_metabolic_targets_{cancer_suffix}.csv`
+- **Ovarian:** `output/ovarian_results/primary_vs_metastasis_ovarian_results_DE_metabolic_targets_{cancer_suffix}.csv`
 
-**Analysis:** We take the intersection of all target genes marked as `Up in Metastasis` across the 5 input files. This yields **23 strictly conserved pan-cancer metabolic targets**.
+**Analysis:** We take the intersection of all target genes marked as `Up in Metastasis` across the 5 input files. This yields **strictly conserved pan-cancer metabolic targets**.
 
 **Underlying Data (CSVs):**
-- **UpSet Plot Data:** `output/pan_cancer_meta_results/upset_plot_data.csv` (contains the raw mapping of which gene belongs to which cancer's Up-Regulated set).
-- **The 23 Pan-Cancer Genes:** `output/pan_cancer_meta_results/pan_cancer_23_genes.csv` (contains the final intersected list).
+- **UpSet Plot Data:** `output/pan_cancer_meta_results/upset_plot_data{ANALYSIS_SUFFIX}.csv` (contains the raw mapping of which gene belongs to which cancer's Up-Regulated set).
+- **The Conserved Pan-Cancer Genes:** `output/pan_cancer_meta_results/pan_cancer_23_genes.csv` (contains the final intersected list).
 """))
 
     code_upset = """# 1. Pan-Cancer Overlap (UpSet Plot)
-image_path = os.path.join(META_RESULTS_DIR, 'upset_plot.png')
+image_path = os.path.join(META_RESULTS_DIR, f'upset_plot{ANALYSIS_SUFFIX}.png')
 if os.path.exists(image_path):
     display(Image(filename=image_path))
 else:
@@ -57,20 +57,20 @@ else:
     # Section 2: Network Plot
     nb.cells.append(nbf.v4.new_markdown_cell("""### 2. Conserved Metabolite-Target Network
 
-**Goal:** Map the 23 pan-cancer conserved genes against their interacting metabolites.
+**Goal:** Map the pan-cancer conserved genes against their interacting metabolites.
 
 **Purpose:** To contextualize these strictly conserved genes into actionable biological pathways and identify highly connected metabolic hubs.
 
 **Inputs / Parameters:**
-- **Gene List:** The 23 strictly conserved genes identified in Section 1 (`output/pan_cancer_meta_results/pan_cancer_23_genes.csv`).
+- **Gene List:** The strictly conserved genes identified in Section 1 (`output/pan_cancer_meta_results/pan_cancer_23_genes.csv`).
 - **Database:** `output/human_metab_target_pairs_cancer_annotated.csv` (our merged metabConnectomeDB pairs).
 
 **Underlying Data (CSV):**
-- **Network Edges:** `output/pan_cancer_meta_results/metabolite_target_network_edges.csv` (contains the raw Source-Target edges used to build this visualization).
+- **Network Edges:** `output/pan_cancer_meta_results/metabolite_target_network_edges{ANALYSIS_SUFFIX}.csv` (contains the raw Source-Target edges used to build this visualization).
 """))
 
     code_network = """# 2. Metabolite-Target Network
-image_path = os.path.join(META_RESULTS_DIR, 'metabolite_target_network.png')
+image_path = os.path.join(META_RESULTS_DIR, 'metabolite_target_network{ANALYSIS_SUFFIX}.png')
 if os.path.exists(image_path):
     display(Image(filename=image_path))
 else:
@@ -79,24 +79,24 @@ else:
     nb.cells.append(nbf.v4.new_code_cell(code_network))
 
     # Section 3: Predictive Biomarker
-    nb.cells.append(nbf.v4.new_markdown_cell("""### 3. Predictive Potential of the 23-Gene Signature
+    nb.cells.append(nbf.v4.new_markdown_cell("""### 3. Predictive Potential of the Conserved Gene Signature
 
-**Goal:** Determine whether the 23-gene signature is heterogeneously expressed in primary tumors.
+**Goal:** Determine whether the conserved gene signature is heterogeneously expressed in primary tumors.
 
 **Purpose:** To compute a single-cell "Metastatic Metabolic Score" across malignant cells within primary tumors. By identifying a sub-population of primary tumor cells with high expression of this signature, we hypothesize these represent pre-metastatic subclones.
 
 **Inputs / Parameters:**
-- **Gene Set:** The 23 Pan-Cancer Genes (`output/pan_cancer_meta_results/pan_cancer_23_genes.csv`).
-- **Algorithm:** `scanpy.tl.score_genes()` computes the average expression of the 23 genes subtracted by the average expression of a reference set of randomly sampled genes.
+- **Gene Set:** The Conserved Pan-Cancer Genes (`output/pan_cancer_meta_results/pan_cancer_23_genes.csv`).
+- **Algorithm:** `scanpy.tl.score_genes()` computes the average expression of the conserved genes subtracted by the average expression of a reference set of randomly sampled genes.
 - **Data sources:** The 100k-cell `.h5ad` file for each cancer, explicitly filtered to `cell_type == 'malignant cell'` and subset to the primary tumor `tissue_general`.
 """))
 
     cancers = [
-        ('Breast', 'breast_primary_signature_score.png', 'breast_primary_signature_scores.csv'),
-        ('Lung', 'lung_primary_signature_score.png', 'lung_primary_signature_scores.csv'),
-        ('Colorectal', 'colorectal_primary_signature_score.png', 'colorectal_primary_signature_scores.csv'),
-        ('Melanoma', 'melanoma_primary_signature_score.png', 'melanoma_primary_signature_scores.csv'),
-        ('Ovarian', 'ovarian_primary_signature_score.png', 'ovarian_primary_signature_scores.csv')
+        ('Breast', f'breast_primary_signature_score{ANALYSIS_SUFFIX}.png', f'breast_primary_signature_scores{ANALYSIS_SUFFIX}.csv'),
+        ('Lung', f'lung_primary_signature_score{ANALYSIS_SUFFIX}.png', f'lung_primary_signature_scores{ANALYSIS_SUFFIX}.csv'),
+        ('Colorectal', f'colorectal_primary_signature_score{ANALYSIS_SUFFIX}.png', f'colorectal_primary_signature_scores{ANALYSIS_SUFFIX}.csv'),
+        ('Melanoma', f'melanoma_primary_signature_score{ANALYSIS_SUFFIX}.png', f'melanoma_primary_signature_scores{ANALYSIS_SUFFIX}.csv'),
+        ('Ovarian', f'ovarian_primary_signature_score{ANALYSIS_SUFFIX}.png', f'ovarian_primary_signature_scores{ANALYSIS_SUFFIX}.csv')
     ]
     
     for i, (cancer, img_file, csv_file) in enumerate(cancers):
@@ -118,7 +118,9 @@ else:
     export_code = """import subprocess
 import sys
 
-ANALYSIS_SUFFIX = '_5MetCan_100k'
+import sys
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX
 notebook_filename = 'pan_cancer_meta_analysis.ipynb'
 output_base = 'pan_cancer_meta_analysis' + ANALYSIS_SUFFIX
 output_dir = os.path.join('..', 'output', 'pan_cancer_meta_results')
@@ -127,7 +129,7 @@ os.makedirs(output_dir, exist_ok=True)
 jupyter_bin = os.path.join(os.path.dirname(sys.executable), 'jupyter')
 if not os.path.exists(jupyter_bin): jupyter_bin = 'jupyter'
 
-cmd_html = [jupyter_bin, "nbconvert", "--to", "html", notebook_filename, "--output-dir", output_dir, "--output", output_base]
+cmd_html = [jupyter_bin, "nbconvert", "--to", "html", "--execute", notebook_filename, "--output-dir", output_dir, "--output", output_base]
 res_html = subprocess.run(cmd_html, capture_output=True, text=True)
 
 if res_html.returncode == 0:

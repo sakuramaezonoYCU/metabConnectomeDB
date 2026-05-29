@@ -1,3 +1,6 @@
+import sys
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX
 import pandas as pd
 import numpy as np
 import os
@@ -70,7 +73,7 @@ def compute_tissue_specific_ratios():
     plt.title('Tissue-Specific Metabolic Adaptation in Breast Cancer Metastasis')
     plt.legend()
     
-    plot_path = os.path.join(OUTPUT_DIR, "tissue_specific_correlation_5MetCan_100k.png")
+    plot_path = os.path.join(OUTPUT_DIR, f"tissue_specific_correlation{ANALYSIS_SUFFIX}.png")
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"Saved {plot_path}")

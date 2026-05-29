@@ -1,5 +1,9 @@
 import pandas as pd
 import os
+import sys
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX, get_de_csv_path
+
 import requests
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -15,7 +19,7 @@ def get_conserved_genes():
     gene_counts = {}
     
     for cancer in CANCERS:
-        res_file = os.path.join(OUTPUT_DIR, f"{cancer}_results", f"primary_vs_metastasis_{cancer}_results_DE_metabolic_targets.csv")
+        res_file = get_de_csv_path(cancer)
         if os.path.exists(res_file):
             df = pd.read_csv(res_file)
             up_genes = df[df['Significance'] == 'Up in Metastasis']['names'].tolist()
@@ -78,14 +82,14 @@ def query_dgidb_graphql(genes):
 if __name__ == '__main__':
     genes_23, genes_181 = get_conserved_genes()
     
-    print("Querying DGIdb for the 23 pan-cancer genes...")
+    print("Querying DGIdb for the strictly conserved pan-cancer genes...")
     df_23 = query_dgidb_graphql(genes_23)
-    path_23 = os.path.join(DRUGGABILITY_DIR, 'druggable_targets_23_genes.csv')
+    path_23 = os.path.join(DRUGGABILITY_DIR, f'druggable_targets_strictly_conserved{ANALYSIS_SUFFIX}.csv')
     df_23.to_csv(path_23, index=False)
     print(f"Saved {path_23} with {len(df_23)} interactions.")
     
-    print("Querying DGIdb for the 181 >=4 cancer genes...")
+    print("Querying DGIdb for the broadly conserved (>=4) cancer genes...")
     df_181 = query_dgidb_graphql(genes_181)
-    path_181 = os.path.join(DRUGGABILITY_DIR, 'druggable_targets_181_genes.csv')
+    path_181 = os.path.join(DRUGGABILITY_DIR, f'druggable_targets_broadly_conserved{ANALYSIS_SUFFIX}.csv')
     df_181.to_csv(path_181, index=False)
     print(f"Saved {path_181} with {len(df_181)} interactions.")

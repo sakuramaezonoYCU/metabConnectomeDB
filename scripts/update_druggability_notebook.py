@@ -1,5 +1,9 @@
 import nbformat as nbf
 import os
+import sys
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX, get_de_csv_path
+
 import pandas as pd
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -28,12 +32,12 @@ In addition to the specific GLS axis, we also query the DGIdb database for the s
 """))
 
     # Code for 23 genes
-    code_23 = """df_23 = pd.read_csv(os.path.join(OUTPUT_DIR, 'druggable_targets_23_genes.csv'))
+    code_23 = """df_23 = pd.read_csv(os.path.join(OUTPUT_DIR, f'druggable_targets_strictly_conserved{ANALYSIS_SUFFIX}.csv'))
 print(f"Total drug interactions for 23 conserved genes: {len(df_23)}")
 display(df_23.head(10))"""
     cell_23 = nbf.v4.new_code_cell(code_23)
     
-    csv_23_path = os.path.join(DRUGGABILITY_DIR, 'druggable_targets_23_genes.csv')
+    csv_23_path = os.path.join(DRUGGABILITY_DIR, f'druggable_targets_strictly_conserved{ANALYSIS_SUFFIX}.csv')
     if os.path.exists(csv_23_path):
         df_23 = pd.read_csv(csv_23_path)
         output_txt = f"Total drug interactions for 23 conserved genes: {len(df_23)}\n"
@@ -44,12 +48,12 @@ display(df_23.head(10))"""
     new_cells.append(cell_23)
     
     # Code for 181 genes
-    code_181 = """df_181 = pd.read_csv(os.path.join(OUTPUT_DIR, 'druggable_targets_181_genes.csv'))
+    code_181 = """df_181 = pd.read_csv(os.path.join(OUTPUT_DIR, f'druggable_targets_broadly_conserved{ANALYSIS_SUFFIX}.csv'))
 print(f"Total drug interactions for 181 conserved genes: {len(df_181)}")
 display(df_181.head(10))"""
     cell_181 = nbf.v4.new_code_cell(code_181)
     
-    csv_181_path = os.path.join(DRUGGABILITY_DIR, 'druggable_targets_181_genes.csv')
+    csv_181_path = os.path.join(DRUGGABILITY_DIR, f'druggable_targets_broadly_conserved{ANALYSIS_SUFFIX}.csv')
     if os.path.exists(csv_181_path):
         df_181 = pd.read_csv(csv_181_path)
         output_txt = f"Total drug interactions for 181 conserved genes: {len(df_181)}\n"

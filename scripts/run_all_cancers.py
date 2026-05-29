@@ -5,13 +5,13 @@ import os
 
 # Set default CAP for CellxGene downloads (number of cells). 100k = 100000 cells.
 # Users can override by setting the environment variable CELLXGENE_CAP before running this script.
-DEFAULT_CAP = "100000"
+DEFAULT_CAP = "500000"
 os.environ.setdefault('CELLXGENE_CAP', DEFAULT_CAP)
 
 cancer_to_primary = {
-    'colorectal cancer, colorectal carcinoma || metastatic malignant neoplasm': ['colon', 'large intestine'],
     'lung cancer, lung adenocarcinoma': ['lung'],
     'breast cancer': ['breast', 'mammary gland'],
+    'colorectal cancer, colorectal carcinoma || metastatic malignant neoplasm': ['colon', 'large intestine'],
     'melanoma, metastatic melanoma': ['skin of body'],
     'ovarian cancer, malignant ovarian serous tumor': ['ovary']
 }
@@ -25,7 +25,7 @@ with cellxgene_census.open_soma(census_version="2025-11-08") as census:
     df = df[df["is_primary_data"] == True]
 
 # For testing, we will only run the first cancer
-test_mode = False
+test_mode = True
 cancers_to_run = list(cancer_to_primary.keys())
 if test_mode:
     cancers_to_run = [cancers_to_run[0]]

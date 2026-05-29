@@ -83,7 +83,9 @@ plt.show()"""
 import sys
 import os
 
-ANALYSIS_SUFFIX = '_5MetCan_100k'
+import sys
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX
 notebook_filename = 'nr1d2_master_regulator_analysis.ipynb'
 output_base = 'nr1d2_master_regulator_analysis' + ANALYSIS_SUFFIX
 output_dir = os.path.join(OUTPUT_DIR, 'nr1d2_results')
@@ -92,7 +94,7 @@ os.makedirs(output_dir, exist_ok=True)
 jupyter_bin = os.path.join(os.path.dirname(sys.executable), 'jupyter')
 if not os.path.exists(jupyter_bin): jupyter_bin = 'jupyter'
 
-cmd_html = [jupyter_bin, "nbconvert", "--to", "html", notebook_filename, "--output-dir", output_dir, "--output", output_base]
+cmd_html = [jupyter_bin, "nbconvert", "--to", "html", "--execute", notebook_filename, "--output-dir", output_dir, "--output", output_base]
 res_html = subprocess.run(cmd_html, capture_output=True, text=True)
 
 if res_html.returncode == 0:
@@ -101,10 +103,13 @@ else:
     print("❌ HTML export failed.")
 """))
 
-    with open('nr1d2_master_regulator_analysis.ipynb', 'w', encoding='utf-8') as f:
-        nbf.write(nb, f)
-        
-    print("Created notebook nr1d2_master_regulator_analysis.ipynb with embedded outputs!")
+    out_path = 'nr1d2_master_regulator_analysis.ipynb'
+    if os.path.exists(out_path):
+        print(f"⚠️ {out_path} already exists. Skipping overwrite to protect user edits.")
+    else:
+        with open(out_path, 'w', encoding='utf-8') as f:
+            nbf.write(nb, f)
+        print(f"Created notebook {out_path} with embedded outputs!")
 
 if __name__ == '__main__':
     create_notebook()

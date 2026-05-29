@@ -1,3 +1,6 @@
+import sys
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX
 import nbformat as nbf
 import os
 import pandas as pd
@@ -54,7 +57,7 @@ plt.title('Tissue-Specific Metabolic Adaptation in Breast Cancer Metastasis')
 plt.show()"""
     cell_plot = nbf.v4.new_code_cell(code_plot)
     
-    plot_path = os.path.join(OUTPUT_DIR, 'tissue_specific_correlation_5MetCan_100k.png')
+    plot_path = os.path.join(OUTPUT_DIR, f'tissue_specific_correlation{ANALYSIS_SUFFIX}.png')
     if os.path.exists(plot_path):
         with open(plot_path, 'rb') as f:
             png_data = base64.b64encode(f.read()).decode('utf-8')

@@ -209,12 +209,14 @@ The following details the relationship between scripts, their inputs, internal p
 
 ### `pan_cancer_meta_analysis.ipynb` & Generators
 
-- **Role:** The capstone multi-cancer meta-analysis. Computes the mathematical intersection of DE results across all 5 cancers to derive a strictly conserved metastatic metabolic signature (23 genes). Includes Network visualizations, druggability scoring, and predictive biomarker scoring from primary datasets.
-- **Key Scripts:** 
-  - `compute_pan_cancer_meta.py`: Aggregates the 5 single-cancer DE results and generates the 23-gene strictly conserved list and network edges.
-  - `generate_predictive_notebook_all5.py`: Computes the "Metastatic Metabolic Score" across primary vs. metastatic single cells.
-  - `generate_combined_pan_cancer_notebook.py`: Auto-generates the final `pan_cancer_meta_analysis.ipynb` notebook.
-- **Output:** Master 5-cancer meta-analysis notebook detailing the 23 conserved genes, network graph, druggability analysis, and predictive scores, alongside all underlying CSV data files in `output/pan_cancer_meta_results/`.
+- **Role:** The capstone multi-cancer meta-analysis. Computes the mathematical intersection of DE results across all 5 cancers to derive a strictly conserved metastatic metabolic signature. Includes Network visualizations, druggability scoring, and predictive biomarker scoring from primary datasets.
+- **Key Scripts (Run in this exact order if you change cell counts or parameters in `pan_cancer_config.py`):** 
+  1. `run_all_cancers.py`: Re-runs the base pipeline for all 5 cancers (generates individual cancer DE results).
+  2. `compute_pan_cancer_meta.py`: Aggregates the 5 single-cancer DE results to generate the strictly conserved gene list, UpSet plot, and network edges.
+  3. `generate_predictive_notebook_all5.py`: Computes the "Metastatic Metabolic Score" across primary vs. metastatic single cells for all 5 cancers, outputting CSVs and PNGs.
+  4. `generate_combined_pan_cancer_notebook.py`: Auto-generates the final `pan_cancer_meta_analysis.ipynb` notebook logic.
+  5. Finally, execute `pan_cancer_meta_analysis.ipynb` top-to-bottom (or use `execute_and_export_notebooks.py`) to render the final HTML report.
+- **Output:** Master 5-cancer meta-analysis notebook detailing the conserved genes, network graph, druggability analysis, and predictive scores, alongside all underlying CSV data files in `output/pan_cancer_meta_results/`.
 
 ### Specialized Investigation Notebooks
 
@@ -223,6 +225,10 @@ Several targeted Jupyter notebooks dive deep into specific biological questions 
 - **`oxygen_tension_analysis.ipynb`**: Correlates the magnitude of metabolic shifts against the physical oxygen tension of varying metastatic niches (e.g., hypoxic pleural effusions vs. oxygenated brain).
 - **`nr1d2_master_regulator_analysis.ipynb`**: Explores whether the universally upregulated gene NR1D2 acts as the master transcriptional switch for the pan-cancer metastatic signature using ChEA/ENCODE enrichment.
 - **`ovarian_serotonin_immune_evasion.ipynb`**: Specifically investigates the role of up-regulated tumor-derived serotonin receptors in the suppression of local T-cells within the ovarian peritoneal metastatic niche.
+- **`deepdive_conserved_metabGeneSig.ipynb`**: Deep dive into the conserved pan-cancer metabolic gene signature, integrating STAT3 targets, directional cell-cell communication, and validating signatures in TCGA survival cohorts using permutation null distributions.
+- **`mitf_regulon_expansion.ipynb`**: Investigates the expansion of the MITF regulon and its downstream metabolic targets.
+- **`predictive_signature_biomarker.ipynb`**: Explores the pan-cancer predictive capability of the strictly conserved metabolic gene signature.
+- **`serotonin_axis_spatial_mapping.ipynb`**: Maps the spatial distribution of the serotonin axis within specific tissue microenvironments.
 
 ## 📊 Data Provenance & Metadata
 
