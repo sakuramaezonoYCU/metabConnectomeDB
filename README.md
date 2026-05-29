@@ -216,6 +216,14 @@ The following details the relationship between scripts, their inputs, internal p
   - `generate_combined_pan_cancer_notebook.py`: Auto-generates the final `pan_cancer_meta_analysis.ipynb` notebook.
 - **Output:** Master 5-cancer meta-analysis notebook detailing the 23 conserved genes, network graph, druggability analysis, and predictive scores, alongside all underlying CSV data files in `output/pan_cancer_meta_results/`.
 
+### Specialized Investigation Notebooks
+
+Several targeted Jupyter notebooks dive deep into specific biological questions raised by the pan-cancer analysis:
+- **`druggability_axis_analysis.ipynb`**: Investigates the clinical actionability of the highly conserved glutamine-sphingolipid-ketone body axis.
+- **`oxygen_tension_analysis.ipynb`**: Correlates the magnitude of metabolic shifts against the physical oxygen tension of varying metastatic niches (e.g., hypoxic pleural effusions vs. oxygenated brain).
+- **`nr1d2_master_regulator_analysis.ipynb`**: Explores whether the universally upregulated gene NR1D2 acts as the master transcriptional switch for the pan-cancer metastatic signature using ChEA/ENCODE enrichment.
+- **`ovarian_serotonin_immune_evasion.ipynb`**: Specifically investigates the role of up-regulated tumor-derived serotonin receptors in the suppression of local T-cells within the ovarian peritoneal metastatic niche.
+
 ## 📊 Data Provenance & Metadata
 
 A critical aspect of this unified database is the tracking of metadata provenance.
