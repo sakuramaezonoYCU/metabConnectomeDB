@@ -25,6 +25,7 @@ metabConnectomeDB/
 │   ├── subclass_mapping.csv            # Mapping dictionary for metabolite subclasses
 │   └── superclass_mapping.csv          # Mapping dictionary for metabolite superclasses
 ├── output/                             # Consolidated output CSV files and HTML reports
+│   └── AI_summary_and_insights.md      # Comprehensive pipeline insights and next steps
 ├── environment.yml                     # Conda environment definition
 ├── requirements.txt                    # Pip requirements definition
 └── README.md                           # This documentation

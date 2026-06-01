@@ -3,40 +3,59 @@ import pandas as pd
 import time
 from druggability_config import DGIDB_API_URL, OPENTARGETS_API_URL
 
+headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) metabConnectomeDB'}
+
 def query_dgidb(genes):
     """
-    Query the Drug Gene Interaction Database (DGIdb) for a list of genes.
+    Query the Drug Gene Interaction Database (DGIdb) for a list of genes using GraphQL.
     """
     print(f"[DGIdb] Querying interactions for {len(genes)} genes...")
     results = []
     
-    # DGIdb v2 expects a comma-separated list of genes
-    params = {'genes': ','.join(genes)}
-    
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) metabConnectomeDB'}
+    DGIDB_GQL = "https://dgidb.org/api/graphql"
+    genes_str = '", "'.join(genes)
+    q = f"""
+    query {{
+      genes(names: ["{genes_str}"]) {{
+        nodes {{
+          name
+          interactions {{
+            drug {{
+              name
+            }}
+            interactionTypes {{
+              type
+            }}
+            interactionAttributes {{
+              name
+              value
+            }}
+          }}
+        }}
+      }}
+    }}
+    """
     
     try:
-        response = requests.get(DGIDB_API_URL, params=params, headers=headers)
-        response.raise_for_status()
+        r = requests.post(DGIDB_GQL, json={"query": q}, headers=headers)
+        r.raise_for_status()
+        data = r.json()
         
-        try:
-            data = response.json()
-        except ValueError:
-            print(f"[DGIdb Error] The API returned non-JSON content. (Status {response.status_code})")
-            return pd.DataFrame()
-            
-        
-        for matched_term in data.get('matchedTerms', []):
-            gene_name = matched_term.get('searchTerm')
-            for interaction in matched_term.get('interactions', []):
-                results.append({
-                    'Database': 'DGIdb',
-                    'Target_Gene': gene_name,
-                    'Drug_Name': interaction.get('drugName'),
-                    'Interaction_Type': ', '.join(interaction.get('interactionTypes', [])),
-                    'Sources': ', '.join(interaction.get('sources', [])),
-                    'Approval_Status': 'N/A' # DGIdb doesn't strictly provide phase here easily
-                })
+        nodes = data.get('data', {}).get('genes', {}).get('nodes', [])
+        for node in nodes:
+            gene_name = node.get('name')
+            for interaction in node.get('interactions', []):
+                drug_name = interaction.get('drug', {}).get('name')
+                if drug_name:
+                    types = [t.get('type') for t in interaction.get('interactionTypes', []) if t.get('type')]
+                    results.append({
+                        'Database': 'DGIdb',
+                        'Target_Gene': gene_name,
+                        'Drug_Name': drug_name,
+                        'Interaction_Type': ', '.join(types) if types else 'Targeted',
+                        'Sources': 'DGIdb GraphQL',
+                        'Approval_Status': 'N/A'
+                    })
         print(f"[DGIdb] Found {len(results)} interactions.")
         return pd.DataFrame(results)
     except Exception as e:
@@ -87,15 +106,16 @@ def query_open_targets(genes):
         query_drugs = """
         query target($ensemblId: String!){
           target(ensemblId: $ensemblId){
-            knownDrugs {
+            drugAndClinicalCandidates {
               rows {
                 drug {
                   name
                 }
-                phase
-                status
-                disease {
-                  name
+                maxClinicalStage
+                diseases {
+                  disease {
+                    name
+                  }
                 }
               }
             }
@@ -112,7 +132,7 @@ def query_open_targets(genes):
                 
             drugs = data.get('data', {}).get('target', {})
             if drugs:
-                drugs = drugs.get('knownDrugs', {})
+                drugs = drugs.get('drugAndClinicalCandidates', {})
                 if drugs:
                     drugs = drugs.get('rows', [])
                 else:
@@ -122,16 +142,20 @@ def query_open_targets(genes):
             
             for row in drugs:
                 drug_info = row.get('drug', {})
+                diseases = row.get('diseases', [])
+                disease_names = [d.get('disease', {}).get('name') for d in diseases if d.get('disease')]
+                
                 results.append({
                     'Database': 'OpenTargets',
                     'Target_Gene': gene,
                     'Drug_Name': drug_info.get('name'),
                     'Interaction_Type': 'Targeted (ChEMBL/CT.gov)',
-                    'Approval_Status': f"Phase {row.get('phase')} ({row.get('status', 'Unknown')})",
-                    'Indication_Disease': row.get('disease', {}).get('name')
+                    'Approval_Status': f"Max Phase {row.get('maxClinicalStage', 'Unknown')}",
+                    'Indication_Disease': ', '.join(disease_names)
                 })
         except Exception as e:
             print(f"[OpenTargets Error] Failed fetching drugs for {gene}: {e}")
+            
             
     print(f"[OpenTargets] Found {len(results)} known drug indications.")
     return pd.DataFrame(results)

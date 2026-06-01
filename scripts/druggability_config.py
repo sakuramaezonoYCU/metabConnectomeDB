@@ -18,10 +18,7 @@ if not os.path.exists(OUTPUT_DIR):
 
 # The gene axis to be investigated
 TARGET_GENES = [
-    "GLS",
-    "SGMS1",
-    "SLC16A7",
-    "SPTLC1"
+    'ADAM10', 'C1GALT1', 'ESRRG', 'FZD6', 'GBE1', 'GLS', 'ITGA4', 'PDE3B', 'SGMS1', 'SLC11A2', 'SLC16A7', 'SLC22A1'
 ]
 
 # Analysis suffix used for file naming and tracking
