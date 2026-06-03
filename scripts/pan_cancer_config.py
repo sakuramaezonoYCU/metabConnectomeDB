@@ -4,7 +4,7 @@ pan_cancer_config.py
 Central configuration for the pan-cancer meta-analysis pipeline.
 
 To adjust which cell-count run is used for a cancer:
-  1. Change the value in CANCER_CAP below (e.g. '100k' → '500k').
+  1. Change the value in CANCER_CAP below (e.g. '100k' → '100k').
   2. Re-run compute_pan_cancer_meta.py  →  generates new upset plot + 23-gene list.
   3. Re-run generate_predictive_notebook.py  →  re-scores primary tumors.
 

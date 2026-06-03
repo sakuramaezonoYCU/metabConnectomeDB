@@ -63,6 +63,7 @@ python -m ipykernel install --user --name metabConnectomeDB --display-name "Pyth
 ```bash
 conda env create -f environment.yml
 conda activate metabconnectome
+
 # Register the kernel for Jupyter
 python -m ipykernel install --user --name metabConnectomeDB --display-name "Python 3.12 (metabConnectomeDB)"
 ```
@@ -211,7 +212,7 @@ The following details the relationship between scripts, their inputs, internal p
 ### `pan_cancer_meta_analysis.ipynb` & Generators
 
 - **Role:** The capstone multi-cancer meta-analysis. Computes the mathematical intersection of DE results across all 5 cancers to derive a strictly conserved metastatic metabolic signature. Includes Network visualizations, druggability scoring, and predictive biomarker scoring from primary datasets.
-- **Key Scripts (Run in this exact order if you change cell counts or parameters in `pan_cancer_config.py`):** 
+- **Key Scripts (Run in this exact order if you change cell counts or parameters in `pan_cancer_config.py`):**
   1. `run_all_cancers.py`: Re-runs the base pipeline for all 5 cancers (generates individual cancer DE results).
   2. `compute_pan_cancer_meta.py`: Aggregates the 5 single-cancer DE results to generate the strictly conserved gene list, UpSet plot, and network edges.
   3. `generate_predictive_notebook_all5.py`: Computes the "Metastatic Metabolic Score" across primary vs. metastatic single cells for all 5 cancers, outputting CSVs and PNGs.
@@ -222,6 +223,7 @@ The following details the relationship between scripts, their inputs, internal p
 ### Specialized Investigation Notebooks
 
 Several targeted Jupyter notebooks dive deep into specific biological questions raised by the pan-cancer analysis:
+
 - **`druggability_axis_analysis.ipynb`**: Investigates the clinical actionability of the highly conserved glutamine-sphingolipid-ketone body axis.
 - **`oxygen_tension_analysis.ipynb`**: Correlates the magnitude of metabolic shifts against the physical oxygen tension of varying metastatic niches (e.g., hypoxic pleural effusions vs. oxygenated brain).
 - **`nr1d2_master_regulator_analysis.ipynb`**: Explores whether the universally upregulated gene NR1D2 acts as the master transcriptional switch for the pan-cancer metastatic signature using ChEA/ENCODE enrichment.
@@ -230,6 +232,7 @@ Several targeted Jupyter notebooks dive deep into specific biological questions 
 - **`mitf_regulon_expansion.ipynb`**: Investigates the expansion of the MITF regulon and its downstream metabolic targets.
 - **`predictive_signature_biomarker.ipynb`**: Explores the pan-cancer predictive capability of the strictly conserved metabolic gene signature.
 - **`serotonin_axis_spatial_mapping.ipynb`**: Maps the spatial distribution of the serotonin axis within specific tissue microenvironments.
+- **`ml_prognostic_classifier.ipynb`**: Trains Cox Proportional Hazards, Random Forest, and MLP Neural Network classifiers on independent clinical cohorts (e.g., METABRIC breast cancer dataset) to evaluate the prognostic power of our derived metabolic gene signatures. Generates risk stratification models, ROC curves, and Kaplan-Meier plots.
 
 ## 📊 Data Provenance & Metadata
 

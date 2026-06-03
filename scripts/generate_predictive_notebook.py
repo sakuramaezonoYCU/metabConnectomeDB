@@ -32,6 +32,7 @@ def run_analysis_and_plot():
     ]
     
     plot_paths = {}
+    cancer_stats = {}
     
     for prefix, tissue, color, title_name in cancers_config:
         h5ad_path = get_h5ad_path(prefix)
@@ -39,8 +40,10 @@ def run_analysis_and_plot():
         
         if isinstance(tissue, list):
             adata_pri = adata[(adata.obs['cell_type'] == 'malignant cell') & (adata.obs['tissue_general'].isin(tissue))].copy()
+            adata_met = adata[(adata.obs['cell_type'] == 'malignant cell') & (~adata.obs['tissue_general'].isin(tissue))]
         else:
             adata_pri = adata[(adata.obs['cell_type'] == 'malignant cell') & (adata.obs['tissue_general'] == tissue)].copy()
+            adata_met = adata[(adata.obs['cell_type'] == 'malignant cell') & (adata.obs['tissue_general'] != tissue)]
             
         valid_genes = [g for g in signature_genes if g in adata_pri.var_names]
         sc.tl.score_genes(adata_pri, gene_list=valid_genes, score_name='Metastatic_Signature_Score')
@@ -66,6 +69,31 @@ def run_analysis_and_plot():
         plt.close()
         
         plot_paths[prefix] = plot_path
+        cancer_stats[prefix] = len(adata_met)
+        
+    # Generate summary CSV
+    summary_data = []
+    for prefix, tissue, color, title_name in cancers_config:
+        csv_path = os.path.join(META_RESULTS_DIR, f'{prefix}_primary_signature_scores{ANALYSIS_SUFFIX}.csv')
+        df = pd.read_csv(csv_path)
+        total_cells = len(df)
+        pct_gt_0 = (df['Metastatic_Signature_Score'] > 0).mean() * 100
+        
+        # Preserve the previously annotated distribution descriptions
+        dist_type = "Bimodal" if prefix == 'lung' else ("Right-skewed / bimodal" if prefix == 'breast' else "Right-skewed")
+        
+        summary_data.append({
+            'Cancer': f"**{title_name}**",
+            'Primary Cells Scored': f"{total_cells:,}",
+            'Metastatic Cells Scored': f"{cancer_stats[prefix]:,}",
+            'Score Distribution': dist_type,
+            'Pre-Metastatic Subclone (%)': f"~{pct_gt_0:.1f}%"
+        })
+        
+    summary_df = pd.DataFrame(summary_data)
+    summary_csv_path = os.path.join(META_RESULTS_DIR, f'pre_metastatic_subclone_summary{ANALYSIS_SUFFIX}.csv')
+    summary_df.to_csv(summary_csv_path, index=False)
+    print(f"Saved summary table to {summary_csv_path}")
         
     return plot_paths, signature_genes
 

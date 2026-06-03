@@ -9,3 +9,9 @@ cellxgene-census
 liana
 ipywidgets
 plotly
+
+# ML Prognostic Classifier Requirements
+scikit-survival
+lifelines
+scikit-learn
+requests
