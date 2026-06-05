@@ -290,21 +290,64 @@ def generate_annotated_signature():
     df.to_csv(out_path, index=False)
     print(f"Generated data-driven annotation: {out_path}")
 
-def generate_dataset_overview():
-    # Dynamically read dataset overview from the cell counts CSV
-    counts_csv = os.path.join(META_RESULTS_DIR, f'cell_type_counts{ANALYSIS_SUFFIX}.csv')
+def generate_dataset_overview(suffix, out_name):
+    counts_csv = os.path.join(META_RESULTS_DIR, f'cell_type_counts{suffix}.csv')
     if not os.path.exists(counts_csv):
         print(f"Cell counts file not found: {counts_csv}")
         return
         
     df = pd.read_csv(counts_csv)
-    # The cell counts file has Dataset, Total Primary TME Cells, Primary Malignant Cells, etc.
-    df = df[['Dataset', 'Total Primary TME Cells', 'Total Metastatic TME Cells']]
     df.rename(columns={'Dataset': 'Cancer'}, inplace=True)
     
-    out_path = os.path.join(SUMMARY_TABLES_DIR, f'dataset_overview{ANALYSIS_SUFFIX}.csv')
+    # Format numbers with commas
+    for col in df.columns:
+        if col != 'Cancer':
+            df[col] = df[col].apply(lambda x: f"{int(x):,}" if pd.notnull(x) else x)
+            
+    out_path = os.path.join(SUMMARY_TABLES_DIR, f'{out_name}.csv')
     df.to_csv(out_path, index=False)
     print(f"Generated data-driven overview: {out_path}")
+
+def generate_subclone_summary(suffix, out_name):
+    cancers = ['breast', 'colorectal', 'lung', 'melanoma', 'ovarian']
+    
+    data = []
+    for c in cancers:
+        file_path = os.path.join(META_RESULTS_DIR, f"{c}_primary_signature_scores{suffix}.csv")
+        if not os.path.exists(file_path):
+            continue
+        df = pd.read_csv(file_path)
+        count = len(df)
+        if count == 0:
+            continue
+            
+        scores = df['Metastatic_Signature_Score']
+        skew = scores.skew()
+        
+        if skew > 0.5:
+            dist = "Right-skewed"
+        elif skew < -0.5:
+            dist = "Left-skewed"
+        else:
+            dist = "Symmetric"
+            
+        # Mathematical extraction of highly metastatic subclone
+        # Defined as cells with scores > Mean + 1 Standard Deviation
+        mean_score = scores.mean()
+        std_score = scores.std()
+        subclone_pct = (scores > (mean_score + std_score)).mean() * 100
+        
+        data.append({
+            'Cancer': f"**{c.capitalize()}**",
+            'Primary Cells Scored': f"{count:,}",
+            'Score Distribution': dist,
+            'Pre-Metastatic Subclone (%)': f"{subclone_pct:.1f}% (> +1 SD)"
+        })
+    if data:
+        summary_df = pd.DataFrame(data)
+        out_path = os.path.join(SUMMARY_TABLES_DIR, f'{out_name}.csv')
+        summary_df.to_csv(out_path, index=False)
+        print(f"Generated: {out_path}")
 
 def generate_unique_signatures():
     # Dynamically read the upset plot intersection data to get UNIQUE genes per cancer
@@ -367,8 +410,15 @@ def main():
     generate_immune_evasion_table()
     generate_ccc_potential_table()
     generate_annotated_signature()
-    generate_dataset_overview()
     generate_unique_signatures()
+    
+    # Generate Version 5 (100k) and Version 6 (500k) specific tables
+    generate_dataset_overview('_Br100k_Co100k_Lu100k_Me100k_Ov100k', 'dataset_overview_100k')
+    generate_dataset_overview('_Br500k_Co100k_Lu500k_Me100k_Ov100k', 'dataset_overview_500k')
+    
+    generate_subclone_summary('_5MetCan_100k', 'subclone_summary_100k')
+    generate_subclone_summary('_Br500k_Co100k_Lu500k_Me100k_Ov100k', 'subclone_summary_500k')
+    
     print(f"\nAll summary CSVs have been saved to: {SUMMARY_TABLES_DIR}")
 
 if __name__ == '__main__':

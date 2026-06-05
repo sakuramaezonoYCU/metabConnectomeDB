@@ -1,5 +1,7 @@
 # AI Summary and Insights
 
+# co-created by Sakura Maezono
+
 ## Version 7: June 3, 2026 — ML Prognostic Classifier Benchmark & Expanded Dataset Validation
 
 Following the Version 6 research agenda, we executed three of the four *In Silico & Computational Verification* items proposed in V6 §8: the ML Prognostic Classifier (item 3), expanded dataset validation (scaling breast cancer from 100k to 500k cells), and updated druggability profiling of the 21-gene directed signature. This version reports the results, including an honest assessment of where the signature performs well and where it does not.
@@ -21,7 +23,7 @@ Each report includes Cox PH hazard ratio plots, Random Forest feature importance
 
 #### Critical Honest Assessment
 
-**Verdict: The metabolic signatures have limited univariate prognostic power on METABRIC bulk RNA-seq.**
+**[🔴 NEGATIVE RESULT] Verdict: The metabolic signatures have limited univariate prognostic power on METABRIC bulk RNA-seq.**
 
 - All four signatures yield C-index values in the range **0.512–0.523** — marginally above random (0.50).
 - The 3-gene Producer Triad paradoxically outperforms all larger signatures (C-index = 0.523), suggesting that adding more genes introduces noise in the bulk RNA-seq context.
@@ -34,7 +36,7 @@ Each report includes Cox PH hazard ratio plots, Random Forest feature importance
 
 The weak univariate performance does **not** invalidate the signatures for:
 - **Multivariate models** combining metabolic + genomic features (PAM50 subtype + 3-gene score)
-- **Multi-cancer validation** using pan-TCGA or ICGC cohorts where the pan-cancer nature of the signature can be fully leveraged
+- **Multi-cancer validation** using pan-TCGA or GEO cohorts where the pan-cancer nature of the signature can be fully leveraged
 - **Single-cell-level prediction** where the full resolution of the signature is preserved
 
 ---
@@ -43,7 +45,7 @@ The weak univariate performance does **not** invalidate the signatures for:
 
 *(Based on results in `output/deepdive_conserved_metabGeneSig_Br500k_Co100k_Lu500k_Me100k_Ov100k/tcga_validation/true_signature_metrics.csv` and `output/deepdive_conserved_metabGeneSig_Br500k_Co100k_Lu500k_Me100k_Ov100k/tcga_validation/null_distribution_metrics.csv`)*
 
-We validated the 21-gene directed signature against 7 TCGA cohorts (3,865 total patients), including a **1,000-permutation null distribution** to assess statistical significance:
+**[🔴 NEGATIVE RESULT]** We validated the 21-gene directed signature against 7 TCGA cohorts (3,865 total patients), including a **1,000-permutation null distribution** to assess statistical significance (all individual cohort p-values were non-significant):
 
 | TCGA Cohort | N Samples | Hazard Ratio | P-value | Direction |
 |:---|:---:|:---:|:---:|:---|
@@ -62,91 +64,67 @@ We validated the 21-gene directed signature against 7 TCGA cohorts (3,865 total 
 
 ---
 
-### 3. Expanded Dataset: Breast Cancer Scale-Up to 500,000 Cells
-
-*(Based on results in `output/pan_cancer_meta_results/cell_type_counts_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv` and `output/ai_summary_tables/dataset_overview_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv`)*
-
-We scaled the breast cancer dataset from 100k to **500,000 cells** (5× expansion) while maintaining 100k cells for the other four cancers. The total dataset now spans **1,258,025 cells**:
-
-| Dataset | Total Primary TME | Primary Malignant | Total Metastatic TME | Metastatic Malignant |
-|:---|:---:|:---:|:---:|:---:|
-| **Breast** | 278,119 | 152,346 | 221,881 | 109,767 |
-| **Colorectal** | 36,080 | 8,955 | 28,025 | 7,751 |
-| **Lung** | 440,642 | 49,312 | 59,359 | 8,233 |
-| **Melanoma** | 13,024 | 10,992 | 10,895 | 4,990 |
-| **Ovarian** | 25,000 | 7,261 | 75,000 | 19,608 |
-
-**Impact of 5× Breast Scaling:**
-- The 5× increase in breast cells enables higher statistical power for rare cell-type analyses and subclone detection.
-- The 21-gene signature and all downstream analyses (STAT3 network, directional CCC, oxygen gradient, TCGA validation) were re-run on this expanded dataset, with results stored in the `Br500k_Co100k_Lu500k_Me100k_Ov100k` output directories.
-- Core findings from V6 (STAT3 12-gene axis, Producer Triad, MITF regulon, serotonin axis) are **stable and reproduced** at the expanded scale.
-
----
-
-### 4. Updated Druggability Profile: 21-Gene Directed Signature
+### 3. Updated Druggability Profile: 21-Gene Directed Signature
 
 *(Based on results in `output/druggability/druggable_targets_strictly_conserved_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv` and `output/druggability/druggable_targets_broadly_conserved_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv`)*
 
 Cross-referencing the 21-gene directed signature against DGIdb yields **175 drug-gene interactions** covering **13 of 21 genes** (62% druggable):
 
-| Gene | N Drugs | Top Drug(s) | Therapeutic Class |
-|:---|:---:|:---|:---|
-| **GLS** | 71 | Telaglenastat (CB-839), Methotrexate, Curcumin | Glutaminase inhibitor (clinical trials) |
-| **TRPM8** | 17 | D-3263, PF-05105679, Elismetrep | TRP channel modulator |
-| **ADAM10** | 16 | Aderbasib, Marimastat, GI254023X | Metalloprotease inhibitor |
-| **SLC22A1** | 16 | Sorafenib, Cisplatin, Sumatriptan | OCT1 transporter substrate/inhibitor |
-| **PDE3B** | 12 | Ensifentrine, Dipyridamole, Theophylline | PDE3 inhibitor |
-| **EPOR** | 10 | Epoetin alfa, Peginesatide | EPO receptor agonist |
-| **ITGA4** | 9 | Natalizumab, Vedolizumab | Integrin α4 antibody |
-| **ESRRG** | 7 | Diethylstilbestrol, Afimoxifene | Nuclear receptor modulator |
-| **ERAP1** | 6 | Tosedostat | Aminopeptidase inhibitor |
-| **GBE1** | 5 | Heparin, Enoxaparin | Glycogen enzyme modulator |
-| **FZD6** | 4 | WNT-3A, WNT-5A | WNT ligand |
-| **AUH** | 1 | SHK Toxin | — |
-| **SLC16A7** | 1 | Methotrexate | Transporter substrate |
-| **SGMS1** | 0 | — | Undrugged |
-| **SPTLC1** | 0 | — | Undrugged |
-| **NR1D2** | 0 | — | Undrugged |
-| **CD46** | 0 | — | Undrugged |
-| **MTMR1** | 0 | — | Undrugged |
-| **AMDHD1** | 0 | — | Undrugged |
-| **C1GALT1** | 0 | — | Undrugged |
-| **ERAP1** | 6 | — | (Listed above) |
+> [!NOTE]
+> **Data Provenance**
+> - **Source File:** `output/ai_summary_tables/21_gene_directed_signature_annotation_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv`
+> - **Scripts:** `scripts/generate_ai_summary_tables.py`, `scripts/fetch_uniprot_roles.py`, `scripts/fetch_opentargets.py`, `scripts/update_md.py`
+
+> [!NOTE]
+> **Data Provenance**
+> - **Source File:** `output/ai_summary_tables/21_gene_directed_signature_annotation_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv`
+> - **Scripts:** `scripts/generate_ai_summary_tables.py`, `scripts/fetch_uniprot_roles.py`, `scripts/fetch_opentargets.py`, `scripts/update_md.py`
+
+> [!NOTE]
+> **Data Provenance**
+> - **Source File:** `output/ai_summary_tables/21_gene_directed_signature_annotation_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv`
+> - **Scripts:** `scripts/generate_ai_summary_tables.py`, `scripts/fetch_uniprot_roles.py`, `scripts/fetch_opentargets.py`, `scripts/update_md.py`
+
+| Gene | Source_Database | Sensor_Type | Key Metabolite(s) | Top OpenTargets Diseases | MRCLinkDB_Disease | GEPIA Link |
+|:---|:---|:---|:---|:---|:---|:---|
+| **GBE1** | scCellFie | Enzyme | glycogen | glycogen storage disease due to glycogen branching enzyme deficiency, adult polyglucosan body disease, glycogen storage disease due to glycogen branching enzyme deficiency, congenital neuromuscular form |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=GBE1) |
+| **SLC16A7** | MEBOCOST, scCellFie | Transporter | 3-hydroxybutyric acid, acetoacetic acid, cl(a-13:0/a-25:0/i-14:0/i-24:0)[rac], cytidine-5'-diphosphocholine, dihydroceramide, glccer(d18:1/16:0), phosphatidylethanolamine, phosphatidylinositol(36:4), phosphatidylserine, sm(d18:0/16:0), taurochenodesoxycholic acid, tg(16:0_34:2), trihexosylceramide(d18:1/24:1) | Abnormality of the skeletal system, glomerulonephritis, nervous system disease |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=SLC16A7) |
+| **AUH** | scCellFie | Enzyme | l-leucine, acetyl-coa | 3-methylglutaconic aciduria type 1, 3-methylglutaconic aciduria, Dystonia |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=AUH) |
+| **FZD6** | MetaLigand | Enzyme, Receptor | guanosine diphosphate, guanosine triphosphate | nonsyndromic congenital nail disorder 1, nail disorder, Autosomal dominant nail dysplasia |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=FZD6) |
+| **SPTLC1** | scCellFie | Enzyme | dihydroceramide, glccer(d18:1/16:0), sm(d18:0/16:0), trihexosylceramide(d18:1/24:1) | neuropathy, hereditary sensory and autonomic, type 1A, hereditary sensory and autonomic neuropathy type 1, Charcot-Marie-Tooth disease |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=SPTLC1) |
+| **NR1D2** | Cellinker2, MRCLinkDB, MEBOCOST, MetaLigand | Channel, Enzyme, Receptor, Transporter | heme, selenomethionine | mathematical ability, intelligence, Escherichia coli Infections |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=NR1D2) |
+| **CD46** | MetaLigand | Channel, Enzyme, Receptor, Transporter | d-galactose, d-glucose, d-mannose, sulfate, n-acetylglucosamine | atypical hemolytic-uremic syndrome with MCP/CD46 anomaly, atypical hemolytic-uremic syndrome, complement deficiency |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=CD46) |
+| **MTMR1** | scCellFie | Enzyme | phosphatidylinositol(36:4) | post-traumatic stress disorder, Blackfan-Diamond anemia, Thrombocytopenia |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=MTMR1) |
+| **ESRRG** | MetaLigand | Channel, Enzyme, Receptor, Transporter | cholic acid, estradiol, glycerol, fumarate | movement disorder, intelligence, Abnormality of the skeletal system |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=ESRRG) |
+| **ITGA4** | MetaLigand | Channel, Enzyme, Receptor, Transporter | d-galactose, d-glucose, d-mannose, glycerol, fumarate, histamine, gamma-aminobutyric acid, n-acetylglucosamine | Crohn's disease, ulcerative colitis, multiple sclerosis |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=ITGA4) |
+| **SLC11A2** | Cellinker2, MEBOCOST, MRCLinkDB | Transporter | iron | microcytic anemia with liver iron overload, hypochromic microcytic anemia, ovarian neoplasm |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=SLC11A2) |
+| **ERAP1** | MetaLigand | Channel, Enzyme, Receptor, Transporter | d-galactose, d-glucose, d-mannose, d-tryptophan, l-alanine, d-alanine, l-arginine, l-serine, l-tyrosine, n-acetylglucosamine | psoriasis, ankylosing spondylitis, hypertension |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=ERAP1) |
+| **C1GALT1** | scCellFie | Enzyme | uridine diphosphate galactose | hypertension, essential hypertension, cardiovascular disease |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=C1GALT1) |
+| **ADAM10** | MetaLigand | Channel, Enzyme, Receptor, Transporter | cholesterol, melatonin, sulfate | reticulate acropigmentation of Kitamura, Alzheimer disease 18, Alzheimer disease |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=ADAM10) |
+| **TRPM8** | MetaLigand | Channel, Enzyme, Receptor, Transporter | histamine, testosterone | Pain, Cough, Back pain |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=TRPM8) |
+| **SLC22A1** | Cellinker2, MEBOCOST, MRCLinkDB | Transporter | acetylcholine, choline, norepinephrine, prostaglandin e2, prostaglandin f2a, serotonin, spermine | coronary artery disease, Hypercholesterolemia, metabolic disease | Breast cancer, Cancer, Inflammation, Inflammatory bowel disease | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=SLC22A1) |
+| **AMDHD1** | scCellFie |  | l-histidine, l-glutamate | cholangiocarcinoma, adolescent idiopathic scoliosis, Okt4 epitope deficiency |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=AMDHD1) |
+| **GLS** | scCellFie | Enzyme | l-glutamine, l-arginine, l-proline, ornithine | global developmental delay, progressive ataxia, and elevated glutamine, genetic developmental and epileptic encephalopathy, infantile cataract, skin abnormalities, glutamate excess, and impaired intellectual development |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=GLS) |
+| **EPOR** | MetaLigand | Channel, Enzyme, Receptor, Transporter | hydrogen peroxide | anemia (phenotype), chronic kidney disease, cancer |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=EPOR) |
+| **PDE3B** | Cellinker2, MEBOCOST, MRCLinkDB, MetaLigand, MetaLigand | Channel, Enzyme, Receptor, Transporter | cyclic gmp | asthma, essential thrombocythemia, coronary artery disease |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=PDE3B) |
+| **SGMS1** | scCellFie | Enzyme | sm(d18:0/16:0) | smoking initiation, Abnormality of the skeletal system, pyogenic granuloma |  | [GEPIA](http://gepia.cancer-pku.cn/detail.php?gene=SGMS1) |
 
 **Interpretation:** The druggable landscape splits sharply — **GLS alone accounts for 71/175 interactions** (41%), confirming it as the dominant therapeutic node. The 8 undrugged genes (SGMS1, SPTLC1, NR1D2, CD46, MTMR1, AMDHD1, C1GALT1, and SLC11A2 with borderline coverage) represent the "dark druggable matter" of the metastatic metabolic program — requiring structural biology investment or indirect targeting strategies.
 
 ---
 
-### 5. Oxygen Gradient Correlations: Reproduced at Expanded Scale
-
-*(Based on results in `output/deepdive_conserved_metabGeneSig_Br500k_Co100k_Lu500k_Me100k_Ov100k/oxygen_gradient/`)*
-
-The intratumoural oxygen gradient analysis from V6 was re-run on the expanded dataset, reproducing the core finding with expanded breast cell counts:
-
-| Cancer | N Primary Malignant Cells | Hypoxia–Metastatic Score Correlation (r) | Interpretation |
-|:---|:---:|:---:|:---|
-| **Lung** | 2,742 | **0.687** | Strong positive — hypoxic core selects pre-metastatic clones |
-| **Colorectal** | 11,933 | **0.649** | Strong positive — same spatial selection mechanism |
-| **Breast** | 13,671 | **0.146** | Weak — non-hypoxic drivers dominate |
-| **Melanoma** | 11,196 | **0.016** | Negligible — niche-driven, not O₂-driven |
-| **Ovarian** | 7,261 | **-0.040** | Negligible to inverse — O₂-independent |
-
-The tripartite pattern is reproduced identically: Lung/CRC (hypoxia-driven metastatic selection) vs. Breast (weak) vs. Melanoma/Ovarian (O₂-independent). This confirms the finding is robust to 5× dataset scaling.
-
----
-
-### 6. NOVELTY CHECK: What Version 7 Adds Beyond Prior Literature
+### 4. NOVELTY CHECK: What Version 7 Adds Beyond Prior Literature
 
 | Discovery | What is Already Known | What V7 Reveals (NEW) |
 | :--- | :--- | :--- |
 | **ML Prognostic Testing** | Gene signature prognostic classifiers are standard in oncology (e.g., OncotypeDX, MammaPrint). | The pan-cancer metastatic metabolic signature has **limited univariate prognostic power** from bulk RNA-seq (C-index ~0.51), pinpointing the resolution gap between single-cell discovery and bulk clinical application. |
-| **Signature Size Paradox** | Larger signatures typically capture more variance and improve prediction (*Fan et al., NEJM, 2006, PMID: 16899778*). | The 3-gene Producer Triad (C-index = 0.523) **outperforms** all larger signatures (12/21/23-gene), suggesting that functional coherence matters more than gene count for metabolic signatures. |
-| **TCGA Directionality Dichotomy** | Metabolic gene expression has context-dependent prognostic value across cancer types (*Reznik et al., Cell, 2018, PMID: 29249459*). | The 21-gene signature is **protective in GI/lung** (HR 0.72–0.79) but **risk-increasing in hormone-driven cancers** (BRCA HR=1.22, OV HR=1.08), revealing an organ-of-origin prognostic polarity not previously described for this specific metabolic program. |
-| **Druggability Concentration** | GLS (glutaminase) is a validated therapeutic target with Telaglenastat in clinical trials (*Gross et al., Mol Cancer Ther, 2014, PMID: 24980947*). | GLS accounts for **41% of all drug-gene interactions** (71/175) in the entire 21-gene directed signature, quantifying the extreme therapeutic concentration on a single node and the undrugged "dark matter" of the remaining network. |
+| **Signature Size Paradox** | Larger signatures typically capture more variance and improve prediction (*Fan et al., NEJM, 2006, PMID: [16891415](https://pubmed.ncbi.nlm.nih.gov/16891415/)*). | The 3-gene Producer Triad (C-index = 0.523) **outperforms** all larger signatures (12/21/23-gene), suggesting that functional coherence matters more than gene count for metabolic signatures. |
+| **TCGA Directionality Dichotomy** | Metabolic gene expression has context-dependent prognostic value across cancer types (*Reznik et al., Cell Syst, 2018, PMID: [29396322](https://pubmed.ncbi.nlm.nih.gov/29396322/)*). | The 21-gene signature is **protective in GI/lung** (HR 0.72–0.79) but **risk-increasing in hormone-driven cancers** (BRCA HR=1.22, OV HR=1.08), revealing an organ-of-origin prognostic polarity not previously described for this specific metabolic program. |
+| **Druggability Concentration** | GLS (glutaminase) is a validated therapeutic target with Telaglenastat in clinical trials (*Gross et al., Mol Cancer Ther, 2014, PMID: [24523301](https://pubmed.ncbi.nlm.nih.gov/24523301/)*). | GLS accounts for **41% of all drug-gene interactions** (71/175) in the entire 21-gene directed signature, quantifying the extreme therapeutic concentration on a single node and the undrugged "dark matter" of the remaining network. |
 
 ---
 
-### 7. Resolution of Version 6 Next Steps
+### 5. Resolution of Version 6 Next Steps
 
 | V6 Next Step | Status | Outcome |
 |:---|:---:|:---|
@@ -157,7 +135,7 @@ The tripartite pattern is reproduced identically: Lung/CRC (hypoxia-driven metas
 
 ---
 
-### 8. NEXT STEPS: Version 8 Research Agenda
+### 6. NEXT STEPS: Version 8 Research Agenda
 
 Based on the honest assessment of ML performance and the remaining unresolved V6 items, the following directions are prioritised:
 
@@ -181,7 +159,7 @@ Based on the honest assessment of ML performance and the remaining unresolved V6
 
 ---
 
-### 9. UPDATED PIPELINE OUTPUTS INVENTORY
+### 7. UPDATED PIPELINE OUTPUTS INVENTORY
 
 | Analysis | Output File(s) / Directory | Status |
 |:---|:---|:---:|
@@ -207,6 +185,40 @@ Based on the honest assessment of ML performance and the remaining unresolved V6
 ## Version 6: May 29, 2026 — Resolution of the Version 6 Research Agenda
 
 Following the execution of the full multi-cancer pipeline and targeted follow-up notebooks (`mitf_regulon_expansion`, `serotonin_axis_spatial_mapping`, `deepdive_conserved_metabGeneSig`, `directional_ccc`, `simulate_oxygen_gradient`), we have computationally resolved the Priority 1 and Priority 2 objectives established in Version 5.
+
+### 0. EXPANDED DATASET OVERVIEW (As of Version 6)
+
+To ensure the robustness of our pan-cancer metastatic signatures, the dataset was expanded to over 1.4 million cells (Br500k, Co100k, Lu500k, Me100k, Ov100k), providing a high-resolution view of the malignant compartments:
+
+| Cancer | Total Primary TME Cells | Primary Malignant Cells | Total Metastatic TME Cells | Metastatic Malignant Cells |
+| :--- | :---: | :---: | :---: | :---: |
+| Breast | 278,119 | 152,346 | 221,881 | 109,767 |
+| Colorectal | 36,080 | 8,955 | 28,025 | 7,751 |
+| Lung | 440,642 | 49,312 | 59,359 | 8,233 |
+| Melanoma | 13,024 | 10,992 | 10,895 | 4,990 |
+| Ovarian | 25,000 | 7,261 | 75,000 | 19,608 |
+
+**Column Definitions:**
+- **Total Primary TME Cells**: All cells in the primary tumor microenvironment, excluding the actual malignant (cancer) cells. This includes immune cells, fibroblasts, and endothelial cells located at the site of the primary tumor.
+- **Primary Malignant Cells**: The actual cancer cells located at the primary tumor site.
+- **Total Metastatic TME Cells**: All cells in the metastatic tumor microenvironment, excluding the disseminated malignant cells. This includes the immune and stromal cells located at the distant metastatic site.
+- **Metastatic Malignant Cells**: The disseminated cancer cells located at a distant metastatic site.
+
+#### Pre-Metastatic Subclone Resolution (Latest Version)
+
+| Cancer | Primary Cells Scored | Score Distribution | Pre-Metastatic Subclone (%) |
+| :--- | :---: | :---: | :---: |
+| **Breast** | 150,852 | Left-skewed | 6.2% (> +1 SD) |
+| **Colorectal** | 8,955 | Left-skewed | 3.3% (> +1 SD) |
+| **Lung** | 19,498 | Left-skewed | 0.3% (> +1 SD) |
+| **Melanoma** | 10,992 | Left-skewed | 0.6% (> +1 SD) |
+| **Ovarian** | 1,596 | Right-skewed | 11.3% (> +1 SD) |
+
+
+**Column Definitions:**
+- **Primary Cells Scored**: The absolute number of malignant cells from the primary tumor that successfully passed quality control and received a 23-gene Metastatic Signature Score.
+- **Score Distribution**: The shape of the score distribution across the primary tumor cells, computed mathematically using skewness (Left-skewed: < -0.5, Right-skewed: > +0.5, Symmetric otherwise).
+- **Pre-Metastatic Subclone (%)**: The percentage of primary tumor cells whose signature score is greater than the mean plus one standard deviation (> +1 SD). This represents the highly metastatic "tail" or subclone already present in the primary tumor prior to dissemination.
 
 ### 1. STAT3 12-Gene Core Metabolic Axis
 
@@ -292,10 +304,10 @@ This confirms that serotonin-mediated T-cell silencing in ovarian metastasis is 
 
 | Discovery | What is Already Known (Primary Literature) | What is Actually NEW (Our Novel Insight) |
 | :--- | :--- | :--- |
-| **STAT3 Axis** | STAT3 is a well-known oncogenic transcription factor linking inflammation to tumorigenesis (*Yu et al., Nat Rev Cancer, 2014, PMID: 24759205*). | Identification of the exact 12-gene metabolic network strictly regulated by STAT3 universally across 5 distinct metastatic cascades. |
-| **MITF Regulon** | MITF is a lineage-specific master regulator in melanoma required for melanocyte survival and proliferation (*Levy et al., Trends Mol Med, 2006, PMID: 16890491*). | MITF controls a vast 440-gene metabolic network across non-melanoma cancers, acting as a universal pan-cancer metabolic stress-response factor. |
-| **Directional CCC** | Tumors heavily alter glutamine and lipid metabolism for energy and building blocks (*Ward & Thompson, Cancer Cell, 2012, PMID: 22439925*). | The identification of the specific "Producer Triad" (GLS, SGMS1, SPTLC1) that acts as the sole directional fuel source for the remaining 18 "consumer" genes in the pan-cancer metastatic signature. |
-| **Serotonin Axis** | Serotonin has known immunomodulatory effects on T-cells, often suppressing activation (*Herr et al., Front Immunol, 2017, PMID: 28824638*). | Ovarian cancer specifically exploits a paracrine (diffusion-based) serotonin gradient in the peritoneal niche to silence T-cells, enabling 5-HT2A antagonist repurposing. |
+| **STAT3 Axis** | STAT3 is a well-known oncogenic transcription factor linking inflammation to tumorigenesis (*Yu et al., Nat Rev Cancer, 2014, PMID: [25342631](https://pubmed.ncbi.nlm.nih.gov/25342631/)*). | Identification of the exact 12-gene metabolic network strictly regulated by STAT3 universally across 5 distinct metastatic cascades. |
+| **MITF Regulon** | MITF is a lineage-specific master regulator in melanoma required for melanocyte survival and proliferation (*Levy et al., Trends Mol Med, 2006, PMID: [16899407](https://pubmed.ncbi.nlm.nih.gov/16899407/)*). | MITF controls a vast 440-gene metabolic network across non-melanoma cancers, acting as a universal pan-cancer metabolic stress-response factor. |
+| **Directional CCC** | Tumors heavily alter glutamine and lipid metabolism for energy and building blocks (*Ward & Thompson, Cancer Cell, 2012, PMID: [22439925](https://pubmed.ncbi.nlm.nih.gov/22439925/)*). | The identification of the specific "Producer Triad" (GLS, SGMS1, SPTLC1) that acts as the sole directional fuel source for the remaining 18 "consumer" genes in the pan-cancer metastatic signature. |
+| **Serotonin Axis** | Serotonin has known immunomodulatory effects on T-cells, often suppressing activation (*Herr et al., Front Cardiovasc Med, 2017, PMID: [28775986](https://pubmed.ncbi.nlm.nih.gov/28775986/)*). | Ovarian cancer specifically exploits a paracrine (diffusion-based) serotonin gradient in the peritoneal niche to silence T-cells, enabling 5-HT2A antagonist repurposing. |
 
 ---
 
@@ -303,7 +315,7 @@ This confirms that serotonin-mediated T-cell silencing in ovarian metastasis is 
 
 1. **Producer Triad Network Collapse Simulation:** Run *in silico* knockouts (using Genome-Scale Metabolic Models or Flux Balance Analysis) of the GLS/SGMS1/SPTLC1 Producer Triad to computationally simulate and quantify the downstream collapse of the metastatic metabolic network.
 2. **Epigenomic Validation of MITF:** Analyze publicly available scATAC-seq datasets for lung, breast, and colorectal metastases to verify MITF chromatin accessibility at the promoters of the 440 target genes, confirming active transcription outside of melanoma.
-3. **Machine Learning Prognostic Classifier:** Build a Random Forest or Cox-Nnet classifier using the 12-gene STAT3 core axis to predict metastasis-free survival on independent, non-TCGA cohorts (e.g., METABRIC, ICGC) to rigorously validate its clinical biomarker potential.
+3. **Machine Learning Prognostic Classifier:** Build a Random Forest or Cox-Nnet classifier using the 12-gene STAT3 core axis to predict metastasis-free survival on independent, non-TCGA cohorts (e.g., METABRIC, GEO) to rigorously validate its clinical biomarker potential.
 4. **Spatial Transcriptomics (ST) Deconvolution:** Run a spatial deconvolution algorithm (e.g., Cell2Location) on primary vs. omental metastasis ST slides to physically visualize the diffusion gradient of TPH1 to HTR2A.
 
 ---
@@ -414,12 +426,20 @@ Analysis of the ovarian `h5ad` dataset (`ovarian_serotonin/ovarian_serotonin_imm
 Single-cell "Metastatic Metabolic Scores" were computed for primary tumor cells across breast (`pan_cancer_meta_results/breast_primary_signature_scores.csv`) and all 5 cancer types, scoring each cell's expression of the 23-gene signature:
 
 | Cancer | Primary Cells Scored | Score Distribution | Pre-Metastatic Subclone (%) |
-|:---|:---:|:---:|:---:|
-| **Breast** | 22,373 | Right-skewed / bimodal | ~8–12% high-scoring cells |
-| **Colorectal** | ~15,000 | Right-skewed | ~6–9% |
-| **Lung** | ~5,000 | Bimodal | ~15–20% |
-| **Melanoma** | ~18,000 | Right-skewed | ~7–11% |
-| **Ovarian** | ~4,000 | Right-skewed | ~5–8% |
+| :--- | :---: | :---: | :---: |
+| **Breast** | 13,540 | Symmetric | 7.3% (> +1 SD) |
+| **Colorectal** | 8,955 | Left-skewed | 7.6% (> +1 SD) |
+| **Lung** | 1,060 | Left-skewed | 0.4% (> +1 SD) |
+| **Melanoma** | 10,992 | Left-skewed | 0.5% (> +1 SD) |
+| **Ovarian** | 1,596 | Right-skewed | 11.3% (> +1 SD) |
+
+
+**Column Definitions:**
+- **Primary Cells Scored**: The absolute number of malignant cells from the primary tumor that successfully passed quality control and received a 23-gene Metastatic Signature Score.
+- **Score Distribution**: The shape of the score distribution across the primary tumor cells, computed mathematically using skewness (Left-skewed: < -0.5, Right-skewed: > +0.5, Symmetric otherwise).
+- **Pre-Metastatic Subclone (%)**: The percentage of primary tumor cells whose signature score is greater than the mean plus one standard deviation (> +1 SD). This represents the highly metastatic "tail" or subclone already present in the primary tumor prior to dissemination.
+
+
 
 - **Lung cancer** shows the most distinct bimodal distribution — a high-scoring cluster of primary lung tumor cells already expresses the full metastatic metabolic programme before dissemination
 - This is mechanistically consistent with Q2: hypoxic primary lung tumors create an intratumoural oxygen gradient that selects for pre-adapted glycolytic/metastatic clones *in situ*
@@ -431,9 +451,9 @@ Single-cell "Metastatic Metabolic Scores" were computed for primary tumor cells 
 
 | Question | Answer | Key Discovery | Therapeutic Implication |
 |:---|:---:|:---|:---|
-| **Q1: Axis druggability** | ❌ No | SGMS1/SPTLC1/SLC16A7 are undrugged; axis lacks PPI coherence | Pursue GLS (Telaglenastat) alone; invest in SGMS1 structural biology |
+| **Q1: Axis druggability** | **[🔴 NEGATIVE RESULT]** ❌ No | SGMS1/SPTLC1/SLC16A7 are undrugged; axis lacks PPI coherence | Pursue GLS (Telaglenastat) alone; invest in SGMS1 structural biology |
 | **Q2: O₂ tension & metabolism** | ✅ Yes | O₂% determines OXPHOS vs glycolysis switch across cancer types | Site-specific metabolic drug selection (IACS-010759 for brain; LDHA-i for pleura) |
-| **Q3: NR1D2 as master TF** | ❌ No | STAT3, AR, MITF are the real upstream regulators of the 23-gene core | Target STAT3 (already druggable) as pan-cancer metastatic metabolic master switch |
+| **Q3: NR1D2 as master TF** | **[🔴 NEGATIVE RESULT]** ❌ No | STAT3, AR, MITF are the real upstream regulators of the 23-gene core | Target STAT3 (already druggable) as pan-cancer metastatic metabolic master switch |
 | **Q4: Serotonin in ovarian** | ✅ Yes | TPH1+ tumor cells → 5-HT → HTR2A+ T-cell silencing in peritoneum | Ketanserin/volinanserin (5-HT₂A antagonist) repurposing for ovarian metastasis |
 | **Q5: 23-gene predictive** | ✅ Yes | Pre-metastatic subclones (~5–20% of primary cells) express full signature | 23-gene score from primary biopsy → metastasis risk stratification |
 
@@ -742,7 +762,7 @@ Beyond the pan-cancer core, each cancer has a unique set of metastasis-specific 
 
 1. **Is the GLS-SGMS1-SLC16A7-SPTLC1 axis druggable pan-cancer?**
    Cross-reference all four genes against drug databases. GLS inhibitors (CB-839/Telaglenastat) are already in clinical trials — does concurrent SGMS1/SPTLC1 inhibition produce synergistic cell death across cancer types?
-   - **No.** Despite strong prognostic value, this axis lacks multi-target therapeutic viability: zero existing drugs (DGIdb), low structural tractability (Open Targets), poor physical cohesion (STRING PPI), and lack of knockout synergy (DepMap).
+   - **[🔴 NEGATIVE RESULT] No.** Despite strong prognostic value, this axis lacks multi-target therapeutic viability: zero existing drugs (DGIdb), low structural tractability (Open Targets), poor physical cohesion (STRING PPI), and lack of knockout synergy (DepMap).
 
 2. **Does metastatic niche oxygen tension predict OXPHOS vs. glycolysis switching?**
    Correlate the metastasis/primary enrichment ratio with known oxygen tension of metastatic sites (brain > liver > pleura). If confirmed, this provides a mechanistic basis for metabolic drug selection based on metastatic site.
@@ -750,7 +770,7 @@ Beyond the pan-cancer core, each cancer has a unique set of metastasis-specific 
 
 3. **Is NR1D2 the master transcriptional regulator of pan-cancer metastatic metabolism?**
    NR1D2 is a transcriptional repressor of many metabolic genes. Its upregulation across all 5 cancers suggests it may be driving the shared metastatic metabolic program. Test this by knockdown experiments in cell lines from each cancer type.
-   - **No.** Transcription factor enrichment analysis (using ChEA, ENCODE, and TRRUST databases) of the 23 pan-cancer conserved metabolic genes reveals that NR1D2 / REV-ERBβ is completely absent from the top enriched regulators. Instead, other transcription factors such as PAX2, NR0B1, ZEB1, and BCL11B show significant enrichment. This indicates that while NR1D2 is consistently upregulated during metastasis, it does not act as the master transcriptional switch for this specific pan-cancer metabolic gene signature.
+   - **[🔴 NEGATIVE RESULT] No.** Transcription factor enrichment analysis (using ChEA, ENCODE, and TRRUST databases) of the 23 pan-cancer conserved metabolic genes reveals that NR1D2 / REV-ERBβ is completely absent from the top enriched regulators. Instead, other transcription factors such as PAX2, NR0B1, ZEB1, and BCL11B show significant enrichment. This indicates that while NR1D2 is consistently upregulated during metastasis, it does not act as the master transcriptional switch for this specific pan-cancer metabolic gene signature.
 
 4. **Do ovarian peritoneal metastases exploit serotonin signaling for immune evasion?**
    HTR2A/HTR2C upregulation in ovarian metastasis is a highly specific finding. Serotonin can suppress T-cell activation via 5-HT2A receptors. Validate with serotonin receptor antagonists in ovarian cancer co-culture with T cells.
@@ -843,7 +863,7 @@ Key tools: COBRApy, Recon3D (human GEM), Human1.
 | **GEFMAP** | Geometric deep learning to infer metabolic objective and mass-balanced relative flux rates | Infers direction from optimization |
 | **LIANA+ + MetalinksDB** | Estimates metabolite abundance from enzyme expression; pairs with receptor expression | **Does NOT explicitly handle direction — this is our gap** |
 
-**Critical limitation of LIANA+ for this problem:** LIANA+ estimates metabolite abundance using a linear regression between enzymatic gene expression and metabolite levels. This does not distinguish whether the enzyme is *producing* or *consuming* the metabolite — i.e., it completely ignores directionality.
+**[🔴 NEGATIVE RESULT] Critical limitation of LIANA+ for this problem:** LIANA+ estimates metabolite abundance using a linear regression between enzymatic gene expression and metabolite levels. This does not distinguish whether the enzyme is *producing* or *consuming* the metabolite — i.e., it completely ignores directionality.
 
 #### 2.6 Machine Learning & Deep Learning (Frontier)
 
@@ -986,7 +1006,7 @@ Biophysical Classification of Metabolic Signals: You established a novel classif
 300–750 Da (GPCR/Hormonal): Carrier-dependent circulation (e.g., bioactive lipids).
 >750 Da (Juxtacrine/Vesicular): Membrane-bound signaling. This framework extends cancer biology by treating metabolites not just as fuels for the Warburg effect or TCA cycle, but as physical signaling ligands constrained by their biophysical diffusion limits in the dense tumor extracellular matrix.
 
-The "Directionality" Blind Spot: Your analysis revealed that 92% of enzyme-metabolite relationships lack explicit product/substrate directionality in modern databases. This is a critical finding that contradicts the assumption that public metabolic networks are ready for flux balance analysis, highlighting a major gap in the field's ability to model true metabolic source/sink dynamics.
+**[🔴 NEGATIVE RESULT] The "Directionality" Blind Spot:** Your analysis revealed that 92% of enzyme-metabolite relationships lack explicit product/substrate directionality in modern databases. This is a critical finding that contradicts the assumption that public metabolic networks are ready for flux balance analysis, highlighting a major gap in the field's ability to model true metabolic source/sink dynamics.
 
 ### 2. CLINICAL IMPLICATIONS & NEXT STEPS
 

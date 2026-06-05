@@ -232,6 +232,9 @@ Several targeted Jupyter notebooks dive deep into specific biological questions 
 - **`mitf_regulon_expansion.ipynb`**: Investigates the expansion of the MITF regulon and its downstream metabolic targets.
 - **`predictive_signature_biomarker.ipynb`**: Explores the pan-cancer predictive capability of the strictly conserved metabolic gene signature.
 - **`serotonin_axis_spatial_mapping.ipynb`**: Maps the spatial distribution of the serotonin axis within specific tissue microenvironments.
+- **`visium_spatial_validation.ipynb`**: Validates the spatial axis involving HTR7+ tumor-associated macrophages (TAMs) and HR-repair genes using Visium spatial transcriptomics via spatial co-localization analysis.
+- **`camp_pancancer_integration.ipynb`**: Investigates pan-cancer integration for Directed Metastatic Signatures.
+- **`massspec_metabolomics_integration_*.ipynb`**: Integrates mass spectrometry metabolomics data with cross-cohort comparisons to validate metabolic signatures.
 - **`ml_prognostic_classifier.ipynb`**: Trains Cox Proportional Hazards, Random Forest, and MLP Neural Network classifiers on independent clinical cohorts (e.g., METABRIC breast cancer dataset) to evaluate the prognostic power of our derived metabolic gene signatures. Generates risk stratification models, ROC curves, and Kaplan-Meier plots.
 
 ## 📊 Data Provenance & Metadata

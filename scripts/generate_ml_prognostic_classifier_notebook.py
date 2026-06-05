@@ -3,64 +3,211 @@ import sys
 import nbformat as nbf
 import subprocess
 import argparse
+import pandas as pd
+import json
+import urllib.request
+import tarfile
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Generate ML Prognostic Classifier Notebook",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Run with the 12-gene STAT3 Core Axis (default):
-  python generate_ml_prognostic_classifier_notebook.py
+def standardize_clinical(clin_df, database):
+    """
+    Standardizes clinical dataframe to ensure PATIENT_ID, OS_MONTHS, and event exist.
+    """
+    if database.lower() == 'tcga':
+        if '_PATIENT' in clin_df.columns:
+            clin_df.rename(columns={'_PATIENT': 'PATIENT_ID'}, inplace=True)
+        elif 'sample' in clin_df.columns:
+            clin_df.rename(columns={'sample': 'PATIENT_ID'}, inplace=True)
+        if 'OS.time' in clin_df.columns:
+            clin_df.rename(columns={'OS.time': 'OS_MONTHS'}, inplace=True)
+            clin_df['OS_MONTHS'] = clin_df['OS_MONTHS'] / 30.44
+        if 'OS' in clin_df.columns:
+            clin_df.rename(columns={'OS': 'event'}, inplace=True)
+            
+    # Try to find Survival Time column
+    time_col = None
+    for col in ['OS_MONTHS', 'OS_DAYS', 'PFS_MONTHS', 'DFS_MONTHS']:
+        if col in clin_df.columns:
+            time_col = col
+            break
+            
+    # Try to find Survival Status column
+    status_col = None
+    for col in ['OS_STATUS', 'VITAL_STATUS', 'DFS_STATUS', 'PFS_STATUS', 'event']:
+        if col in clin_df.columns:
+            status_col = col
+            break
+            
+    if time_col is None or status_col is None:
+        raise ValueError(f"Could not find required survival columns in the clinical data. Available columns: {clin_df.columns.tolist()}")
 
-  # Run with the 21-Gene Directed Metastatic Signature:
-  python generate_ml_prognostic_classifier_notebook.py \\
-    --signature-name "Directed Metastatic Signature" \\
-    --genes GLS SGMS1 SPTLC1 GBE1 SLC16A7 AUH FZD6 NR1D2 CD46 MTMR1 ESRRG ITGA4 SLC11A2 ERAP1 C1GALT1 ADAM10 TRPM8 SLC22A1 AMDHD1 EPOR PDE3B
-"""
-    )
-    parser.add_argument("--genes", nargs="+", 
-                        default=['ADAM10', 'C1GALT1', 'ESRRG', 'FZD6', 'GBE1', 'GLS', 'ITGA4', 'PDE3B', 'SGMS1', 'SLC11A2', 'SLC16A7', 'SLC22A1'], 
-                        help="List of genes for the signature")
-    parser.add_argument("--signature-name", default="STAT3 Core Axis", help="Name of the signature")
-    args = parser.parse_args()
+    clin_cols = ['PATIENT_ID', time_col, status_col]
+    if 'SAMPLE_ID' in clin_df.columns:
+        clin_cols.append('SAMPLE_ID')
+        
+    # Drop rows missing time or status
+    clin_df = clin_df.dropna(subset=[time_col, status_col]).copy()
     
-    genes_list = args.genes
-    signature_name = args.signature_name
-    num_genes = len(genes_list)
-    genes_str = ", ".join(genes_list)
+    # Standardize to OS_MONTHS
+    if 'DAYS' in time_col:
+        clin_df['OS_MONTHS'] = clin_df[time_col] / 30.44
+    else:
+        clin_df['OS_MONTHS'] = clin_df[time_col]
+        
+    # Standardize to event (1 = death/progression, 0 = alive/censored)
+    if status_col != 'event':
+        def parse_event(x):
+            val = str(x).upper()
+            if any(keyword in val for keyword in ['DECEASED', 'PROGRESSION', 'RECURRENCE']):
+                return 1
+            if val in ['1', '1.0', 'TRUE', 'YES']:
+                return 1
+            return 0
+            
+        clin_df['event'] = clin_df[status_col].apply(parse_event)
+        
+    if database.lower() == 'tcga':
+        clin_df['PATIENT_ID'] = clin_df['PATIENT_ID'].apply(lambda x: str(x)[:12])
+        
+    cols_to_keep = ['PATIENT_ID', 'OS_MONTHS', 'event']
+    if 'SAMPLE_ID' in clin_df.columns:
+        cols_to_keep.append('SAMPLE_ID')
+        
+    return clin_df[cols_to_keep]
 
-    # 1. Create a new notebook
+def prepare_data(database, cancers, study_ids, profile_expr):
+    """
+    Downloads and prepares CSV files for the requested cancers.
+    """
+    if os.path.exists('input'):
+        data_dir = f'input/{database}'
+        tcga_dir = 'input/TCGA'
+    else:
+        data_dir = f'../input/{database}'
+        tcga_dir = '../input/TCGA'
+        
+    os.makedirs(data_dir, exist_ok=True)
+    
+    for idx, cancer in enumerate(cancers):
+        clin_path = os.path.join(data_dir, f'{cancer}_clinical.csv')
+        expr_path = os.path.join(data_dir, f'{cancer}_expression.csv')
+        
+        if os.path.exists(clin_path) and os.path.exists(expr_path) and os.path.getsize(expr_path) > 1000:
+            print(f"[{cancer.upper()}] Preprocessed data already exists.")
+            continue
+            
+        print(f"[{cancer.upper()}] Preprocessing {database} data...")
+        
+        if database.lower() == 'tcga':
+            tcga_clin = os.path.join(tcga_dir, f'TCGA-{cancer.upper()}.survival.tsv.gz')
+            tcga_expr = os.path.join(tcga_dir, f'TCGA-{cancer.upper()}.star_fpkm.tsv.gz')
+            
+            if not os.path.exists(tcga_clin) or not os.path.exists(tcga_expr):
+                raise FileNotFoundError(f"TCGA files missing. Expected: {tcga_clin} and {tcga_expr}")
+            
+            # Clinical
+            clin_df = pd.read_csv(tcga_clin, sep='\t')
+            clin_df = standardize_clinical(clin_df, 'tcga')
+            clin_df.to_csv(clin_path, index=False)
+            
+            # Expression
+            expr_df = pd.read_csv(tcga_expr, sep='\t')
+            if 'Ensembl_ID' in expr_df.columns:
+                expr_df['Ensembl_ID_clean'] = expr_df['Ensembl_ID'].apply(lambda x: str(x).split('.')[0])
+                
+                hgnc_path = os.path.join(tcga_dir, '..', 'hgnc_approved_genes.json')
+                if os.path.exists(hgnc_path):
+                    with open(hgnc_path, 'r') as f:
+                        hgnc_data = json.load(f)
+                    ensembl_to_hugo = {}
+                    for doc in hgnc_data.get('response', {}).get('docs', []):
+                        if 'ensembl_gene_id' in doc and 'symbol' in doc:
+                            ensembl_to_hugo[doc['ensembl_gene_id']] = doc['symbol']
+                    expr_df['Hugo_Symbol'] = expr_df['Ensembl_ID_clean'].map(ensembl_to_hugo)
+                    expr_df['Hugo_Symbol'] = expr_df['Hugo_Symbol'].fillna(expr_df['Ensembl_ID_clean'])
+                else:
+                    expr_df['Hugo_Symbol'] = expr_df['Ensembl_ID_clean']
+                    
+                expr_df = expr_df.drop(columns=['Ensembl_ID', 'Ensembl_ID_clean'])
+            
+            # Set Hugo_Symbol as the first column for standard merging later
+            if 'Hugo_Symbol' in expr_df.columns:
+                cols = ['Hugo_Symbol'] + [c for c in expr_df.columns if c != 'Hugo_Symbol']
+                expr_df = expr_df[cols]
+                
+            expr_df.to_csv(expr_path, index=False)
+            
+        else:
+            # cBioPortal
+            if idx >= len(study_ids):
+                raise ValueError(f"Missing study_id for cancer: {cancer}. Provide matching study-ids.")
+            study_id = study_ids[idx]
+            
+            tar_url = f"https://cbioportal-datahub.s3.amazonaws.com/{study_id}.tar.gz"
+            tar_path_local = os.path.join(data_dir, f"{study_id}.tar.gz")
+            
+            print(f"Downloading {study_id} tarball from AWS Datahub...")
+            urllib.request.urlretrieve(tar_url, tar_path_local)
+            
+            with tarfile.open(tar_path_local, "r:gz") as tar:
+                # Clinical Patient
+                clin_member = [m for m in tar.getmembers() if 'data_clinical_patient.txt' in m.name][0]
+                clin_df = pd.read_csv(tar.extractfile(clin_member), sep='\t', skiprows=4)
+                
+                sample_members = [m for m in tar.getmembers() if 'data_clinical_sample.txt' in m.name]
+                if sample_members:
+                    sample_df = pd.read_csv(tar.extractfile(sample_members[0]), sep='\t', skiprows=4)
+                    clin_df = pd.merge(clin_df, sample_df, on='PATIENT_ID', how='inner')
+                
+                clin_df = standardize_clinical(clin_df, 'cbioportal')
+                clin_df.to_csv(clin_path, index=False)
+                
+                # Expression
+                expr_members = [m for m in tar.getmembers() if f'data_{profile_expr}.txt' in m.name]
+                if not expr_members:
+                    expr_members = [m for m in tar.getmembers() if 'mrna' in m.name.lower() and m.name.endswith('.txt')]
+                if not expr_members:
+                    raise ValueError(f"No mRNA expression file found in {study_id} tarball.")
+                
+                expr_df = pd.read_csv(tar.extractfile(expr_members[0]), sep='\t')
+                expr_df.to_csv(expr_path, index=False)
+                
+            os.remove(tar_path_local)
+
+def generate_notebook(database, cancers, study_ids, profile_expr, genes_list, signature_name, genes_str, num_genes):
     nb = nbf.v4.new_notebook()
     
-    # Notebook metadata
     nb['metadata'] = {
-        'kernelspec': {
-            'display_name': 'Python 3',
-            'language': 'python',
-            'name': 'python3'
-        },
-        'language_info': {
-            'name': 'python'
-        }
+        'kernelspec': {'display_name': 'Python 3', 'language': 'python', 'name': 'python3'},
+        'language_info': {'name': 'python'}
     }
     
     cells = []
     
-    # --- Cell 1: Title and Purpose ---
-    cell_1_md = f"""\
-# ML Prognostic Classifier using the {num_genes}-gene {signature_name}
+    cancers_str = ", ".join([c.upper() for c in cancers])
+    
+    cells.append(nbf.v4.new_markdown_cell(f"""\
+# ML Prognostic Classifier using the {num_genes}-gene {signature_name} ({database.upper()} - {cancers_str})
 
-**Purpose:** We have identified a {num_genes}-gene {signature_name} signature: `{genes_str}`. This notebook builds and validates a Machine Learning Prognostic Classifier using this signature on the METABRIC breast cancer cohort.
+### Goal
+Build and validate a Machine Learning Prognostic Classifier using the `{genes_str}` signature across {cancers_str} cohorts from {database.upper()}.
 
-**Methodology:**
-1. Download METABRIC clinical and mRNA expression data from cBioPortal.
-2. Train baseline Cox Proportional Hazards, Random Forest, and MLP Neural Network models.
-3. Evaluate models using C-index, ROC-AUC, Kaplan-Meier curves, and feature importance.
-"""
-    cells.append(nbf.v4.new_markdown_cell(cell_1_md))
+### Purpose
+To determine whether the multi-gene metabolic signature possesses independent non-linear prognostic utility for predicting 5-year overall survival, providing translational insight beyond traditional linear survival models.
 
-    # --- Cell 2: Imports and Setup ---
+### Interpretation
+- **Cox Proportional Hazards C-index**: Establishes baseline linear survival predictive power.
+- **Random Forest & MLP ROC-AUC**: Evaluates non-linear and interactive predictive power for 5-year binary overall survival.
+- **Kaplan-Meier High vs Low Risk**: Stratifies patients based on machine learning risk scores to demonstrate clinical significance.
+
+### Inputs/Parameters
+- **Database:** `{database.upper()}`
+- **Cancers:** `{cancers_str}`
+- **Gene Signature:** `{signature_name}` (`{genes_str}`)
+
+### Outputs
+- **Plots & Models:** Saved to `output/ml_prognostic_results/{database}/{"_".join(cancers)}/{num_genes}-gene/`
+"""))
+
     cells.append(nbf.v4.new_code_cell("""\
 import os
 import sys
@@ -68,7 +215,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import requests
 import joblib
 
 # ML & Survival Modeling
@@ -89,136 +235,139 @@ except ImportError:
 import warnings
 warnings.filterwarnings('ignore')
 
-# Set aesthetic style
 sns.set_style('whitegrid')
 plt.rcParams['figure.dpi'] = 300
 """))
 
-    # --- Cell 3: Data Loading & Preprocessing ---
-    cells.append(nbf.v4.new_markdown_cell("""\
-## 1. Data Fetching and Preprocessing
+    cells.append(nbf.v4.new_markdown_cell(f"""\
+## 1. Data Loading
 
-**Methodology:** We fetch the METABRIC clinical and expression data directly from the cBioPortal datahub. Data is saved locally in `../input/metabric/` so we don't redownload it repeatedly.
-
-**Interpretation Guide:** Patients with missing survival times or status are dropped. We convert `OS_STATUS` to a boolean event indicator (1 = Death, 0 = Censored).
+**Methodology:** We load the cleaned {database.upper()} clinical and expression data that was pre-processed by our generator script. We also transpose and merge the expression data into the clinical cohort, yielding a unified pan-cancer dataset (if multiple cancers were specified).
 """))
 
     cell_3_code = f"""\
 genes = {repr(genes_list)}
+database = "{database}"
+cancers = {repr(cancers)}
 
-data_dir = '../input/metabric'
-os.makedirs(data_dir, exist_ok=True)
+data_dir = '../input/{database}'
+if not os.path.exists(data_dir):
+    data_dir = 'input/{database}'
 
-clin_url = 'https://raw.githubusercontent.com/cBioPortal/datahub/master/public/brca_metabric/data_clinical_patient.txt'
-expr_url = 'https://raw.githubusercontent.com/cBioPortal/datahub/master/public/brca_metabric/data_mrna_illumina_microarray.txt'
+clin_dfs = []
+expr_dfs = []
 
-clin_path = os.path.join(data_dir, 'clinical.csv')
-expr_path = os.path.join(data_dir, 'expression.csv')
-
-# Download clinical data if needed
-try:
-    if not os.path.exists(clin_path) or os.path.getsize(clin_path) < 1000:
-        clin_df = pd.read_csv(clin_url, sep='\\t', skiprows=4)
-        clin_df.to_csv(clin_path, index=False)
+for cancer in cancers:
+    clin_path = os.path.join(data_dir, f'{{cancer}}_clinical.csv')
+    expr_path = os.path.join(data_dir, f'{{cancer}}_expression.csv')
+    
+    c_df = pd.read_csv(clin_path, low_memory=False)
+    e_df = pd.read_csv(expr_path, low_memory=False)
+    
+    c_df['CANCER_TYPE'] = cancer.upper()
+    
+    # Preprocessing Expression for ML format
+    e_df = e_df.drop(columns=['Entrez_Gene_Id'], errors='ignore')
+    if 'Hugo_Symbol' in e_df.columns:
+        e_df = e_df.set_index('Hugo_Symbol').T
     else:
-        clin_df = pd.read_csv(clin_path)
+        e_df = e_df.set_index(e_df.columns[0]).T
+        
+    e_df.index.name = 'SAMPLE_ID' if 'SAMPLE_ID' in c_df.columns else 'PATIENT_ID'
+    e_df = e_df.reset_index()
+    
+    if database.lower() == 'tcga':
+        # Align TCGA IDs
+        e_df[e_df.columns[0]] = e_df[e_df.columns[0]].apply(lambda x: str(x)[:12])
+        
+    clin_dfs.append(c_df)
+    expr_dfs.append(e_df)
 
-    # Download expression data if needed
-    if not os.path.exists(expr_path) or os.path.getsize(expr_path) < 1000:
-        expr_df = pd.read_csv(expr_url, sep='\\t')
-        expr_df.to_csv(expr_path, index=False)
-    else:
-        expr_df = pd.read_csv(expr_path)
-except Exception as e:
-    print(f"\\n🚨 ERROR: Failed to download METABRIC data automatically.")
-    print(f"This is likely due to a network proxy blocking raw.githubusercontent.com.")
-    print(f"Please manually download the following two files:")
-    print(f"1. {{clin_url}}")
-    print(f"   --> Save as: {{os.path.abspath(clin_path)}}")
-    print(f"2. {{expr_url}}")
-    print(f"   --> Save as: {{os.path.abspath(expr_path)}}")
-    print(f"\\nOnce saved, please re-run this notebook. Exception details: {{e}}")
-    raise e
+# Pan-Cancer Merge
+clin_df = pd.concat(clin_dfs, ignore_index=True)
+expr_df = pd.concat(expr_dfs, ignore_index=True)
 
-# Preprocessing Clinical
-# We need OS_MONTHS and OS_STATUS
-clin_df = clin_df[['PATIENT_ID', 'OS_MONTHS', 'OS_STATUS']].dropna()
-clin_df['event'] = clin_df['OS_STATUS'].apply(lambda x: 1 if 'DECEASED' in str(x).upper() else 0)
+# Merge based on available ID type
+merge_key = 'SAMPLE_ID' if 'SAMPLE_ID' in clin_df.columns else 'PATIENT_ID'
+df = pd.merge(clin_df, expr_df, on=merge_key, how='inner')
 
-# Preprocessing Expression
-# Set index to Hugo_Symbol, drop Entrez, transpose so rows are patients
-expr_df = expr_df.drop(columns=['Entrez_Gene_Id'], errors='ignore').set_index('Hugo_Symbol').T
-expr_df.index.name = 'PATIENT_ID'
-expr_df = expr_df.reset_index()
-
-# Merge
-df = pd.merge(clin_df, expr_df, on='PATIENT_ID', how='inner')
+# Drop duplicate patients if any
+df = df.drop_duplicates(subset=['PATIENT_ID'])
 print(f"Final dataset shape: {{df.shape}}")
+if df.shape[0] == 0:
+    raise ValueError("After merging clinical and expression data, the dataset is empty. Check if PATIENT_ID/SAMPLE_ID match between files.")
 df.head()
 """
     cells.append(nbf.v4.new_code_cell(cell_3_code))
 
-    # --- Cell 4: Train / Test Split ---
     cells.append(nbf.v4.new_code_cell("""\
 # Features & Target
-# Ensure all signature genes are present (some might be missing in METABRIC array, check first)
 present_genes = [g for g in genes if g in df.columns]
-print(f"Found {len(present_genes)} out of {len(genes)} signature genes in expression data.")
+missing_genes = set(genes) - set(present_genes)
+if len(present_genes) == 0:
+    raise ValueError("None of the signature genes were found in the expression dataset.")
+if len(missing_genes) > 0:
+    print(f"Warning: The following genes were missing from the dataset and will be ignored: {missing_genes}")
 
-X = df[present_genes]
-# Target for Cox (time, event)
-y_surv = df[['OS_MONTHS', 'event']]
-# Target for Classifier: 5-year survival status (60 months)
-# 1 = lived > 60 months, 0 = died <= 60 months
+num_genes = len(present_genes)
+print(f"Proceeding with {num_genes} genes: {present_genes}")
+
+# Output Directory
+out_dir = f'../output/ml_prognostic_results/{database}/{"_".join(cancers)}/' + str(num_genes) + '-gene'
+os.makedirs(out_dir, exist_ok=True)
+
 df['5yr_survival'] = np.where((df['OS_MONTHS'] >= 60), 1, 
                               np.where((df['event'] == 1) & (df['OS_MONTHS'] < 60), 0, np.nan))
-                              
-# We will use train_test_split on the main dataset
+
+# train_test_split
 X_train, X_test, y_train, y_test = train_test_split(df[present_genes], df, test_size=0.2, random_state=42)
 
-out_dir = '../output/ml_prognostic_results/""" + str(num_genes) + """-gene'
-os.makedirs(out_dir, exist_ok=True)
+print(f"Train size: {X_train.shape[0]}")
+print(f"Test size: {X_test.shape[0]}")
 """))
 
-    # --- Cell 5: Cox Proportional Hazards Model ---
-    cells.append(nbf.v4.new_markdown_cell(f"""\
-## 2. Cox Proportional Hazards Model (Baseline)
-
-**Methodology:** A multivariate Cox model to assess the linear risk effects of the gene signature.
-
-**Interpretation Guide:** Hazard Ratios (HR) > 1 imply higher expression increases risk (worse prognosis). HR < 1 implies protective effect.
+    cells.append(nbf.v4.new_markdown_cell("""\
+## 2. Model 1: Baseline Cox Proportional Hazards Model
 """))
-    cell_5_code = f"""\
-cph_data = pd.concat([X_train, y_train[['OS_MONTHS', 'event']]], axis=1)
-cph = CoxPHFitter(penalizer=0.1) # Add small penalization for stability
-cph.fit(cph_data, duration_col='OS_MONTHS', event_col='event')
+
+    cells.append(nbf.v4.new_code_cell("""\
+cph_train = pd.concat([X_train, y_train[['OS_MONTHS', 'event']]], axis=1)
+cph = CoxPHFitter(penalizer=0.1)
+cph.fit(cph_train, duration_col='OS_MONTHS', event_col='event')
+
 cph.print_summary()
+c_index_cph = cph.concordance_index_
+print(f"\\nCox PH C-index on training set: {c_index_cph:.3f}")
+"""))
 
-plt.figure(figsize=(8, 6))
+    cells.append(nbf.v4.new_code_cell("""\
+cph_test = pd.concat([X_test, y_test[['OS_MONTHS', 'event']]], axis=1)
+c_index_test = cph.score(cph_test, scoring_method='concordance_index')
+print(f"Cox PH C-index on TEST set: {c_index_test:.3f}")
+
+plt.figure(figsize=(10, 6))
 cph.plot()
-plt.title(f'CoxPH Hazard Ratios for {num_genes}-gene Signature')
+plt.title(f'Cox PH Hazard Ratios ({num_genes}-gene Signature)')
 plt.tight_layout()
-plt.savefig(f"{{out_dir}}/cox_hazard_ratios.png")
+plt.savefig(f"{out_dir}/cox_hazard_ratios.png")
 plt.show()
+"""))
 
-# Predictions (Hazard)
-cph_risk_train = cph.predict_partial_hazard(X_train)
-cph_risk_test = cph.predict_partial_hazard(X_test)
-
-# Concordance index
-print(f"CoxPH Test Concordance Index: {{cph.score(pd.concat([X_test, y_test[['OS_MONTHS', 'event']]], axis=1), scoring_method='concordance_index'):.3f}}")
-"""
-    cells.append(nbf.v4.new_code_cell(cell_5_code))
-
-    # --- Cell 6: Random Forest & Neural Net (MLP) ---
     cells.append(nbf.v4.new_markdown_cell("""\
 ## 3. Machine Learning Models (Random Forest & Neural Network)
 
-**Methodology:** Since standard classifiers don't natively handle censoring, we train them to predict 5-year overall survival (binary classification). Patients censored before 5 years are excluded from this specific training subset.
+**Methodology:**
+This section evaluates the multi-gene signature's non-linear predictive power using two standard approaches:
+1. **Random Forest Classifier**
+2. **Multi-Layer Perceptron (Neural Network)**
 
-**Interpretation:** These non-linear models capture complex epistatic gene interactions that linear Cox models might miss.
+Patients are labeled based on their **5-year Overall Survival (OS)** status (1 = survived > 5 years, 0 = died < 5 years). The models evaluate performance using the **ROC-AUC** metric, explicitly plot the overlapping ROC curves, and save the trained models for future inference.
 """))
+
     cells.append(nbf.v4.new_code_cell("""\
+from sklearn.neural_network import MLPClassifier
+import joblib
+
 # Filter valid cases for binary classification (5-year survival)
 train_bin = y_train.dropna(subset=['5yr_survival'])
 test_bin = y_test.dropna(subset=['5yr_survival'])
@@ -228,7 +377,7 @@ y_train_bin = train_bin['5yr_survival']
 y_test_bin = test_bin['5yr_survival']
 
 # Random Forest
-rf = RandomForestClassifier(n_estimators=100, random_state=42)
+rf = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42, class_weight='balanced')
 rf.fit(X_train_bin, y_train_bin)
 
 # Neural Net (MLP)
@@ -251,47 +400,33 @@ auc_rf = roc_auc_score(1 - y_test_bin, rf_risk_test)
 fpr_mlp, tpr_mlp, _ = roc_curve(1 - y_test_bin, mlp_risk_test)
 auc_mlp = roc_auc_score(1 - y_test_bin, mlp_risk_test)
 
-plt.plot(fpr_rf, tpr_rf, label=f'Random Forest (AUC = {auc_rf:.3f})')
-plt.plot(fpr_mlp, tpr_mlp, label=f'MLP Neural Net (AUC = {auc_mlp:.3f})')
-plt.plot([0,1], [0,1], 'k--', label='Random Chance')
+plt.plot(fpr_rf, tpr_rf, color='darkorange', lw=2, label=f'Random Forest (AUC = {auc_rf:.3f})')
+plt.plot(fpr_mlp, tpr_mlp, color='green', lw=2, label=f'MLP Neural Net (AUC = {auc_mlp:.3f})')
+plt.plot([0,1], [0,1], 'k--', lw=2, label='Random Chance')
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title('ROC Curve: 5-Year Survival Prediction')
-plt.legend()
+plt.title(f'ROC Curve: 5-Year Survival Prediction ({num_genes}-gene Signature)')
+plt.legend(loc="lower right")
 plt.tight_layout()
 plt.savefig(f"{out_dir}/roc_curves.png")
 plt.show()
-"""))
 
-    # --- Cell 7: Feature Importance ---
-    cells.append(nbf.v4.new_markdown_cell("""\
-## 4. Feature Importance
-
-**Methodology:** Extract Random Forest Gini importance to see which genes are the strongest predictive drivers.
-"""))
-    cell_7_code = f"""\
-fi = pd.Series(rf.feature_importances_, index=present_genes).sort_values(ascending=False)
-
-plt.figure(figsize=(10, 5))
-sns.barplot(x=fi.values, y=fi.index, palette='viridis')
-plt.title(f'Random Forest Feature Importance ({num_genes}-gene signature)')
-plt.xlabel('Importance')
+# Plot Feature Importances from Random Forest
+feature_imp_rf = pd.Series(rf.feature_importances_, index=X_train.columns).sort_values(ascending=False)
+plt.figure(figsize=(10, 6))
+sns.barplot(x=feature_imp_rf.values, y=feature_imp_rf.index, palette='viridis')
+plt.title(f'RF Gini Importances ({num_genes}-gene Signature)')
 plt.tight_layout()
-plt.savefig(f"{{out_dir}}/rf_feature_importance.png")
+plt.savefig(f"{out_dir}/rf_feature_importances.png")
 plt.show()
-"""
-    cells.append(nbf.v4.new_code_cell(cell_7_code))
-
-    # --- Cell 8: Kaplan-Meier Risk Stratification ---
-    cells.append(nbf.v4.new_markdown_cell("""\
-## 5. Kaplan-Meier Risk Stratification
-
-**Methodology:** We stratify the test cohort into 'High Risk' and 'Low Risk' groups based on the median risk score predicted by the baseline Cox model. We then plot Kaplan-Meier survival curves.
-
-**Interpretation:** A significant separation (visual gap, log-rank test) demonstrates the clinical utility of the prognostic classifier.
 """))
-    cell_8_code = f"""\
-# Stratify based on median risk in the test set (using Cox model)
+
+    cells.append(nbf.v4.new_markdown_cell("""\
+## 4. Kaplan-Meier Survival Analysis (High vs Low Risk)
+"""))
+
+    cells.append(nbf.v4.new_code_cell("""\
+cph_risk_test = cph.predict_partial_hazard(X_test)
 median_risk = np.median(cph_risk_test)
 high_risk_mask = cph_risk_test > median_risk
 
@@ -301,17 +436,16 @@ test_low = y_test[~high_risk_mask]
 kmf = KaplanMeierFitter()
 plt.figure(figsize=(8, 6))
 
-kmf.fit(test_low['OS_MONTHS'], event_observed=test_low['event'], label=f'Low Risk (n={{len(test_low)}})')
+kmf.fit(test_low['OS_MONTHS'], event_observed=test_low['event'], label=f'Low Risk (n={len(test_low)})')
 ax = kmf.plot()
 
-kmf.fit(test_high['OS_MONTHS'], event_observed=test_high['event'], label=f'High Risk (n={{len(test_high)}})')
+kmf.fit(test_high['OS_MONTHS'], event_observed=test_high['event'], label=f'High Risk (n={len(test_high)})')
 kmf.plot(ax=ax)
 
-# Try importing logrank test
 try:
     from lifelines.statistics import multivariate_logrank_test
     res = multivariate_logrank_test(y_test['OS_MONTHS'], high_risk_mask, y_test['event'])
-    plt.text(0.05, 0.05, f"Log-rank p-value: {{res.p_value:.2e}}", transform=ax.transAxes, fontsize=12)
+    plt.text(0.05, 0.05, f"Log-rank p-value: {res.p_value:.2e}", transform=ax.transAxes, fontsize=12)
 except Exception as e:
     pass
 
@@ -319,13 +453,11 @@ plt.title(f'Kaplan-Meier Survival Curve: High vs Low Risk ({num_genes}-gene Sign
 plt.xlabel('Time (Months)')
 plt.ylabel('Survival Probability')
 plt.tight_layout()
-plt.savefig(f"{{out_dir}}/km_survival_curve.png")
+plt.savefig(f"{out_dir}/km_survival_curve.png")
 plt.show()
-"""
-    cells.append(nbf.v4.new_code_cell(cell_8_code))
+"""))
 
-    # --- Cell 9: Auto-HTML Export ---
-    cell_9_code = f"""\\
+    cells.append(nbf.v4.new_code_cell(f"""\
 import subprocess
 import sys
 import os
@@ -349,16 +481,75 @@ if res_html.returncode == 0:
 else:
     print("❌ HTML export failed.")
     print(res_html.stderr)
-"""
-    cells.append(nbf.v4.new_code_cell(cell_9_code))
+"""))
 
     nb['cells'] = cells
-    
-    # Save the notebook
     notebook_filename = 'scripts/ml_prognostic_classifier.ipynb'
     with open(notebook_filename, 'w', encoding='utf-8') as f:
         nbf.write(nb, f)
     
     print(f"Notebook successfully created at: {notebook_filename}")
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate ML Prognostic Classifier Notebook with Pan-Cancer Support",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # TCGA single cancer:
+  python scripts/generate_ml_prognostic_classifier_notebook.py --database tcga --cancer luad
+
+  # TCGA pan-cancer (BRCA and LUAD combined):
+  python scripts/generate_ml_prognostic_classifier_notebook.py --database tcga --cancer brca luad
+
+  # cBioPortal pan-cancer (BRCA AURORA and LUAD BROAD combined):
+  python scripts/generate_ml_prognostic_classifier_notebook.py --database cbioportal --cancer brca luad --study-id brca_aurora_2023 luad_broad
+"""
+    )
+    parser.add_argument("--genes", nargs="+", 
+                        default=['ADAM10', 'C1GALT1', 'ESRRG', 'FZD6', 'GBE1', 'GLS', 'ITGA4', 'PDE3B', 'SGMS1', 'SLC11A2', 'SLC16A7', 'SLC22A1'], 
+                        help="List of genes for the signature")
+    parser.add_argument("--signature-name", default="STAT3 Core Axis", help="Name of the signature")
+    parser.add_argument("--database", default="tcga", help="Data source to use (e.g. cbioportal, tcga, metabric)")
+    parser.add_argument("--cancer", nargs="+", default=["brca"], help="List of cancer prefixes (e.g., brca, luad)")
+    parser.add_argument("--study-id", nargs="+", default=["brca_metabric"], help="List of cBioPortal study IDs matching the cancers (for fallback downloading)")
+    parser.add_argument("--profile-expr", default="mrna_illumina_microarray", help="cBioPortal mRNA profile name")
+    args = parser.parse_args()
+    
+    genes_list = args.genes
+    signature_name = args.signature_name
+    database = args.database
+    cancers = args.cancer
+    
+    if len(cancers) == 1 and cancers[0].lower() == 'all':
+        import glob
+        if database.lower() == 'tcga':
+            tcga_dir = '../input/TCGA' if not os.path.exists('input') else 'input/TCGA'
+            if os.path.exists(tcga_dir):
+                files = glob.glob(os.path.join(tcga_dir, 'TCGA-*.survival.tsv.gz'))
+                cancers = [os.path.basename(f).split('-')[1].split('.')[0].lower() for f in files]
+                print(f"Auto-detected {len(cancers)} cancers for TCGA: {', '.join(cancers)}")
+            else:
+                raise ValueError(f"TCGA directory {tcga_dir} not found.")
+        else:
+            data_dir = f'../input/{database}' if not os.path.exists('input') else f'input/{database}'
+            if os.path.exists(data_dir):
+                files = glob.glob(os.path.join(data_dir, '*_clinical.csv'))
+                cancers = [os.path.basename(f).replace('_clinical.csv', '').lower() for f in files]
+                print(f"Auto-detected {len(cancers)} cancers for {database}: {', '.join(cancers)}")
+            else:
+                raise ValueError(f"Data directory {data_dir} not found for {database}.")
+                
+    study_ids = args.study_id
+    profile_expr = args.profile_expr
+    num_genes = len(genes_list)
+    genes_str = ", ".join(genes_list)
+
+    # 1. Prepare and standardize all datasets before writing notebook
+    prepare_data(database, cancers, study_ids, profile_expr)
+
+    # 2. Generate the notebook
+    generate_notebook(database, cancers, study_ids, profile_expr, genes_list, signature_name, genes_str, num_genes)
+
 if __name__ == "__main__":
     main()
