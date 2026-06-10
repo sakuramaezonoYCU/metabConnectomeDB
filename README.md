@@ -1,12 +1,20 @@
 # metabConnectomeDB
 
-This repository processes and merges multiple metabolite and protein databases (such as HMDB, CellPhoneDBv5, MEBOCOST, MetaLigand, MRCLinkDB, scCellFie, NeuronChat, and Cellinker2) to generate consolidated, unified human and mouse datasets.
+This repository processes and merges multiple metabolite and protein databases (such as HMDB, CellPhoneDBv5, MEBOCOST, MetaLigand, MRCLinkDB, scCellFie, NeuronChat, and Cellinker2) to generate consolidated, unified human and mouse datasets called metabConnectomeDB.
+
+Beyond data consolidation, this repository contains a comprehensive suite of computational pipelines and analytical notebooks for multi-omics cancer research. Key capabilities include:
+- **Pan-Cancer Meta-Analysis:** Cross-cancer identification of conserved metabolic gene signatures (e.g., the 21-gene Directed Metastatic Signature and the 12-gene STAT3 Core Axis) using large-scale single-cell RNA-seq integration (CellxGene).
+- **Prognostic and Predictive Modeling:** Machine learning classifiers (Random Forest, Cox Proportional Hazards, MLP Neural Networks) trained on clinical cohorts (e.g., METABRIC, TCGA) to evaluate the prognostic power of metabolic signatures.
+- **Spatial Transcriptomics & Metabolomics Integration:** Validation of metabolic interactions (like the Serotonin-TAM immune evasion axis) using physical mass-spectrometry metabolomics and high-resolution spatial transcriptomics (Visium).
+- **In Silico Microenvironment Analysis:** Computationally simulating intratumoral oxygen gradients, mapping macrophage immunometabolism (CAMP Integration), and modeling directional cell-cell communication networks.
+- **Therapeutic Target Discovery:** Cross-referencing identified metabolic targets against pharmacological databases (DGIdb, Open Targets) to profile druggability and guide synthetic lethality strategies.
 
 ## 📂 Directory Structure
 
 ```text
 metabConnectomeDB/
 ├── scripts/                            # Pipeline scripts and utilities
+│   ├── merge_dbs_claude.py             # Primary data ingestion and standardization
 │   ├── annotate_with_hmdb.py
 │   ├── execute_and_export_notebooks.py # Exports notebooks to styled HTML reports
 │   ├── run_cancer_pipeline.py          # Executes full single-cancer pipeline
