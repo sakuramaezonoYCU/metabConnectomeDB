@@ -16,6 +16,7 @@ metabConnectomeDB/
 ├── scripts/                            # Pipeline scripts and utilities
 │   ├── merge_dbs_claude.py             # Primary data ingestion and standardization
 │   ├── annotate_with_hmdb.py
+│   ├── annotate_with_databases.py      # Final consolidation step mapping external databases
 │   ├── execute_and_export_notebooks.py # Exports notebooks to styled HTML reports
 │   ├── run_cancer_pipeline.py          # Executes full single-cancer pipeline
 │   ├── run_all_cancers.py              # Queries CellxGene Census and runs multi-cancer pipeline
@@ -23,6 +24,8 @@ metabConnectomeDB/
 │   ├── merge_simplify_annotate.sh
 │   ├── parse_md_tables.py              # Utility to extract Markdown tables
 │   ├── standardize_categories.py       # Standardizes metabolite classifications
+│   ├── query_advanced_analysis.py      # Queries external APIs for gene interactions/druggability
+│   ├── druggability_config.py          # Centralized configuration for API URLs and constants
 │   ├── cancer_cellxgene_integration.ipynb         # CellxGene cancer scRNA-seq integration
 │   ├── metab_targetPair_analysis.ipynb            # Metabolite-Target pair analysis
 │   ├── orphan_metabolic_immune_evasion.ipynb      # Orphan metabolite immune evasion mapping
@@ -33,7 +36,6 @@ metabConnectomeDB/
 │   ├── subclass_mapping.csv            # Mapping dictionary for metabolite subclasses
 │   └── superclass_mapping.csv          # Mapping dictionary for metabolite superclasses
 ├── output/                             # Consolidated output CSV files and HTML reports
-│   └── AI_summary_and_insights.md      # Comprehensive pipeline insights and next steps
 ├── environment.yml                     # Conda environment definition
 ├── requirements.txt                    # Pip requirements definition
 └── README.md                           # This documentation
@@ -228,6 +230,20 @@ The following details the relationship between scripts, their inputs, internal p
   5. Finally, execute `pan_cancer_meta_analysis.ipynb` top-to-bottom (or use `execute_and_export_notebooks.py`) to render the final HTML report.
 - **Output:** Master 5-cancer meta-analysis notebook detailing the conserved genes, network graph, druggability analysis, and predictive scores, alongside all underlying CSV data files in `output/pan_cancer_meta_results/`.
 
+### `query_advanced_analysis.py`
+
+- **Role:** A utility module used by downstream notebooks to query external databases for advanced target analysis. It enforces strict data integrity by immediately raising `RuntimeError` exceptions rather than returning empty placeholders if an API call to STRING or Open Targets fails.
+- **Input:** Takes lists of target gene symbols (e.g., `["STAT3", "HTR7"]`) as arguments to its internal functions (`query_string_ppi`, `query_tractability`).
+- **Parameters:** Relies on `druggability_config.py` for API URLs (e.g., `OPENTARGETS_API_URL`).
+- **Output:** Returns Pandas DataFrames containing physical interaction scores (from STRING) and tractability assessments (Small Molecule / Antibody druggability from Open Targets).
+
+### `druggability_config.py`
+
+- **Role:** Centralized configuration script to maintain data provenance and prevent hardcoding constants or API endpoints in analysis scripts.
+- **Input:** None.
+- **Parameters:** Defines constants such as `OPENTARGETS_API_URL`.
+- **Output:** Exposes constants for other modules to import.
+
 ### Specialized Investigation Notebooks
 
 Several targeted Jupyter notebooks dive deep into specific biological questions raised by the pan-cancer analysis:
@@ -241,7 +257,7 @@ Several targeted Jupyter notebooks dive deep into specific biological questions 
 - **`predictive_signature_biomarker.ipynb`**: Explores the pan-cancer predictive capability of the strictly conserved metabolic gene signature.
 - **`serotonin_axis_spatial_mapping.ipynb`**: Maps the spatial distribution of the serotonin axis within specific tissue microenvironments.
 - **`visium_spatial_validation.ipynb`**: Validates the spatial axis involving HTR7+ tumor-associated macrophages (TAMs) and HR-repair genes using Visium spatial transcriptomics via spatial co-localization analysis.
-- **`camp_pancancer_integration.ipynb`**: Investigates pan-cancer integration for Directed Metastatic Signatures.
+- **`camp_pancancer_integration_*.ipynb`**: Investigates pan-cancer integration for Directed Metastatic Signatures.
 - **`massspec_metabolomics_integration_*.ipynb`**: Integrates mass spectrometry metabolomics data with cross-cohort comparisons to validate metabolic signatures.
 - **`ml_prognostic_classifier.ipynb`**: Trains Cox Proportional Hazards, Random Forest, and MLP Neural Network classifiers on independent clinical cohorts (e.g., METABRIC breast cancer dataset) to evaluate the prognostic power of our derived metabolic gene signatures. Generates risk stratification models, ROC curves, and Kaplan-Meier plots.
 
