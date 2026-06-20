@@ -74,7 +74,11 @@ def match_metabolites(gene_list, meta_results_dir):
                 'match_type': 'Cleaned Exact/Synonym'
             })
             
-    match_df = pd.DataFrame(matches)
+    if not matches:
+        match_df = pd.DataFrame(columns=['ms_metabolite', 'hmdb_metabolite', 'linked_genes', 'match_type'])
+    else:
+        match_df = pd.DataFrame(matches)
+        
     match_df.to_csv(os.path.join(meta_results_dir, 'metabolite_match_table.csv'), index=False)
     print(f"Found {len(match_df)} matching metabolites linked to signature genes.")
     
@@ -85,6 +89,11 @@ def match_metabolites(gene_list, meta_results_dir):
 # -----------------------------------------------------------------------------
 def run_differential_abundance(ms_df, match_df, meta_results_dir):
     print("Module 2: Running Differential Abundance...")
+    if match_df.empty:
+        print("No matched metabolites. Skipping Differential Abundance.")
+        pd.DataFrame(columns=['Cancer', 'Metabolite', 'Tumor_Samples', 'Normal_Samples', 'Log2FC', 'P_Value', 'FDR']).to_csv(os.path.join(meta_results_dir, 'differential_abundance_per_cancer.csv'), index=False)
+        return pd.DataFrame(), pd.DataFrame(), {}
+        
     matched_ms_names = match_df['ms_metabolite'].tolist()
     # Filter ms_df to only matched metabolites
     ms_sub = ms_df[ms_df['X'].isin(matched_ms_names)].set_index('X')
@@ -213,6 +222,10 @@ def run_coabundance(ms_sub, meta_results_dir):
 # -----------------------------------------------------------------------------
 def run_pca_signature(ms_sub, cancer_samples, meta_results_dir):
     print("Module 4: PCA Metabolic Signature Score...")
+    if ms_sub.empty or len(ms_sub) == 0:
+        print("Not enough metabolites. Skipping PCA.")
+        return
+        
     # Impute missing values with row median for PCA
     ms_imputed = ms_sub.apply(lambda row: row.fillna(row.median()), axis=1)
     
@@ -260,7 +273,12 @@ def run_pca_signature(ms_sub, cancer_samples, meta_results_dir):
 # -----------------------------------------------------------------------------
 def run_bipartite_network(hmdb_filtered, match_df, meta_results_dir):
     print("Module 5: Gene-Metabolite Bipartite Network...")
-    matched_hmdb = set(match_df['hmdb_metabolite'])
+    if hmdb_filtered.empty:
+        print("No genes to build network. Skipping.")
+        pd.DataFrame(columns=['Gene', 'Metabolite', 'Is_Detected_MassSpec', 'Super_Class']).to_csv(os.path.join(meta_results_dir, 'gene_metabolite_network_edges.csv'), index=False)
+        return
+        
+    matched_hmdb = set(match_df['hmdb_metabolite']) if not match_df.empty else set()
     
     G = nx.Graph()
     edges = []
@@ -316,6 +334,10 @@ def run_bipartite_network(hmdb_filtered, match_df, meta_results_dir):
 # -----------------------------------------------------------------------------
 def run_pan_cancer_heatmap(ms_sub, cancer_samples, meta_results_dir):
     print("Module 6: Pan-Cancer Metabolite Heatmap...")
+    if ms_sub.empty or not cancer_samples:
+        print("No data. Skipping Heatmap.")
+        return
+        
     tumor_medians = {}
     
     for c, samps in cancer_samples.items():
@@ -340,6 +362,11 @@ def run_pan_cancer_heatmap(ms_sub, cancer_samples, meta_results_dir):
 # -----------------------------------------------------------------------------
 def run_per_gene_profile(edges_df, res_df, meta_results_dir):
     print("Module 7: Per-Gene Metabolite Profile...")
+    if edges_df.empty:
+        print("No edges. Skipping Profile.")
+        pd.DataFrame(columns=['Gene', 'Total_Linked_Metabolites', 'Detected_in_MassSpec', 'Detected_Metabolites']).to_csv(os.path.join(meta_results_dir, 'per_gene_metabolite_profile.csv'), index=False)
+        return
+        
     profile = []
     
     for gene in edges_df['Gene'].unique():
@@ -370,14 +397,28 @@ def run_per_gene_profile(edges_df, res_df, meta_results_dir):
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Mass Spec Metabolomics Integration")
-    parser.add_argument('--genes', nargs='+', default="ACAT1 ALDH2 ALDH6A1 ATP5F1D CD81 CPT1A CYP2J2 ETFDH GAD1 GLUD1 GRM5 HCCS MAOB NDUFB8 NSF PROCR QDPR SLC22A1 SLC25A20 UQCR11 ZP3".split(), help="List of genes in the signature")
-    parser.add_argument('--signature-name', default="21-gene", help="Name of the signature (e.g. 21-gene, 3-gene)")
+    parser.add_argument('--signature_csv', required=True, help="Path to the signature CSV file containing a 'Gene' or 'Strictly_Conserved_Gene' column")
     args = parser.parse_args()
 
-    meta_results_dir = os.path.join(OUTPUT_DIR, 'massspec_metabolomics', args.signature_name)
+    if not os.path.exists(args.signature_csv):
+        raise FileNotFoundError(f"CRITICAL ERROR: Signature CSV {args.signature_csv} does not exist.")
+
+    df_sig = pd.read_csv(args.signature_csv)
+    if 'Gene' in df_sig.columns:
+        genes = df_sig['Gene'].dropna().unique().tolist()
+    elif 'Target' in df_sig.columns:
+        genes = df_sig['Target'].dropna().unique().tolist()
+    elif 'Strictly_Conserved_Gene' in df_sig.columns:
+        genes = df_sig['Strictly_Conserved_Gene'].dropna().unique().tolist()
+    else:
+        raise ValueError(f"CRITICAL ERROR: Could not find 'Gene', 'Target', or 'Strictly_Conserved_Gene' column in {args.signature_csv}")
+
+    sig_name = os.path.basename(args.signature_csv).replace('.csv', '')
+
+    meta_results_dir = os.path.join(OUTPUT_DIR, 'massspec_metabolomics', sig_name)
     os.makedirs(meta_results_dir, exist_ok=True)
     
-    ms_df, match_df, hmdb_filtered = match_metabolites(args.genes, meta_results_dir)
+    ms_df, match_df, hmdb_filtered = match_metabolites(genes, meta_results_dir)
     res_df, ms_sub, cancer_samples = run_differential_abundance(ms_df, match_df, meta_results_dir)
     run_coabundance(ms_sub, meta_results_dir)
     run_pca_signature(ms_sub, cancer_samples, meta_results_dir)

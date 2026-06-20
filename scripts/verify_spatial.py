@@ -14,12 +14,12 @@ import pandas as pd
 import scanpy as sc
 import squidpy as sq
 import matplotlib.pyplot as plt
+import scipy.stats as stats
+import argparse
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.append(BASE_DIR)
-
-from serotonin_config import HTR7_TAM_SIGNATURE, HR_REPAIR_GENES
 
 def format_visium_dir(base_raw_dir, sample_prefix, out_dir):
     """
@@ -145,7 +145,7 @@ def load_visium_from_mtx(sample_dir):
             
     return adata
 
-def analyze_sample(sample_dir, sample_name, out_dir):
+def analyze_sample(sample_dir, sample_name, out_dir, sig_genes, sig_name):
     print(f"\n[{sample_name}] Loading Visium data...")
     try:
         adata = load_visium_from_mtx(sample_dir)
@@ -159,8 +159,15 @@ def analyze_sample(sample_dir, sample_name, out_dir):
     
     # Compute signatures
     print(f"[{sample_name}] Computing spatial signatures...")
-    adata.obs['HTR7_TAM_Score'] = calculate_module_score(adata, HTR7_TAM_SIGNATURE, 'temp_tam')
-    adata.obs['HR_Repair_Score'] = calculate_module_score(adata, HR_REPAIR_GENES, 'temp_hr')
+    if len(sig_genes) == 0:
+        print(f"  -> Signature has 0 genes. Skipping analysis for {sample_name}.")
+        return {
+            'Sample': sample_name,
+            'Spots': adata.n_obs,
+            'Morans_I': np.nan,
+            'Morans_Pval': np.nan
+        }
+    adata.obs['Signature_Score'] = calculate_module_score(adata, sig_genes, 'temp_sig')
     
     # Calculate spatial neighbors
     print(f"[{sample_name}] Building spatial graph...")
@@ -168,77 +175,80 @@ def analyze_sample(sample_dir, sample_name, out_dir):
     
     # Generate plots
     print(f"[{sample_name}] Generating spatial plots...")
-    sc.pl.spatial(adata, color=['HTR7_TAM_Score', 'HR_Repair_Score'], cmap='viridis', 
-                  title=[f'{sample_name}: HTR7+ TAM Score', f'{sample_name}: HR Repair Score'], 
+    sc.pl.spatial(adata, color=['Signature_Score'], cmap='viridis', 
+                  title=[f'{sample_name}: {sig_name} Score'], 
                   show=False)
                   
-    plot_path = os.path.join(out_dir, f"visium_{sample_name}_signatures.png")
+    plot_path = os.path.join(out_dir, f"visium_{sample_name}_{sig_name}.png")
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     plt.close()
     
-    # Calculate spot-to-spot correlation
-    r, p = stats.pearsonr(adata.obs['HTR7_TAM_Score'], adata.obs['HR_Repair_Score'])
-    print(f"[{sample_name}] Spot-level correlation: r={r:.3f}, p={p:.3e}")
+    # Calculate spot-to-spot spatial autocorrelation (Moran's I) to measure spatial clustering
+    # Squidpy spatial_autocorr expects genes in adata.X, so we create a temp AnnData
+    tmp_adata = sc.AnnData(X=adata.obs[['Signature_Score']].values)
+    tmp_adata.obsp['spatial_connectivities'] = adata.obsp['spatial_connectivities']
+    tmp_adata.obsp['spatial_distances'] = adata.obsp['spatial_distances']
+    tmp_adata.var_names = ['Signature_Score']
     
-    # Binarize scores (top 20% spots) for co-occurrence analysis
-    thresh_tam = np.percentile(adata.obs['HTR7_TAM_Score'], 80)
-    thresh_hr = np.percentile(adata.obs['HR_Repair_Score'], 80)
+    sq.gr.spatial_autocorr(tmp_adata, mode='moran', genes=['Signature_Score'])
+    moran_df = tmp_adata.uns['moranI']
+    moran_i = moran_df.loc['Signature_Score', 'I']
     
-    adata.obs['High_TAM'] = adata.obs['HTR7_TAM_Score'] > thresh_tam
-    adata.obs['High_HR'] = adata.obs['HR_Repair_Score'] > thresh_hr
+    # Squidpy versions differ in their p-value column names (e.g., pval_norm, pval_sim)
+    pval_cols = [c for c in moran_df.columns if 'pval' in c.lower()]
+    moran_pval = moran_df.loc['Signature_Score', pval_cols[0]] if pval_cols else np.nan
     
-    # Create categorical for co-occurrence
-    def assign_category(row):
-        if row['High_TAM'] and row['High_HR']: return 'Co-localized'
-        elif row['High_TAM']: return 'TAM_Only'
-        elif row['High_HR']: return 'HR_Only'
-        return 'Neither'
-        
-    adata.obs['Spot_Category'] = adata.obs.apply(assign_category, axis=1).astype('category')
-    
-    sc.pl.spatial(adata, color='Spot_Category', 
-                  title=f'{sample_name}: High TAM / High HR Repair Co-localization',
-                  show=False)
-    coloc_path = os.path.join(out_dir, f"visium_{sample_name}_colocalization.png")
-    plt.savefig(coloc_path, dpi=300, bbox_inches='tight')
-    plt.close()
+    print(f"[{sample_name}] Moran's I (Spatial Clustering): I={moran_i:.3f}, p={moran_pval:.3e}")
     
     return {
         'Sample': sample_name,
         'Spots': adata.n_obs,
-        'Pearson_R': r,
-        'Pearson_P': p,
-        'Co_localized_Spots': (adata.obs['Spot_Category'] == 'Co-localized').sum()
+        'Morans_I': moran_i,
+        'Morans_Pval': moran_pval
     }
 
 def main():
-    import scipy.stats as stats
-    # Make stats available globally for the analyze function
-    global stats 
+    parser = argparse.ArgumentParser(description="Visium Spatial Transcriptomics Signature Verification")
+    parser.add_argument('--signature_csv', required=True, help="Path to the signature CSV file")
+    args = parser.parse_args()
     
+    if not os.path.exists(args.signature_csv):
+        raise FileNotFoundError(f"CRITICAL ERROR: Signature CSV {args.signature_csv} does not exist.")
+        
+    sig_name = os.path.basename(args.signature_csv).replace('.csv', '')
+        
+    df_sig = pd.read_csv(args.signature_csv)
+    if 'Strictly_Conserved_Gene' in df_sig.columns:
+        sig_genes = df_sig['Strictly_Conserved_Gene'].dropna().unique().tolist()
+    elif 'Gene' in df_sig.columns:
+        sig_genes = df_sig['Gene'].dropna().unique().tolist()
+    elif 'Target' in df_sig.columns:
+        sig_genes = df_sig['Target'].dropna().unique().tolist()
+    else:
+        raise ValueError(f"CRITICAL ERROR: Could not find gene column in {args.signature_csv}")
+
     raw_dir = os.path.join(BASE_DIR, "input", "spatial", "GSE211956_RAW_Forrest")
-    out_dir = os.path.join(BASE_DIR, "output", "serotonin_axis_spatial_mapping")
+    out_dir = os.path.join(BASE_DIR, "output", "spatial_verification", sig_name)
     os.makedirs(out_dir, exist_ok=True)
     
     if not os.path.exists(raw_dir):
-        print(f"Error: Directory {raw_dir} not found.")
-        print("Please ensure the GSE211956 spatial data is downloaded.")
+        print(f"Warning: Directory {raw_dir} not found. Skipping spatial verification.")
         return
         
     samples = [f"SP{i}" for i in range(1, 9)]
     results = []
     
     for sp in samples:
-        print(f"\nProcessing {sp}...")
+        print(f"\nProcessing {sp} for {sig_name}...")
         tmp_dir = format_visium_dir(raw_dir, sp, out_dir)
         if tmp_dir:
-            res = analyze_sample(tmp_dir, sp, out_dir)
+            res = analyze_sample(tmp_dir, sp, out_dir, sig_genes, sig_name)
             if res:
                 results.append(res)
                 
     if results:
         df_res = pd.DataFrame(results)
-        csv_path = os.path.join(out_dir, "visium_colocalization_summary.csv")
+        csv_path = os.path.join(out_dir, f"visium_spatial_clustering_summary.csv")
         df_res.to_csv(csv_path, index=False)
         print(f"\nSuccess! Analyzed {len(results)} samples. Summary saved to {csv_path}.")
         print("Generated spatial plots are in the output directory.")

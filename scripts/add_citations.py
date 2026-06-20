@@ -1,13 +1,17 @@
 import re
 
+import sys
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX
+
 md_file = 'output/AI_summary_and_insights.md'
 with open(md_file, 'r') as f:
     content = f.read()
 
-# Fix 1: 21-gene signature
-prov1 = """> [!NOTE]
+# Fix 1: Conserved gene signature
+prov1 = f"""> [!NOTE]
 > **Data Provenance**
-> - **Source File:** `output/ai_summary_tables/21_gene_directed_signature_annotation_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv`
+> - **Source File:** `output/ai_summary_tables/conserved_gene_directed_signature_annotation{ANALYSIS_SUFFIX}.csv`
 > - **Scripts:** `scripts/generate_ai_summary_tables.py`, `scripts/fetch_uniprot_roles.py`, `scripts/fetch_opentargets.py`
 
 """
@@ -19,9 +23,9 @@ content = re.sub(
 )
 
 # Fix 2: Total Candidates table
-prov2 = """> [!NOTE]
+prov2 = f"""> [!NOTE]
 > **Data Provenance**
-> - **Source File:** `output/pan_cancer_meta_results/dataset_overview_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv` and DE meta-analysis files
+> - **Source File:** `output/pan_cancer_meta_results/dataset_overview{ANALYSIS_SUFFIX}.csv` and DE meta-analysis files
 > - **Scripts:** `scripts/generate_ai_summary_tables.py` (for automated version)
 
 """
@@ -33,9 +37,9 @@ content = re.sub(
 )
 
 # Fix 3: Metabolic Target Genes
-prov3 = """> [!NOTE]
+prov3 = f"""> [!NOTE]
 > **Data Provenance**
-> - **Source File:** `output/pan_cancer_meta_results/metastatic_enrichment_summary_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv`
+> - **Source File:** `output/pan_cancer_meta_results/metastatic_enrichment_summary{ANALYSIS_SUFFIX}.csv`
 > - **Scripts:** `scripts/generate_ai_summary_tables.py` (for automated version)
 
 """
@@ -47,9 +51,9 @@ content = re.sub(
 )
 
 # Fix 4: Unique Metastatic Targets
-prov4 = """> [!NOTE]
+prov4 = f"""> [!NOTE]
 > **Data Provenance**
-> - **Source File:** `output/pan_cancer_meta_results/cancer_specific_unique_signatures_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv`
+> - **Source File:** `output/pan_cancer_meta_results/cancer_specific_unique_signatures{ANALYSIS_SUFFIX}.csv`
 > - **Scripts:** `scripts/generate_ai_summary_tables.py` (for automated version)
 
 """

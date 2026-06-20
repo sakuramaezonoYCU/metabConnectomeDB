@@ -9,7 +9,17 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT_DIR = os.path.join(BASE_DIR, 'output')
 
 def create_notebook(signature_name, genes):
+    import pandas as pd
     META_RESULTS_DIR = os.path.join(OUTPUT_DIR, 'massspec_metabolomics', signature_name)
+    match_file = os.path.join(META_RESULTS_DIR, 'metabolite_match_table.csv')
+    num_matches = 0
+    if os.path.exists(match_file):
+        try:
+            df = pd.read_csv(match_file)
+            num_matches = len(df)
+        except Exception:
+            pass
+            
     nb = nbf.v4.new_notebook()
     
     # 1. Title and Goal
@@ -27,13 +37,20 @@ To show the association between the {signature_name} and actual metabolite abund
 - **Biomarker Utility**: Detecting consistent metabolite changes linked to the signature opens avenues for blood-based or tissue-based mass spectrometry diagnostics.
 
 ### Inputs
-- **Mass Spec Data:** `input/databases/massSpecDataMetabolicData_7panCancer_PMID29396322.csv`
-- **Metabolite DB:** `input/databases/human_database_merge_unique_metab_with_HMDB_Info.csv`
+- **Mass Spec Data:** `input/massSpecDataMetabolicData_7panCancer_PMID29396322.csv`
+- **Metabolite DB:** `output/human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv`
 - **Gene Signature:** {signature_name} ({len(genes)} genes)
 
 ### Outputs
 - **Final Notebook Report:** `output/massspec_metabolomics/massspec_metabolomics_integration_{signature_name}.html`
 """))
+
+    print_config_code = """
+print('--- INJECTED PIPELINE CONFIGURATION ---')
+from pan_cancer_config import CANCERS_TO_RUN
+print(f'CANCERS_TO_RUN: {CANCERS_TO_RUN}')
+"""
+    nb.cells.append(nbf.v4.new_code_cell(print_config_code))
 
     # 2. Config Code
     nb.cells.append(nbf.v4.new_code_cell(f"""import pandas as pd
@@ -45,6 +62,15 @@ from IPython.display import Image, display
 BASE_DIR = os.path.dirname(os.path.abspath('.'))
 OUTPUT_DIR = os.path.join(BASE_DIR, 'output')
 META_RESULTS_DIR = os.path.join(OUTPUT_DIR, 'massspec_metabolomics', '{signature_name}')
+
+TARGET_GENES = {genes}
+
+print(f"==========================================")
+print(f"PARAMETERS FOR THIS RUN:")
+print(f"Signature Name: {signature_name}")
+print(f"Target Genes Investigated (n={{len(TARGET_GENES)}}):")
+print(f"{{TARGET_GENES}}")
+print(f"==========================================")
 """))
 
     # Helper function to embed images in Markdown
@@ -61,86 +87,46 @@ META_RESULTS_DIR = os.path.join(OUTPUT_DIR, 'massspec_metabolomics', '{signature
         else:
             nb.cells.append(nbf.v4.new_markdown_cell(f"### {title}\n*Plot not found: {image_filename}*"))
 
-    # 3. PCA Score Boxplot
-    append_image_markdown(
-        "Metabolite PCA Signature Score",
-        "PCA score derived from the matched metabolites, showing the metabolic axis activity across Tumor vs Normal samples.",
-        "metabolite_pca_boxplot.png",
-        "pca_boxplot.png"
-    )
+    if num_matches == 0:
+        nb.cells.append(nbf.v4.new_markdown_cell("### ❌ 0 matched metabolites\n\nNo mass spec metabolites could be matched to the genes in this signature. Please try other signatures."))
+    else:
+        # 3. PCA Score Boxplot
+        append_image_markdown(
+            "Metabolite PCA Signature Score",
+            "PCA score derived from the matched metabolites, showing the metabolic axis activity across Tumor vs Normal samples.",
+            "metabolite_pca_boxplot.png",
+            "pca_boxplot.png"
+        )
+    
+        # 4. Pan-Cancer Heatmap
+        append_image_markdown(
+            "Pan-Cancer Median Tumor Metabolite Abundance (Z-score)",
+            "Median abundance of matched metabolites across cancer types.",
+            "pan_cancer_metabolite_heatmap.png",
+            "heatmap.png"
+        )
+    
+        # 5. Network Plot
+        append_image_markdown(
+            "Gene-Metabolite Bipartite Network",
+            "Green nodes are metabolites detected in the mass spec data; gray are missing.",
+            "gene_metabolite_network.png",
+            "network.png"
+        )
+    
+        # 6. Cross-Cohort Comparison
+        append_image_markdown(
+            "Cross-Cohort Comparison: scRNA vs Mass Spec",
+            "Comparison of primary vs metastatic scRNA expression (y-axis) against normal vs tumor mass spec abundance (x-axis).",
+            "cross_cohort_comparison_scatter.png",
+            "cross_scatter.png"
+        )
 
-    # 4. Pan-Cancer Heatmap
-    append_image_markdown(
-        "Pan-Cancer Median Tumor Metabolite Abundance (Z-score)",
-        "Median abundance of matched metabolites across cancer types.",
-        "pan_cancer_metabolite_heatmap.png",
-        "heatmap.png"
-    )
 
-    # 5. Network Plot
-    append_image_markdown(
-        "Gene-Metabolite Bipartite Network",
-        "Green nodes are metabolites detected in the mass spec data; gray are missing.",
-        "gene_metabolite_network.png",
-        "network.png"
-    )
 
-    # 6. Cross-Cohort Comparison
-    append_image_markdown(
-        "Cross-Cohort Comparison: scRNA vs Mass Spec",
-        "Comparison of primary vs metastatic scRNA expression (y-axis) against normal vs tumor mass spec abundance (x-axis).",
-        "cross_cohort_comparison_scatter.png",
-        "cross_scatter.png"
-    )
-
-    # 7. Export code
-    nb.cells.append(nbf.v4.new_code_cell(f"""import subprocess
-import sys
-
-notebook_filename = 'massspec_metabolomics_integration_{signature_name}.ipynb'
-output_base = 'massspec_metabolomics_integration_{signature_name}'
-output_dir = os.path.join(OUTPUT_DIR, 'massspec_metabolomics')
-os.makedirs(output_dir, exist_ok=True)
-
-jupyter_bin = os.path.join(os.path.dirname(sys.executable), 'jupyter')
-if not os.path.exists(jupyter_bin): jupyter_bin = 'jupyter'
-
-cmd_html = [jupyter_bin, "nbconvert", "--to", "html", "--execute", notebook_filename, "--output-dir", output_dir, "--output", output_base]
-res_html = subprocess.run(cmd_html, capture_output=True, text=True)
-
-if res_html.returncode == 0:
-    print(f"🎉 SUCCESS: Notebook exported to '{{os.path.join(output_dir, output_base)}}.html'")
-else:
-    print("❌ HTML export failed.")
-"""))
 
     scripts_dir = os.path.join(BASE_DIR, 'scripts')
-    nb.cells.append(nbf.v4.new_code_cell(f"""# ==========================================
-# HTML EXPORT
-# ==========================================
-import subprocess
-import sys
-import os
-
-notebook_filename = 'massspec_metabolomics_integration_{signature_name}.ipynb'
-output_base = 'massspec_metabolomics_integration_{signature_name}'
-output_dir = os.path.join('..', 'output', 'massspec_metabolomics')
-os.makedirs(output_dir, exist_ok=True)
-
-jupyter_bin = os.path.join(os.path.dirname(sys.executable), 'jupyter')
-if not os.path.exists(jupyter_bin): jupyter_bin = 'jupyter'
-
-cmd_html = [jupyter_bin, "nbconvert", "--to", "html", notebook_filename, "--output-dir", output_dir, "--output", output_base]
-res_html = subprocess.run(cmd_html, capture_output=True, text=True)
-
-if res_html.returncode == 0:
-    print(f"🎉 SUCCESS: Notebook successfully exported to '{{os.path.join(output_dir, output_base)}}.html'")
-else:
-    print("❌ HTML export failed.")
-    print(res_html.stderr)
-"""))
-
-    notebook_filename = os.path.join(scripts_dir, f'massspec_metabolomics_integration_{signature_name}.ipynb')
+    notebook_filename = os.path.join(scripts_dir, f'massspec_metabolomics_integration.ipynb')
     with open(notebook_filename, 'w') as f:
         nbf.write(nb, f)
         
@@ -152,46 +138,37 @@ else:
         env['JUPYTER_DATA_DIR'] = os.path.abspath('./.jupyter_data_cache')
         
         # Run nbconvert from the scripts directory
-        subprocess.run([sys.executable, '-m', 'jupyter', 'nbconvert', '--execute', '--to', 'html', os.path.basename(notebook_filename), '--output-dir', '../output/massspec_metabolomics', '--output', f'massspec_metabolomics_integration_{signature_name}'], check=True, env=env, cwd=scripts_dir)
-        print(f"Notebook exported to HTML: ../output/massspec_metabolomics/massspec_metabolomics_integration_{signature_name}.html")
+        subprocess.run([sys.executable, '-m', 'jupyter', 'nbconvert', '--execute', '--to', 'html', os.path.basename(notebook_filename), '--output-dir', '../output/massspec_metabolomics', '--output', f'massspec_metabolomics_integration'], check=True, env=env, cwd=scripts_dir)
+        print(f"Notebook exported to HTML: ../output/massspec_metabolomics/massspec_metabolomics_integration.html")
     except subprocess.CalledProcessError as e:
         print(f"Failed to execute and export notebook: {e}")
 
 if __name__ == '__main__':
+    import pandas as pd
     parser = argparse.ArgumentParser(description="Generate Mass Spec Notebook")
-    parser.add_argument('--signature-name', default="Directed Metastatic Signature", help="Name of the signature")
-    parser.add_argument('--genes', nargs='+', default="GLS SGMS1 SPTLC1 GBE1 SLC16A7 AUH FZD6 NR1D2 CD46 MTMR1 ESRRG ITGA4 SLC11A2 ERAP1 C1GALT1 ADAM10 TRPM8 SLC22A1 AMDHD1 EPOR PDE3B".split(), help="List of genes in the signature")
-    args = parser.parse_args()
+    parser.add_argument('--signature_csv', required=True, help="Path to the signature CSV file containing a 'Gene' or 'Strictly_Conserved_Gene' column")
     args = parser.parse_args()
     
-    print(f"Running full mass spec pipeline for {args.signature_name}...")
+    if not os.path.exists(args.signature_csv):
+        raise FileNotFoundError(f"CRITICAL ERROR: Signature CSV {args.signature_csv} does not exist.")
+
+    df_sig = pd.read_csv(args.signature_csv)
+    if 'Gene' in df_sig.columns:
+        genes = df_sig['Gene'].dropna().unique().tolist()
+    elif 'Target' in df_sig.columns:
+        genes = df_sig['Target'].dropna().unique().tolist()
+    elif 'Strictly_Conserved_Gene' in df_sig.columns:
+        genes = df_sig['Strictly_Conserved_Gene'].dropna().unique().tolist()
+    else:
+        raise ValueError(f"CRITICAL ERROR: Could not find 'Gene', 'Target', or 'Strictly_Conserved_Gene' column in {args.signature_csv}")
+
+    signature_name = os.path.basename(args.signature_csv).replace('.csv', '')
     
-    # 1. Run core analysis
-    try:
-        print("Step 1: Running massspec_metabolomics_analysis.py...")
-        analysis_script = os.path.join(BASE_DIR, 'scripts', 'massspec_metabolomics_analysis.py')
-        subprocess.run([sys.executable, analysis_script, '--signature-name', args.signature_name, '--genes'] + args.genes, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Error running core analysis: {e}")
-        sys.exit(1)
-        
-    # 2. Run cross-cohort comparison
-    try:
-        print("Step 2: Running massspec_cross_cohort_comparison.py...")
-        cross_script = os.path.join(BASE_DIR, 'scripts', 'massspec_cross_cohort_comparison.py')
-        subprocess.run([sys.executable, cross_script, '--signature-name', args.signature_name], check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Error running cross-cohort comparison: {e}")
-        sys.exit(1)
-        
-    print("Step 3: Generating Notebook...")
-    create_notebook(args.signature_name, args.genes)
+    print(f"Generating Notebook for {signature_name}...")
+    create_notebook(signature_name, genes)
     
-    print("Step 4: Cleaning up intermediate raw files to keep output clean...")
-    import shutil
-    meta_results_dir = os.path.join(OUTPUT_DIR, 'massspec_metabolomics', args.signature_name)
-    if os.path.exists(meta_results_dir):
-        shutil.rmtree(meta_results_dir)
-        print(f"Removed intermediate data folder: {meta_results_dir}")
-        
+    # We DO NOT delete the intermediate meta_results_dir here, because the generated notebook 
+    # needs the images! Instead of cleaning up, we just let the notebook reference them.
+    # The previous code removed the directory, causing broken image links in the notebook.
+    
     print(f"\n✅ All done! The self-contained HTML notebook is in: output/massspec_metabolomics/")

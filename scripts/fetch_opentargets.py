@@ -3,10 +3,13 @@ import requests
 import json
 import pandas as pd
 
+import sys
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX, OPENTARGETS_API_URL
+
 # Define paths
 META_RESULTS_DIR = 'output/pan_cancer_meta_results'
 OUTPUT_DIR = 'output'
-ANALYSIS_SUFFIX = '_Br500k_Co100k_Lu500k_Me100k_Ov100k'
 
 def fetch_opentargets_diseases():
     conserved_csv = os.path.join(META_RESULTS_DIR, f'pan_cancer_conserved_genes{ANALYSIS_SUFFIX}.csv')
@@ -20,7 +23,7 @@ def fetch_opentargets_diseases():
     results = []
     
     print("Fetching disease associations from Open Targets Platform GraphQL API...")
-    url = "https://api.platform.opentargets.org/api/v4/graphql"
+    url = OPENTARGETS_API_URL
     
     # GraphQL Query to search for gene symbol, get its Ensembl ID, and fetch top 3 associated diseases
     query = """

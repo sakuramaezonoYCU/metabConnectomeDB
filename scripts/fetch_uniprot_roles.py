@@ -2,11 +2,14 @@ import os
 import json
 import urllib.request
 import pandas as pd
+import sys
+
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX
 
 # Define paths
 META_RESULTS_DIR = 'output/pan_cancer_meta_results'
 OUTPUT_DIR = 'output'
-ANALYSIS_SUFFIX = '_Br500k_Co100k_Lu500k_Me100k_Ov100k'
 
 def fetch_uniprot_roles():
     conserved_csv = os.path.join(META_RESULTS_DIR, f'pan_cancer_conserved_genes{ANALYSIS_SUFFIX}.csv')

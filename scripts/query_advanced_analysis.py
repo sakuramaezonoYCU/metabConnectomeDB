@@ -1,7 +1,18 @@
 import requests
 import pandas as pd
 from IPython.display import display
-from druggability_config import OPENTARGETS_API_URL
+from pan_cancer_config import OPENTARGETS_API_URL
+
+import os
+import json
+import hashlib
+from datetime import datetime
+
+def _get_api_cache_dir():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    cache_dir = os.path.join(root, "input", "api_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    return cache_dir
 
 def query_string_ppi(genes):
     """
@@ -9,6 +20,18 @@ def query_string_ppi(genes):
     This helps establish if the 'axis' has physical or functional evidence of interaction.
     """
     print(f"[STRING PPI] Querying network for: {genes}")
+    cache_dir = _get_api_cache_dir()
+    gene_hash = hashlib.md5("_".join(sorted(genes)).encode()).hexdigest()
+    cache_file = os.path.join(cache_dir, f"string_ppi_{gene_hash}.csv")
+    failures_file = os.path.join(cache_dir, "api_failures.log")
+
+    if os.path.exists(cache_file):
+        print(f"[STRING PPI] Loading cached network from version-controlled cache: {cache_file}")
+        df = pd.read_csv(cache_file)
+        if not df.empty:
+            df['Source'] = 'Cache'
+        return df
+
     url = "https://string-db.org/api/json/network"
     
     params = {
@@ -23,8 +46,11 @@ def query_string_ppi(genes):
         data = r.json()
         
         if not data:
-            print("[STRING PPI] No interactions found among these genes in STRING.")
-            return pd.DataFrame()
+            import warnings
+            warnings.warn("[STRING PPI] No interactions found among these genes in STRING.")
+            df = pd.DataFrame()
+            df.to_csv(cache_file, index=False)
+            return df
             
         results = []
         for interaction in data:
@@ -37,10 +63,16 @@ def query_string_ppi(genes):
             })
             
         df = pd.DataFrame(results)
-        print(f"[STRING PPI] Found {len(df)} interaction(s).")
+        df.to_csv(cache_file, index=False)
+        print(f"[STRING PPI] Found {len(df)} interaction(s). Cached to version-controlled file: {cache_file}.")
+        if not df.empty:
+            df['Source'] = 'API'
         return df
     except Exception as e:
-        print(f"[STRING PPI Error] Failed to query STRING: {e}")
+        msg = f"{datetime.now().isoformat()} - [STRING PPI] Failed to query STRING: {e}"
+        print(f"{msg}. Logged to {failures_file}.")
+        with open(failures_file, "a") as f:
+            f.write(msg + "\n")
         return pd.DataFrame()
 
 def query_tractability(genes):
@@ -52,9 +84,25 @@ def query_tractability(genes):
     print(f"[Tractability] Querying Open Targets for tractability of {genes}...")
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) metabConnectomeDB'}
     
+    cache_dir = _get_api_cache_dir()
+    cache_file = os.path.join(cache_dir, "tractability_cache.json")
+    failures_file = os.path.join(cache_dir, "api_failures.log")
+    
+    if os.path.exists(cache_file):
+        with open(cache_file, 'r') as f:
+            cache = json.load(f)
+    else:
+        cache = {}
+        
     results = []
     
     for gene in genes:
+        if gene in cache:
+            cached_result = dict(cache[gene])
+            cached_result['Source'] = 'Cache'
+            results.append(cached_result)
+            continue
+            
         # First resolve symbol to Ensembl ID
         query_search = """
         query search($queryString: String!) {
@@ -101,17 +149,33 @@ def query_tractability(genes):
             # We filter for modalities that have 'value' == True (i.e. considered tractable)
             tractable_modalities = set([t['modality'] for t in tractability if t.get('value') is True])
             
-            results.append({
+            result = {
                 'Target_Gene': gene,
                 'Small_Molecule_Tractable': 'SM' in tractable_modalities,
                 'Antibody_Tractable': 'AB' in tractable_modalities,
-                'Other_Modalities_Tractable': 'PR' in tractable_modalities or 'Other' in tractable_modalities
-            })
+                'Other_Modalities_Tractable': 'PR' in tractable_modalities or 'Other' in tractable_modalities,
+            }
+            cache[gene] = result
+            
+            # For the current run's dataframe, explicitly mark it as API
+            current_run_result = dict(result)
+            current_run_result['Source'] = 'API'
+            results.append(current_run_result)
             
         except Exception as e:
-            print(f"[Tractability Error] Failed for {gene}: {e}")
+            msg = f"{datetime.now().isoformat()} - [Tractability] Failed for {gene}: {e}"
+            print(f"[Tractability Warning] Failed for {gene}: {e}. Logged to failures.")
+            with open(failures_file, "a") as f:
+                f.write(msg + "\n")
+            continue
             
+    # Save cache
+    with open(cache_file, 'w') as f:
+        json.dump(cache, f, indent=4)
+        
     df = pd.DataFrame(results)
     if not df.empty:
+        sources = df['Source'].value_counts().to_dict()
         print(f"[Tractability] Found tractability data for {len(df)} genes.")
+        print(f"[Tractability] Data Sources -> {sources}")
     return df

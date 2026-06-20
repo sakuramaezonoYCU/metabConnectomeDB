@@ -30,6 +30,13 @@ cells.append(create_markdown_cell([
     "**⚠️ IMPORTANT ONEDRIVE WARNING:** If you get `[Errno 60] Operation timed out` when running these cells, it means your Visium `.gz` files are still 'Cloud-only'. You MUST open Finder, go to `input/spatial/GSE211956_RAW_Forrest`, right-click the folder, and select **'Always keep on this device'** to force OneDrive to download them to your physical disk."
 ]))
 
+# Cell 0.5: Code - Configuration Print
+cells.append(create_code_cell([
+    "print('--- INJECTED PIPELINE CONFIGURATION ---')",
+    "from pan_cancer_config import STRICT_MASK_CANCERS",
+    "print(f'STRICT_MASK_CANCERS: {STRICT_MASK_CANCERS}')"
+]))
+
 # Cell 1: Code - Configuration and Setup
 cells.append(create_code_cell([
     "import os",
@@ -75,7 +82,7 @@ cells.append(create_code_cell([
     "        src = matches[0]",
     "        dst = os.path.join(tmp_dir, f_dest)",
     "        if not os.path.exists(dst):",
-    "            os.symlink(src, dst)",
+    "            os.symlink(os.path.abspath(src), dst)",
     "            ",
     "    spatial_dir = os.path.join(tmp_dir, 'spatial')",
     "    if not os.path.exists(spatial_dir):",
@@ -125,7 +132,7 @@ cells.append(create_code_cell([
     "def calculate_module_score(adata, gene_list, score_name):",
     "    valid_genes = [g for g in gene_list if g in adata.var_names]",
     "    if len(valid_genes) == 0:",
-    "        return np.zeros(adata.n_obs)",
+    "        raise RuntimeError('None of the genes in the signature were found. Failing to ensure data integrity.')",
     "    sc.tl.score_genes(adata, gene_list=valid_genes, score_name=score_name)",
     "    score = adata.obs[score_name].values",
     "    del adata.obs[score_name]",
@@ -154,8 +161,7 @@ cells.append(create_code_cell([
     "    try:",
     "        adata = load_visium_from_mtx(tmp_dir)",
     "    except Exception as e:",
-    "        print(f\"Failed to load {sample_name}: {e}\")",
-    "        continue",
+    "        raise RuntimeError(f\"Failed to load {sample_name}: {e}. Strict data integrity requires crashing on upstream failure.\") from e",
     "        ",
     "    adata.var_names_make_unique()",
     "    print(f\"Loaded {adata.n_obs} spots and {adata.n_vars} genes.\")",

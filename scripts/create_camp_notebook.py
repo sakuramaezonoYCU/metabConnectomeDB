@@ -7,14 +7,14 @@ import subprocess
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT_DIR = os.path.join(BASE_DIR, 'output', 'camp_integration')
 
-def create_notebook(signature_name, genes):
+def create_notebook():
     nb = nbf.v4.new_notebook()
     
     # 1. Title and Goal Markdown
     nb.cells.append(nbf.v4.new_markdown_cell(f"""# Pan-Cancer CAMP Metabolomics Integration
 
 ### Goal
-Integrate the {signature_name} metabolic signature with the pan-cancer mass spectrometry metabolomics dataset (CAMP, PMID: 37337120).
+Integrate the dynamically computed pan-cancer metastatic metabolic signature with the pan-cancer mass spectrometry metabolomics dataset (CAMP, PMID: 37337120).
 
 ### Purpose
 To dynamically analyze the abundance of metabolites associated with a specific gene signature across multiple cancer cohorts. It directly maps genes to metabolites using the human database, extracts matching metabolomic/transcriptomic data, and evaluates differential abundance, gene-metabolite covariation, and immune microenvironment correlation.
@@ -27,15 +27,14 @@ To dynamically analyze the abundance of metabolites associated with a specific g
 ### Inputs
 - **CAMP Data Directory:** `input/pancancer_metabolomics_2023_PMID37337120/data/` (contains `metabolomics_processed`, `transcriptomics_processed`, `TME_deconvolution_processed`)
 - **Metabolite Database:** `input/databases/human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv`
-- **Gene Signature Name:** {signature_name}
-- **Genes:** {', '.join(genes)}
+- **Dynamic Gene Signature:** Pan-cancer upregulated metabolic targets loaded directly from `output/[cancer]_results/`
 
 ### Outputs
 - **Plots & Output CSV:** `output/camp_integration/`
 
 ### Example Usage
-To run the analysis for this {signature_name} signature:
-1. Ensure the parameters cell below is configured properly (it is already pre-filled with the `{signature_name}` parameters).
+To run the analysis:
+1. Ensure the parameters cell below is configured properly.
 2. Click **Run All** in Jupyter.
 3. The integrated plots will be displayed inline and the master dataset will be saved as `master_integrated_camp_data.csv`.
 """))
@@ -49,11 +48,9 @@ import seaborn as sns
 from scipy import stats
 
 # ==========================================
-# PARAMETERS
+# PARAMETERS & DYNAMIC TARGET GENES
 # ==========================================
-# Gene signature name and the genes themselves
-SIGNATURE_NAME = "{signature_name}"
-TARGET_GENES = {genes}
+SIGNATURE_NAME = "Pan_Cancer_Directed_Metastatic_Signature"
 
 # Which cohorts to load. 
 # Available TCGA-like in CAMP: 'BRCA1', 'BRCA2', 'COAD', 'DLBCL', 'GBM', 'HCC', 'HurthleCC', 'ICC', 'OV', 'PDAC', 'PRAD', 'ccRCC1', 'ccRCC2', 'ccRCC3', 'ccRCC4'
@@ -75,8 +72,22 @@ CAMP_DIR = os.path.join(INPUT_DIR, 'pancancer_metabolomics_2023_PMID37337120', '
 DB_PATH = os.path.join(INPUT_DIR, 'databases', 'human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv')
 OUTPUT_DIR = os.path.join(BASE_DIR, 'output', 'camp_integration')
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# Dynamically compute pan-cancer intersection genes
+import sys
+if 'scripts' not in sys.path and '.' not in sys.path:
+    sys.path.append('scripts')
+    sys.path.append('.')
+
+try:
+    from dynamic_genes import get_dynamic_genes
+    TARGET_GENES = get_dynamic_genes(BASE_DIR)
+except Exception as e:
+    print(f"Warning: Could not dynamically load genes: {{e}}")
+    TARGET_GENES = []
+
 print(f"Signature: {{SIGNATURE_NAME}}")
-print(f"Target Genes: {{TARGET_GENES}}")
+print(f"Dynamically loaded {{len(TARGET_GENES)}} Target Genes: {{TARGET_GENES}}")
 """))
 
     nb.cells.append(nbf.v4.new_code_cell("""# ==========================================
@@ -220,6 +231,8 @@ if gene_cols and metab_cols:
                 corr_matrix.loc[g, m] = rho
 
     corr_matrix = corr_matrix.astype(float)
+    corr_matrix.to_csv(os.path.join(OUTPUT_DIR, f'gene_metabolite_covariation_{SIGNATURE_NAME}.csv'))
+    
     plt.figure(figsize=(10, max(4, len(gene_cols)*0.5)))
     sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', center=0, vmin=-1, vmax=1)
     plt.title("Gene-Metabolite Spearman Correlation (Tumors only)")
@@ -243,6 +256,8 @@ if metab_cols and immune_cells:
                 tme_corr.loc[m, tme] = rho
 
     tme_corr = tme_corr.astype(float)
+    tme_corr.to_csv(os.path.join(OUTPUT_DIR, f'metabolite_immune_covariation_{SIGNATURE_NAME}.csv'))
+    
     plt.figure(figsize=(12, max(5, len(metab_cols)*0.8)))
     sns.heatmap(tme_corr, annot=False, cmap='PRGn', center=0)
     plt.title("Metabolite vs Immune Cell Population Correlation")
@@ -263,8 +278,8 @@ import subprocess
 import sys
 import os
 
-notebook_filename = 'camp_pancancer_integration_{signature_name}.ipynb'
-output_base = 'camp_pancancer_integration_{signature_name}'
+notebook_filename = 'camp_pancancer_integration.ipynb'
+output_base = 'camp_pancancer_integration'
 output_dir = OUTPUT_DIR
 os.makedirs(output_dir, exist_ok=True)
 
@@ -281,15 +296,10 @@ else:
     print(res_html.stderr)
 """))
 
-    notebook_filename = os.path.join(BASE_DIR, 'scripts', f'camp_pancancer_integration_{signature_name}.ipynb')
+    notebook_filename = os.path.join(BASE_DIR, 'scripts', f'camp_pancancer_integration.ipynb')
     with open(notebook_filename, 'w') as f:
         nbf.write(nb, f)
     print(f"Notebook generated successfully at {notebook_filename}")
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Generate Mass Spec Notebook")
-    parser.add_argument('--signature-name', default="Directed Metastatic Signature", help="Name of the signature")
-    parser.add_argument('--genes', nargs='+', default="GLS SGMS1 SPTLC1 GBE1 SLC16A7 AUH FZD6 NR1D2 CD46 MTMR1 ESRRG ITGA4 SLC11A2 ERAP1 C1GALT1 ADAM10 TRPM8 SLC22A1 AMDHD1 EPOR PDE3B".split(), help="List of genes in the signature")
-    args = parser.parse_args()
-    
-    create_notebook(args.signature_name, args.genes)
+    create_notebook()

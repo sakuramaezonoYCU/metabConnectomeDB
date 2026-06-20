@@ -6,21 +6,21 @@ import seaborn as sns
 
 import argparse
 
+import sys
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX, get_de_csv_path, CANCERS_TO_RUN, TCGA_MAPPING
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT_DIR = os.path.join(BASE_DIR, 'output')
-
-# The meta results dir will be constructed dynamically
-# META_RESULTS_DIR = os.path.join(OUTPUT_DIR, 'massspec_metabolomics', signature_name)
-
-BRCA_SCRNA_FILE = os.path.join(OUTPUT_DIR, 'breast_results', 'primary_vs_metastasis_breast_results_DE_metabolic_targets_500k.csv')
-OV_SCRNA_FILE = os.path.join(OUTPUT_DIR, 'ovarian_results', 'primary_vs_metastasis_ovarian_results_DE_metabolic_targets_100k.csv')
 
 def load_data(meta_results_dir):
     diff_file = os.path.join(meta_results_dir, 'differential_abundance_per_cancer.csv')
     match_file = os.path.join(meta_results_dir, 'metabolite_match_table.csv')
     
     if not os.path.exists(diff_file) or not os.path.exists(match_file):
-        raise FileNotFoundError(f"Missing required input files in {meta_results_dir}. Did you run the analysis script first?")
+        print(f"Skipping Cross-Cohort Comparison: Missing input files in {meta_results_dir} (Likely 0 matched metabolites).")
+        import sys
+        sys.exit(0)
 
     diff_df = pd.read_csv(diff_file)
     match_df = pd.read_csv(match_file)
@@ -105,7 +105,7 @@ def plot_cross_cohort(all_merged, meta_results_dir):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Mass Spec Cross Cohort Comparison")
-    parser.add_argument('--signature-name', default="21-gene", help="Name of the signature (e.g. 21-gene, 3-gene)")
+    parser.add_argument('--signature-name', required=True, help="Name of the signature (e.g. Conserved)")
     args = parser.parse_args()
     
     print(f"Running Cross-Cohort Comparison for signature: {args.signature_name}...")
@@ -113,15 +113,27 @@ if __name__ == '__main__':
     
     diff_df, gene_ms_df = load_data(meta_results_dir)
     
-    breast_merged = process_cohort('Breast (BRCA)', BRCA_SCRNA_FILE, 'BRCA', diff_df, gene_ms_df)
-    ovarian_merged = process_cohort('Ovarian (OV)', OV_SCRNA_FILE, 'OV', diff_df, gene_ms_df)
-    
     dfs = []
-    if breast_merged is not None and not breast_merged.empty:
-        dfs.append(breast_merged)
-    if ovarian_merged is not None and not ovarian_merged.empty:
-        dfs.append(ovarian_merged)
+    
+    for cancer in CANCERS_TO_RUN:
+        tcga_ids = TCGA_MAPPING.get(cancer)
+        if not tcga_ids:
+            print(f"Warning: No TCGA ID mapping for {cancer}. Skipping.")
+            continue
         
+        if isinstance(tcga_ids, str):
+            tcga_ids = [tcga_ids]
+            
+        sc_file = get_de_csv_path(cancer)
+        
+        # We process each TCGA ID separately and then append
+        for tcga_id in tcga_ids:
+            display_name = f"{cancer.capitalize()} ({tcga_id})"
+            merged = process_cohort(display_name, sc_file, tcga_id, diff_df, gene_ms_df)
+            
+            if merged is not None and not merged.empty:
+                dfs.append(merged)
+            
     if dfs:
         all_merged = pd.concat(dfs, ignore_index=True)
         plot_cross_cohort(all_merged, meta_results_dir)

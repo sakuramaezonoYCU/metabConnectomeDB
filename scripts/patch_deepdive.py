@@ -1,6 +1,7 @@
 import nbformat as nbf
-
-nb_path = "/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/scripts/deepdive_conserved_metabGeneSig.ipynb"
+import os
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+nb_path = os.path.join(BASE_DIR, "scripts", "deepdive_conserved_metabGeneSig.ipynb")
 
 try:
     with open(nb_path, 'r', encoding='utf-8') as f:

@@ -22,46 +22,57 @@ def update_notebook():
             export_cell_index = i
             break
             
-    # New cells to add
+    # New cells to add at the end
     new_cells = []
+    
+    # Also add a config print cell at the very beginning
+    print_config_code = """
+print('--- INJECTED PIPELINE CONFIGURATION ---')
+from pan_cancer_config import CANCER_CAP, CANCERS_TO_RUN, ANALYSIS_SUFFIX, DGIDB_API_URL
+print(f'CANCERS_TO_RUN: {CANCERS_TO_RUN}')
+print(f'CANCER_CAP: {CANCER_CAP}')
+print(f'ANALYSIS_SUFFIX: {ANALYSIS_SUFFIX}')
+print(f'DGIDB_API_URL: {DGIDB_API_URL}')
+"""
+    nb.cells.insert(0, nbf.v4.new_code_cell(print_config_code))
     
     # Markdown
     new_cells.append(nbf.v4.new_markdown_cell("""---
 ## Druggability of Pan-Cancer Conserved Genes
-In addition to the specific GLS axis, we also query the DGIdb database for the strictly conserved **23 pan-cancer genes** (upregulated in all 5 cancers) and the broadly conserved **181 genes** (upregulated in $\ge$ 4 cancers).
+In addition to the specific GLS axis, we also query the DGIdb database for the strictly conserved **pan-cancer genes** (upregulated in all cancers) and the broadly conserved **genes** (upregulated in $\ge$ max-1 cancers).
 """))
 
-    # Code for 23 genes
-    code_23 = """df_23 = pd.read_csv(os.path.join(OUTPUT_DIR, f'druggable_targets_strictly_conserved{ANALYSIS_SUFFIX}.csv'))
-print(f"Total drug interactions for 23 conserved genes: {len(df_23)}")
-display(df_23.head(10))"""
-    cell_23 = nbf.v4.new_code_cell(code_23)
+    # Code for strictly conserved genes
+    code_strict = """df_strict = pd.read_csv(os.path.join(OUTPUT_DIR, f'druggable_targets_strictly_conserved{ANALYSIS_SUFFIX}.csv'))
+print(f"Total drug interactions for strictly conserved genes: {len(df_strict)}")
+display(df_strict.head(10))"""
+    cell_strict = nbf.v4.new_code_cell(code_strict)
     
-    csv_23_path = os.path.join(DRUGGABILITY_DIR, f'druggable_targets_strictly_conserved{ANALYSIS_SUFFIX}.csv')
-    if os.path.exists(csv_23_path):
-        df_23 = pd.read_csv(csv_23_path)
-        output_txt = f"Total drug interactions for 23 conserved genes: {len(df_23)}\n"
-        html_tbl = df_23.head(10).to_html()
-        cell_23.outputs.append(nbf.v4.new_output("stream", name="stdout", text=output_txt))
-        cell_23.outputs.append(nbf.v4.new_output("execute_result", data={"text/html": html_tbl}, execution_count=2))
+    csv_strict_path = os.path.join(DRUGGABILITY_DIR, f'druggable_targets_strictly_conserved{ANALYSIS_SUFFIX}.csv')
+    if os.path.exists(csv_strict_path):
+        df_strict = pd.read_csv(csv_strict_path)
+        output_txt = f"Total drug interactions for strictly conserved genes: {len(df_strict)}\n"
+        html_tbl = df_strict.head(10).to_html()
+        cell_strict.outputs.append(nbf.v4.new_output("stream", name="stdout", text=output_txt))
+        cell_strict.outputs.append(nbf.v4.new_output("execute_result", data={"text/html": html_tbl}, execution_count=2))
         
-    new_cells.append(cell_23)
+    new_cells.append(cell_strict)
     
-    # Code for 181 genes
-    code_181 = """df_181 = pd.read_csv(os.path.join(OUTPUT_DIR, f'druggable_targets_broadly_conserved{ANALYSIS_SUFFIX}.csv'))
-print(f"Total drug interactions for 181 conserved genes: {len(df_181)}")
-display(df_181.head(10))"""
-    cell_181 = nbf.v4.new_code_cell(code_181)
+    # Code for broadly conserved genes
+    code_broad = """df_broad = pd.read_csv(os.path.join(OUTPUT_DIR, f'druggable_targets_broadly_conserved{ANALYSIS_SUFFIX}.csv'))
+print(f"Total drug interactions for broadly conserved genes: {len(df_broad)}")
+display(df_broad.head(10))"""
+    cell_broad = nbf.v4.new_code_cell(code_broad)
     
-    csv_181_path = os.path.join(DRUGGABILITY_DIR, f'druggable_targets_broadly_conserved{ANALYSIS_SUFFIX}.csv')
-    if os.path.exists(csv_181_path):
-        df_181 = pd.read_csv(csv_181_path)
-        output_txt = f"Total drug interactions for 181 conserved genes: {len(df_181)}\n"
-        html_tbl = df_181.head(10).to_html()
-        cell_181.outputs.append(nbf.v4.new_output("stream", name="stdout", text=output_txt))
-        cell_181.outputs.append(nbf.v4.new_output("execute_result", data={"text/html": html_tbl}, execution_count=3))
+    csv_broad_path = os.path.join(DRUGGABILITY_DIR, f'druggable_targets_broadly_conserved{ANALYSIS_SUFFIX}.csv')
+    if os.path.exists(csv_broad_path):
+        df_broad = pd.read_csv(csv_broad_path)
+        output_txt = f"Total drug interactions for broadly conserved genes: {len(df_broad)}\n"
+        html_tbl = df_broad.head(10).to_html()
+        cell_broad.outputs.append(nbf.v4.new_output("stream", name="stdout", text=output_txt))
+        cell_broad.outputs.append(nbf.v4.new_output("execute_result", data={"text/html": html_tbl}, execution_count=3))
         
-    new_cells.append(cell_181)
+    new_cells.append(cell_broad)
 
     if export_cell_index != -1:
         # Insert before the export cell

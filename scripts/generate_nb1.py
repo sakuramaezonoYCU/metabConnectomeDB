@@ -4,14 +4,14 @@ import os
 def create_notebook():
     nb = nbf.v4.new_notebook()
     
-    nb.cells.append(nbf.v4.new_markdown_cell("""# Deep-Dive: 23-Gene Metastatic Metabolic Signature
+    nb.cells.append(nbf.v4.new_markdown_cell("""# Deep-Dive: Conserved Metastatic Metabolic Signature
 ## Exploring STAT3, Oxygen Gradients, Directional CCC, and Clinical Prognosis
 This notebook addresses **Priority 1** and **Priority 2** next steps from the AI Summary (Version 5).
 Specifically, we cover:
 1. **STAT3 Regulatory Network Reconstruction** (Step 1)
 2. **Intratumoural Oxygen Gradient Simulation** (Step 2)
 3. **Directionality-Aware Metabolic Communication Scoring** (Step 4)
-4. **23-Gene Score TCGA Clinical Validation** (Step 5)
+4. **Conserved Signature Score TCGA Clinical Validation** (Step 5)
 """))
 
     nb.cells.append(nbf.v4.new_code_cell("""import os
@@ -24,14 +24,14 @@ sys.path.append(os.path.abspath("."))
 """))
 
     nb.cells.append(nbf.v4.new_markdown_cell("""### Step 1: STAT3 Regulatory Network Reconstruction
-**Purpose**: Map all 23 pan-cancer conserved genes within the STAT3 transcriptional network using ChEA 2022 ChIP-Seq data.
+**Purpose**: Map all strictly conserved pan-cancer genes within the STAT3 transcriptional network using ChEA 2022 ChIP-Seq data.
 **Interpretation**: Validates STAT3 as an upstream regulatory master switch for the metastatic metabolic signature.
 """))
     
     nb.cells.append(nbf.v4.new_code_cell("""from compute_stat3_network import compute_stat3_network
 compute_stat3_network()
 # Load output
-stat3_out = os.path.join("..", "output", "deepdive_23_metabGeneSig", "stat3_network", "stat3_u87_targets_23genes.csv")
+stat3_out = os.path.join("..", "output", "deepdive_conserved_metabGeneSig", "stat3_network", "stat3_u87_targets_strictly_conserved.csv")
 if os.path.exists(stat3_out):
     df = pd.read_csv(stat3_out)
     display(df)
@@ -54,8 +54,12 @@ if os.path.exists(stat3_out):
 """))
 
     nb.cells.append(nbf.v4.new_markdown_cell("""### Step 2: Intratumoural Oxygen Gradient Simulation
-**Purpose**: Reconstruct oxygen gradients using hypoxia signature proxy scores (VEGFA, SLC2A1, BNIP3) from established HIF-1α literature (Semenza et al.) and project the 23-gene score onto this gradient.
+**Purpose**: Reconstruct oxygen gradients using hypoxia signature proxy scores (VEGFA, SLC2A1, BNIP3) from established HIF-1α literature (Semenza et al.) and project the conserved signature score onto this gradient.
 **Interpretation**: Determines if the pre-metastatic subclone maps to the hypoxic core of the primary tumor.
+
+> [!NOTE]
+> **Data Resolution Fallback Protocol**
+> If specific cell type filtering (e.g., restricting only to malignant epithelial cells) yields too few cells in a primary tumor to build a robust statistical gradient, the simulation automatically falls back to analyzing all available primary cells across the tumor microenvironment. This ensures empirical modeling of the full tumor oxygen gradient instead of failing abruptly, while still accurately projecting the metabolic signature onto the hypoxia continuum.
 """))
 
     nb.cells.append(nbf.v4.new_code_cell("""from simulate_oxygen_gradient import simulate_oxygen_gradient
@@ -65,7 +69,7 @@ simulate_oxygen_gradient()
     nb.cells.append(nbf.v4.new_code_cell("""import seaborn as sns
 import glob
 
-oxy_dir = os.path.join("..", "output", "deepdive_23_metabGeneSig", "oxygen_gradient")
+oxy_dir = os.path.join("..", "output", "deepdive_conserved_metabGeneSig", "oxygen_gradient")
 oxy_files = glob.glob(os.path.join(oxy_dir, "*_primary_oxygen_gradient_scores.csv"))
 
 if oxy_files:
@@ -85,7 +89,7 @@ if oxy_files:
         ax.set_title(f'Hypoxia vs Metastatic Score ({cancer_prefix} Primary)')
         ax.set_xlabel('Hypoxia Score (VEGFA, SLC2A1, BNIP3)')
         if ax == axes[0]:
-            ax.set_ylabel('23-Gene Metastatic Score')
+            ax.set_ylabel('Metastatic Signature Score')
         else:
             ax.set_ylabel('')
             
@@ -103,7 +107,7 @@ else:
 compute_directional_ccc()
 """))
 
-    nb.cells.append(nbf.v4.new_code_cell("""ccc_file = os.path.join("..", "output", "deepdive_23_metabGeneSig", "directional_ccc", "metalinks_direction_classes.csv")
+    nb.cells.append(nbf.v4.new_code_cell("""ccc_file = os.path.join("..", "output", "deepdive_conserved_metabGeneSig", "directional_ccc", "metalinks_direction_classes.csv")
 if os.path.exists(ccc_file):
     ccc_df = pd.read_csv(ccc_file)
     plt.figure(figsize=(6,4))
@@ -114,7 +118,7 @@ if os.path.exists(ccc_file):
 """))
 
     nb.cells.append(nbf.v4.new_markdown_cell("""### Step 5: TCGA Survival Validation
-**Purpose**: Validate the 23-gene Metastatic Metabolic Score on TCGA primary tumor data against distant metastasis-free survival.
+**Purpose**: Validate the Conserved Metastatic Metabolic Score on TCGA primary tumor data against distant metastasis-free survival.
 """))
 
     nb.cells.append(nbf.v4.new_code_cell("""from validate_tcga_signature import validate_tcga_signature
@@ -122,7 +126,7 @@ validate_tcga_signature()
 """))
 
     nb.cells.append(nbf.v4.new_markdown_cell("""### Step 5.1: Empirical Validation (Permutation Test)
-**Purpose**: To verify that our 23-gene signature's predictive power is statistically significantly better than randomly chosen genes, we generate 100 random 23-gene signatures, compute their Hazard Ratios, and plot our true signature against this null distribution.
+**Purpose**: To verify that our conserved signature's predictive power is statistically significantly better than randomly chosen genes, we generate 100 random signatures of the same size, compute their Hazard Ratios, and plot our true signature against this null distribution.
 """))
 
     nb.cells.append(nbf.v4.new_code_cell("""from compute_permutation_null import compute_permutation_null
@@ -133,8 +137,8 @@ compute_permutation_null(n_permutations=100)
     nb.cells.append(nbf.v4.new_code_cell("""import matplotlib.pyplot as plt
 import seaborn as sns
 
-null_file = os.path.join("..", "output", "deepdive_23_metabGeneSig", "tcga_validation", "null_distribution_metrics.csv")
-true_file = os.path.join("..", "output", "deepdive_23_metabGeneSig", "tcga_validation", "true_signature_metrics.csv")
+null_file = os.path.join("..", "output", "deepdive_conserved_metabGeneSig", "tcga_validation", "null_distribution_metrics.csv")
+true_file = os.path.join("..", "output", "deepdive_conserved_metabGeneSig", "tcga_validation", "true_signature_metrics.csv")
 
 if os.path.exists(null_file) and os.path.exists(true_file):
     null_df = pd.read_csv(null_file)
@@ -150,7 +154,7 @@ if os.path.exists(null_file) and os.path.exists(true_file):
         cancer_null = null_df[null_df['TCGA_Cohort'] == cancer]['Hazard_Ratio']
         cancer_true = true_df[true_df['TCGA_Cohort'] == cancer]['Hazard_Ratio'].iloc[0]
         
-        sns.histplot(cancer_null, bins=20, kde=True, color='lightgray', ax=ax, label=f'Random 23-Gene Signatures (Null)')
+        sns.histplot(cancer_null, bins=20, kde=True, color='lightgray', ax=ax, label=f'Random Gene Signatures (Null)')
         ax.axvline(cancer_true, color='red', linestyle='--', linewidth=2, label=f'True Signature (HR={cancer_true:.2f})')
         
         ax.set_title(f'TCGA-{cancer}: True Signature vs. Null Distribution')
@@ -166,9 +170,9 @@ if os.path.exists(null_file) and os.path.exists(true_file):
 import sys
 import os
 
-notebook_filename = 'deepdive_23_metabGeneSig.ipynb'
-output_base = 'deepdive_23_metabGeneSig'
-output_dir = os.path.join('..', 'output', 'deepdive_23_metabGeneSig')
+notebook_filename = 'deepdive_conserved_metabGeneSig.ipynb'
+output_base = 'deepdive_conserved_metabGeneSig'
+output_dir = os.path.join('..', 'output', 'deepdive_conserved_metabGeneSig')
 os.makedirs(output_dir, exist_ok=True)
 
 cmd_html = [sys.executable, "-m", "jupyter", "nbconvert", "--to", "html", "--execute", notebook_filename, "--output-dir", output_dir, "--output", output_base]
@@ -181,7 +185,7 @@ else:
     print(res_html.stderr)
 """))
 
-    out_path = os.path.join(os.path.dirname(__file__), "deepdive_23_metabGeneSig.ipynb")
+    out_path = os.path.join(os.path.dirname(__file__), "deepdive_conserved_metabGeneSig.ipynb")
     if os.path.exists(out_path):
         print(f"⚠️ {out_path} already exists. Skipping overwrite to protect user edits.")
     else:

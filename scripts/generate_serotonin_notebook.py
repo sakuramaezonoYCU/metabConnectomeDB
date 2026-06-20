@@ -1,7 +1,7 @@
 import json
 import os
-
-NOTEBOOK_PATH = "/Users/sakuramaezono/Library/CloudStorage/OneDrive-YokohamaCityUniversity/Personal/05_Python_repositories/metabConnectomeDB/scripts/serotonin_axis_spatial_mapping.ipynb"
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+NOTEBOOK_PATH = os.path.join(BASE_DIR, "scripts", "serotonin_axis_spatial_mapping.ipynb")
 
 def create_markdown_cell(source):
     return {
@@ -80,7 +80,7 @@ cells.append(create_code_cell([
     "    plt.tight_layout()",
     "    plt.show()",
     "else:",
-    "    print(f\"File not found: {tam_file}\")"
+    "    raise RuntimeError(f\"Missing required data: {tam_file}. Failing gracefully per data integrity rules.\")"
 ]))
 
 # Cell 4: Markdown - Section 2
@@ -106,7 +106,7 @@ cells.append(create_code_cell([
     "    plt.tight_layout()",
     "    plt.show()",
     "else:",
-    "    print(f\"File not found: {sero_file}\")"
+    "    raise RuntimeError(f\"Missing required data: {sero_file}. Failing gracefully per data integrity rules.\")"
 ]))
 
 # Cell 6: Markdown - Section 3
@@ -130,7 +130,7 @@ cells.append(create_code_cell([
     "    plt.tight_layout()",
     "    plt.show()",
     "else:",
-    "    print(f\"File not found: {hr_file}\")"
+    "    raise RuntimeError(f\"Missing required data: {hr_file}. Failing gracefully per data integrity rules.\")"
 ]))
 
 # Cell 8: Markdown - Section 4
@@ -157,50 +157,16 @@ cells.append(create_code_cell([
     "    plt.tight_layout()",
     "    plt.show()",
     "else:",
-    "    print(f\"File not found: {ev_file}\")"
+    "    raise RuntimeError(f\"Missing required data: {ev_file}. Failing gracefully per data integrity rules.\")"
 ]))
 
 # Cell 10: Markdown - Section 5
 cells.append(create_markdown_cell([
-    "## 5. Spatial Proximity Analysis (kNN Graph Permutation)",
-    "Results of the kNN graph permutation test to determine if HTR7+ TAMs are significantly closer to TPH1+ Tumor cells than expected by chance."
-]))
-
-# Cell 11: Code - Plot Spatial Proximity
-cells.append(create_code_cell([
-    "prox_file = os.path.join(out_dir, f'serotonin_proximity_results_{cancer}{analysis_suffix}.csv')",
-    "dist_file = os.path.join(out_dir, f'serotonin_null_dist_{cancer}{analysis_suffix}.npy')",
-    "",
-    "if os.path.exists(prox_file) and os.path.exists(dist_file):",
-    "    df_prox = pd.read_csv(prox_file)",
-    "    obs_score = df_prox['Observed_Proximity'].iloc[0]",
-    "    p_val = df_prox['P_Value'].iloc[0]",
-    "    z_score = df_prox['Z_Score'].iloc[0]",
-    "    ",
-    "    null_dist = np.load(dist_file)",
-    "    ",
-    "    plt.figure(figsize=(8, 6))",
-    "    sns.histplot(null_dist, bins=50, color='gray', alpha=0.5, label='Null Distribution')",
-    "    plt.axvline(obs_score, color='red', linestyle='--', linewidth=2, label=f'Observed (P={p_val:.4f}, Z={z_score:.2f})')",
-    "    plt.title(f'{cancer.upper()}: HTR7+ TAMs vs TPH1+ Tumor Proximity')",
-    "    plt.xlabel('Mean kNN Connectivity')",
-    "    plt.ylabel('Permutation Count')",
-    "    plt.legend()",
-    "    plt.tight_layout()",
-    "    plt.show()",
-    "    ",
-    "    display(df_prox)",
-    "else:",
-    "    print(f\"Proximity results not found. Files checked: {prox_file}, {dist_file}\")"
-]))
-
-# Cell 12: Markdown - Section 6
-cells.append(create_markdown_cell([
-    "## 6. Export Report",
+    "## 5. Export Report",
     "Exporting the analysis to HTML format."
 ]))
 
-# Cell 13: Code - HTML Export
+# Cell 11: Code - HTML Export
 cells.append(create_code_cell([
     "import subprocess",
     "import sys",

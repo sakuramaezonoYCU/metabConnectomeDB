@@ -28,7 +28,14 @@ for filepath in files_to_patch:
     content = content.replace("'../output/pan_cancer_meta_results/metabolite_target_network.png'", "f'../output/pan_cancer_meta_results/metabolite_target_network{ANALYSIS_SUFFIX}.png'")
     
     # 4. Fix Signature Scores
-    cancers = ['breast', 'lung', 'colorectal', 'melanoma', 'ovarian']
+    import sys
+    if '..' not in sys.path: sys.path.append('..')
+    try:
+        from pan_cancer_config import CANCERS_TO_RUN
+        cancers = CANCERS_TO_RUN
+    except ImportError:
+        cancers = ['breast', 'lung', 'colorectal', 'melanoma', 'ovarian']
+        
     for c in cancers:
         content = content.replace(f"'{c}_primary_signature_score.png'", f"f'{c}_primary_signature_score{{ANALYSIS_SUFFIX}}.png'")
         content = content.replace(f"'{c}_primary_signature_scores.csv'", f"f'{c}_primary_signature_scores{{ANALYSIS_SUFFIX}}.csv'")

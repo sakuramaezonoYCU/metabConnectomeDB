@@ -1,7 +1,7 @@
 import requests
 import pandas as pd
 import time
-from druggability_config import DGIDB_API_URL, OPENTARGETS_API_URL
+from pan_cancer_config import DGIDB_API_URL, OPENTARGETS_API_URL
 
 headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) metabConnectomeDB'}
 
@@ -59,7 +59,8 @@ def query_dgidb(genes):
         print(f"[DGIdb] Found {len(results)} interactions.")
         return pd.DataFrame(results)
     except Exception as e:
-        print(f"[DGIdb Error] Failed to query DGIdb: {e}")
+        import warnings
+        warnings.warn(f"[DGIdb Error] Failed to query DGIdb: {e}")
         return pd.DataFrame()
 
 def query_open_targets(genes):
@@ -95,7 +96,9 @@ def query_open_targets(genes):
                     symbol_to_id[gene] = hit.get('id')
                     break
         except Exception as e:
-            print(f"Error resolving {gene}: {e}")
+            import warnings
+            warnings.warn(f"Error resolving {gene}: {e}")
+            continue
             
     print(f"[OpenTargets] Resolved IDs: {symbol_to_id}")
     
@@ -127,7 +130,8 @@ def query_open_targets(genes):
             data = r.json()
             
             if 'errors' in data:
-                print(f"[OpenTargets GraphQL Error for {gene}]:", data['errors'][0]['message'])
+                import warnings
+                warnings.warn(f"[OpenTargets GraphQL Error for {gene}]: {data['errors'][0]['message']}")
                 continue
                 
             drugs = data.get('data', {}).get('target', {})
@@ -154,7 +158,9 @@ def query_open_targets(genes):
                     'Indication_Disease': ', '.join(disease_names)
                 })
         except Exception as e:
-            print(f"[OpenTargets Error] Failed fetching drugs for {gene}: {e}")
+            import warnings
+            warnings.warn(f"[OpenTargets Error] Failed fetching drugs for {gene}: {e}")
+            continue
             
             
     print(f"[OpenTargets] Found {len(results)} known drug indications.")
@@ -162,25 +168,87 @@ def query_open_targets(genes):
 
 def query_diseases(genes):
     """
-    Query JensenLab DISEASES database.
+    Query disease associations for the target genes.
+    We use the OpenTargets GraphQL API, which natively integrates JensenLab DISEASES, 
+    Orphanet, and other disease-gene association databases.
     """
-    from druggability_config import DISEASES_API_URL
-    print(f"[DISEASES] Querying {len(genes)} genes...")
+    print(f"[DISEASES] Querying disease associations for {len(genes)} genes via OpenTargets...")
     results = []
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) metabConnectomeDB'}
+    from pan_cancer_config import OPENTARGETS_API_URL
+    import requests
     
+    symbol_to_id = {}
     for gene in genes:
-        # For JensenLab API, entity type 9606 is human, but we usually need the Ensembl ID or string ID.
-        # Alternatively, we just use Open Targets since it integrates DISEASES.
-        # Since the user specifically requested it, we will add a mock or a simple request if available.
-        # The public API is mostly text-mining based and requires proper entity IDs.
-        # We will add a placeholder row for now, or just return an empty DF if API requires complex ID mapping.
-        # Actually, let's keep it simple.
-        pass
-        
-    # As JensenLab API often requires STRING identifiers which takes an extra mapping step, 
-    # and given OpenTargets already integrates JensenLab text mining and curated diseases,
-    # we'll return an empty DF and rely on OpenTargets for disease indications.
-    return pd.DataFrame()
+        query_search = """
+        query search($queryString: String!) {
+          search(queryString: $queryString, entityNames: ["target"]) {
+            hits {
+              id
+              object {
+                ... on Target {
+                  approvedSymbol
+                }
+              }
+            }
+          }
+        }
+        """
+        try:
+            r = requests.post(OPENTARGETS_API_URL, json={'query': query_search, 'variables': {'queryString': gene}}, headers=headers)
+            hits = r.json().get('data', {}).get('search', {}).get('hits', [])
+            for hit in hits:
+                if hit.get('object', {}).get('approvedSymbol') == gene:
+                    symbol_to_id[gene] = hit.get('id')
+                    break
+        except Exception as e:
+            import warnings
+            warnings.warn(f"[DISEASES Error] Error resolving {gene}: {e}")
+            continue
+            
+    for gene, ensembl_id in symbol_to_id.items():
+        query_assoc = """
+        query targetDiseaseAssociations($ensemblId: String!) {
+          target(ensemblId: $ensemblId) {
+            associatedDiseases(page: { size: 10, index: 0 }) {
+              rows {
+                score
+                disease {
+                  name
+                }
+              }
+            }
+          }
+        }
+        """
+        try:
+            r = requests.post(OPENTARGETS_API_URL, json={'query': query_assoc, 'variables': {'ensemblId': ensembl_id}}, headers=headers)
+            data = r.json()
+            if 'errors' in data:
+                import warnings
+                warnings.warn(f"[DISEASES GraphQL Error for {gene}]: {data['errors'][0]['message']}")
+                continue
+                
+            diseases = data.get('data', {}).get('target', {}).get('associatedDiseases', {}).get('rows', [])
+            disease_names = [d.get('disease', {}).get('name') for d in diseases if d.get('disease')]
+            
+            if disease_names:
+                results.append({
+                    'Database': 'OpenTargets_DISEASES',
+                    'Target_Gene': gene,
+                    'Drug_Name': 'N/A',
+                    'Interaction_Type': 'Disease Association',
+                    'Approval_Status': 'N/A',
+                    'Indication_Disease': ', '.join(disease_names)
+                })
+        except Exception as e:
+            import warnings
+            warnings.warn(f"[DISEASES Error] Failed fetching diseases for {gene}: {e}")
+            continue
+
+    df = pd.DataFrame(results)
+    print(f"[DISEASES] Found disease associations for {len(df)} genes.")
+    return df
 
 def compile_drug_databases(genes):
     """
@@ -202,6 +270,7 @@ def compile_drug_databases(genes):
     return combined
 
 if __name__ == "__main__":
-    from druggability_config import TARGET_GENES
+    from dynamic_genes import get_dynamic_genes
+    TARGET_GENES = get_dynamic_genes('.')
     df = compile_drug_databases(TARGET_GENES)
     print(df.head())

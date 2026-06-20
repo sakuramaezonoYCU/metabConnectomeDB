@@ -1,8 +1,12 @@
 import pandas as pd
 import numpy as np
 import os
-import json
-from oxygen_tension_config import CANCERS, GLYCOLYSIS_GENES, OXPHOS_GENES, OXYGEN_TENSION_MAP, BASE_DIR
+import sys
+
+# Ensure the scripts directory is in path to import our modular scripts
+if '..' not in sys.path: sys.path.append('..')
+from oxygen_tension_config import GLYCOLYSIS_GENES, OXPHOS_GENES, HIF1_GENES, BASE_DIR
+from pan_cancer_config import CANCERS_TO_RUN, CANCER_PO2_CSV_MAPPING, normalize_cancer_name
 
 def get_de_file_path(cancer):
     # Depending on how the output folder is structured, try standard locations
@@ -18,7 +22,16 @@ def get_de_file_path(cancer):
 def compute_enrichment_ratios():
     results = []
     
-    for cancer in CANCERS:
+    # Load the physiological oxygen tension reference CSV
+    csv_path = os.path.join(BASE_DIR, "input", "pO2_guide_24588669.csv")
+    try:
+        po2_df = pd.read_csv(csv_path)
+    except Exception as e:
+        print(f"[Error] Failed to read {csv_path}: {e}")
+        po2_df = pd.DataFrame()
+
+    for raw_cancer in CANCERS_TO_RUN:
+        cancer = normalize_cancer_name(raw_cancer)
         file_path = get_de_file_path(cancer)
         
         if file_path is None:
@@ -37,11 +50,13 @@ def compute_enrichment_ratios():
         # Filter sets
         glyco_df = df[df['names'].isin(GLYCOLYSIS_GENES)]
         oxphos_df = df[df['names'].isin(OXPHOS_GENES)]
+        hif1_df = df[df['names'].isin(HIF1_GENES)]
         
         # Calculate mean Log2 Fold Change (Metastasis vs Primary)
         # Positive LFC means upregulated in Metastasis
         mean_glyco_lfc = glyco_df['logfoldchanges'].mean() if not glyco_df.empty else 0
         mean_oxphos_lfc = oxphos_df['logfoldchanges'].mean() if not oxphos_df.empty else 0
+        mean_hif1_lfc = hif1_df['logfoldchanges'].mean() if not hif1_df.empty else 0
         
         # Compute OXPHOS / Glycolysis Enrichment Ratio in Linear Scale
         # LFC difference: LFC_oxphos - LFC_glyco
@@ -49,17 +64,41 @@ def compute_enrichment_ratios():
         lfc_diff = mean_oxphos_lfc - mean_glyco_lfc
         oxphos_glyco_ratio = 2 ** lfc_diff
         
-        cancer_name = cancer.capitalize()
-        o2_tension = OXYGEN_TENSION_MAP.get(cancer_name, np.nan)
+        # Fetch oxygen tension data
+        csv_name = CANCER_PO2_CSV_MAPPING.get(cancer, "")
+        o2_tumour = np.nan
+        o2_normal = np.nan
+        pmid = ""
+        
+        if csv_name and not po2_df.empty:
+            row = po2_df[po2_df['Tumour type'] == csv_name]
+            if not row.empty:
+                try:
+                    o2_tumour = float(row['Median % oxygen_tumour'].values[0])
+                except Exception:
+                    pass
+                try:
+                    o2_normal = float(row['Median % oxygen_normal'].values[0])
+                except Exception:
+                    pass
+                pmid = str(row['Reference'].values[0]).replace('"', '')
+                
+                # Default empty normal tissue to 6.0 average
+                if pd.isna(o2_normal) and pd.notna(o2_tumour):
+                    o2_normal = 6.0
         
         results.append({
-            "Cancer": cancer_name,
+            "Cancer": cancer.capitalize(),
             "Mean_Glycolysis_LFC": mean_glyco_lfc,
             "Mean_OXPHOS_LFC": mean_oxphos_lfc,
+            "Mean_HIF1_LFC": mean_hif1_lfc,
             "OXPHOS_Glycolysis_Ratio": oxphos_glyco_ratio,
-            "O2_Tension_Pct": o2_tension,
+            "O2_Tension_Tumour_Pct": o2_tumour,
+            "O2_Tension_Normal_Pct": o2_normal,
+            "PMID_Reference": pmid,
             "Glycolysis_Genes_Found": len(glyco_df),
-            "OXPHOS_Genes_Found": len(oxphos_df)
+            "OXPHOS_Genes_Found": len(oxphos_df),
+            "HIF1_Genes_Found": len(hif1_df)
         })
         
     return pd.DataFrame(results)

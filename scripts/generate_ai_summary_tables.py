@@ -1,3 +1,6 @@
+"""
+Purpose: Aggregates all the extracted outputs into formatted CSVs in output/ai_summary_tables/ for the AI insights generation.
+"""
 import os
 import sys
 import pandas as pd
@@ -27,32 +30,24 @@ os.makedirs(SUMMARY_TABLES_DIR, exist_ok=True)
 # NOTE: The size suffix might differ depending on the dataset used.
 # Checking for 100k or 500k files.
 def get_cancer_prefix(cancer_name):
-    mapping = {
-        'Breast': 'breast',
-        'Colorectal': 'colorectal',
-        'Lung': 'lung',
-        'Melanoma': 'melanoma',
-        'Ovarian': 'ovarian'
-    }
-    return mapping.get(cancer_name, cancer_name.lower())
+    from pan_cancer_config import normalize_cancer_name
+    return normalize_cancer_name(cancer_name)
 
 def find_file(prefix, folder, pattern, cancer_name):
-    from pan_cancer_config import CANCER_CAP
-    cap = CANCER_CAP[cancer_name.lower()]
+    from pan_cancer_config import CANCER_CAP, normalize_cancer_name
+    normalized_cancer = normalize_cancer_name(cancer_name)
+    cap = CANCER_CAP[normalized_cancer]
     folder_path = os.path.join(OUTPUT_DIR, folder)
     if not os.path.exists(folder_path):
         return None
     for f in os.listdir(folder_path):
-        if pattern in f and f.endswith(f'_{cap}.csv'):
-            return os.path.join(folder_path, f)
-        # Check for alternative naming (some don't use _cap at the very end if it's not present)
-        # wait, let's just make sure it has the cap in it.
-        if pattern in f and cap in f and f.endswith('.csv'):
+        if pattern in f and f.endswith('.csv'):
             return os.path.join(folder_path, f)
     return None
 
 def generate_metastatic_enrichment_table():
-    cancers = ['Breast', 'Colorectal', 'Lung', 'Melanoma', 'Ovarian']
+    from pan_cancer_config import CANCERS_TO_RUN
+    cancers = [c.capitalize() for c in CANCERS_TO_RUN]
     data = []
     
     for cancer in cancers:
@@ -82,12 +77,32 @@ def generate_metastatic_enrichment_table():
                 
         ratio = up / max(down, 1) # Avoid division by zero
         
+        # Fetch oxygen tension data
+        from pan_cancer_config import CANCER_PO2_CSV_MAPPING, _project_root, normalize_cancer_name
+        csv_path = os.path.join(_project_root(), "input", "pO2_guide_24588669.csv")
+        o2_tumour = "N/A"
+        o2_normal = "N/A"
+        try:
+            po2_df = pd.read_csv(csv_path)
+            csv_name = CANCER_PO2_CSV_MAPPING.get(normalize_cancer_name(cancer), "")
+            if csv_name and not po2_df.empty:
+                row = po2_df[po2_df['Tumour type'] == csv_name]
+                if not row.empty:
+                    o2_tumour = row['Median % oxygen_tumour'].values[0]
+                    o2_normal = row['Median % oxygen_normal'].values[0]
+                    if pd.isna(o2_normal) and pd.notna(o2_tumour):
+                        o2_normal = 6.0
+        except Exception:
+            pass
+        
         data.append({
             'Cancer': cancer,
             'Up in Metastasis': up,
             'Up in Primary': down,
             'Not Significant': ns,
-            'Metastasis/Primary Ratio': f"{ratio:.2f}x"
+            'Metastasis/Primary Ratio': f"{ratio:.2f}x",
+            'Tumor pO2 (%)': o2_tumour,
+            'Normal pO2 (%)': o2_normal
         })
         
     if data:
@@ -97,7 +112,8 @@ def generate_metastatic_enrichment_table():
         print(f"Generated: {out_path}")
 
 def generate_immune_evasion_table():
-    cancers = ['Breast', 'Colorectal', 'Lung', 'Melanoma', 'Ovarian']
+    from pan_cancer_config import CANCERS_TO_RUN
+    cancers = [c.capitalize() for c in CANCERS_TO_RUN]
     data = []
     
     for cancer in cancers:
@@ -132,7 +148,8 @@ def generate_immune_evasion_table():
         print(f"Generated: {out_path}")
 
 def generate_ccc_potential_table():
-    cancers = ['Breast', 'Colorectal', 'Lung', 'Melanoma', 'Ovarian']
+    from pan_cancer_config import CANCERS_TO_RUN
+    cancers = [c.capitalize() for c in CANCERS_TO_RUN]
     data = []
     
     for cancer in cancers:
@@ -201,7 +218,7 @@ def generate_annotated_signature():
         print(f"Database not found: {db_path}")
         return
         
-    db_df = pd.read_csv(db_path)
+    db_df = pd.read_csv(db_path, low_memory=False)
     
     # The database maps multiple targets per row, so we need to explode or search carefully
     # Target column can be comma/semicolon separated.
@@ -286,7 +303,7 @@ def generate_annotated_signature():
         })
         
     df = pd.DataFrame(results)
-    out_path = os.path.join(SUMMARY_TABLES_DIR, f'21_gene_directed_signature_annotation{ANALYSIS_SUFFIX}.csv')
+    out_path = os.path.join(SUMMARY_TABLES_DIR, f'conserved_gene_directed_signature_annotation{ANALYSIS_SUFFIX}.csv')
     df.to_csv(out_path, index=False)
     print(f"Generated data-driven annotation: {out_path}")
 
@@ -309,7 +326,8 @@ def generate_dataset_overview(suffix, out_name):
     print(f"Generated data-driven overview: {out_path}")
 
 def generate_subclone_summary(suffix, out_name):
-    cancers = ['breast', 'colorectal', 'lung', 'melanoma', 'ovarian']
+    from pan_cancer_config import CANCER_CAP
+    cancers = list(CANCER_CAP.keys())
     
     data = []
     for c in cancers:
@@ -321,28 +339,38 @@ def generate_subclone_summary(suffix, out_name):
         if count == 0:
             continue
             
-        scores = df['Metastatic_Signature_Score']
-        skew = scores.skew()
-        
-        if skew > 0.5:
-            dist = "Right-skewed"
-        elif skew < -0.5:
-            dist = "Left-skewed"
-        else:
-            dist = "Symmetric"
+        score_cols = [col for col in df.columns if col.startswith('Metastatic_Signature_Score')]
+        if not score_cols:
+            continue
             
-        # Mathematical extraction of highly metastatic subclone
-        # Defined as cells with scores > Mean + 1 Standard Deviation
-        mean_score = scores.mean()
-        std_score = scores.std()
-        subclone_pct = (scores > (mean_score + std_score)).mean() * 100
-        
-        data.append({
-            'Cancer': f"**{c.capitalize()}**",
-            'Primary Cells Scored': f"{count:,}",
-            'Score Distribution': dist,
-            'Pre-Metastatic Subclone (%)': f"{subclone_pct:.1f}% (> +1 SD)"
-        })
+        for score_col in score_cols:
+            scores = df[score_col]
+            skew = scores.skew()
+            
+            if skew > 0.5:
+                dist = "Right-skewed"
+            elif skew < -0.5:
+                dist = "Left-skewed"
+            else:
+                dist = "Symmetric"
+                
+            # Mathematical extraction of highly metastatic subclone
+            # Defined as cells with scores > Mean + 1 Standard Deviation
+            mean_score = scores.mean()
+            std_score = scores.std()
+            subclone_pct = (scores > (mean_score + std_score)).mean() * 100
+            
+            sig_name = score_col.replace('Metastatic_Signature_Score_', '')
+            if sig_name == 'Metastatic_Signature_Score':
+                sig_name = 'Conserved Pan-Cancer'
+                
+            data.append({
+                'Cancer': f"**{c.capitalize()}**",
+                'Signature': sig_name,
+                'Primary Cells Scored': f"{count:,}",
+                'Score Distribution': dist,
+                'Pre-Metastatic Subclone (%)': f"{subclone_pct:.1f}% (> +1 SD)"
+            })
     if data:
         summary_df = pd.DataFrame(data)
         out_path = os.path.join(SUMMARY_TABLES_DIR, f'{out_name}.csv')
@@ -363,7 +391,7 @@ def generate_unique_signatures():
     if not os.path.exists(db_path):
         print(f"Database not found: {db_path}")
         return
-    db_df = pd.read_csv(db_path)
+    db_df = pd.read_csv(db_path, low_memory=False)
     db_df['Target'] = db_df['Target'].astype(str).str.split(r'[,;]')
     db_df = db_df.explode('Target')
     db_df['Target'] = db_df['Target'].str.strip()
@@ -412,12 +440,9 @@ def main():
     generate_annotated_signature()
     generate_unique_signatures()
     
-    # Generate Version 5 (100k) and Version 6 (500k) specific tables
-    generate_dataset_overview('_Br100k_Co100k_Lu100k_Me100k_Ov100k', 'dataset_overview_100k')
-    generate_dataset_overview('_Br500k_Co100k_Lu500k_Me100k_Ov100k', 'dataset_overview_500k')
-    
-    generate_subclone_summary('_5MetCan_100k', 'subclone_summary_100k')
-    generate_subclone_summary('_Br500k_Co100k_Lu500k_Me100k_Ov100k', 'subclone_summary_500k')
+    # Generate dynamically based on the current run's configuration
+    generate_dataset_overview(ANALYSIS_SUFFIX, f'dataset_overview{ANALYSIS_SUFFIX}')
+    generate_subclone_summary(ANALYSIS_SUFFIX, f'subclone_summary{ANALYSIS_SUFFIX}')
     
     print(f"\nAll summary CSVs have been saved to: {SUMMARY_TABLES_DIR}")
 

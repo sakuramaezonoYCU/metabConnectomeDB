@@ -1,32 +1,37 @@
-import sys
-if '..' not in sys.path: sys.path.append('..')
-from pan_cancer_config import ANALYSIS_SUFFIX
 import os
+import sys
 import pandas as pd
 import numpy as np
+import argparse
 from lifelines import CoxPHFitter
 
-def validate_tcga_signature():
-    print("Validating strictly-conserved metabolic signature in TCGA cohorts...")
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX
+
+def validate_tcga_signature(signature_csv):
+    print(f"Validating metabolic signature from {signature_csv} in TCGA cohorts...")
     
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     dir_input = os.path.join(BASE_DIR, "input", "TCGA")
-    out_dir = os.path.join(BASE_DIR, "output", f"deepdive_conserved_metabGeneSig{ANALYSIS_SUFFIX}", "tcga_validation")
+    
+    sig_name = os.path.basename(signature_csv).replace('.csv', '')
+    out_dir = os.path.join(BASE_DIR, "output", f"tcga_validation", sig_name)
     os.makedirs(out_dir, exist_ok=True)
     
-    # Gene signature
-    sig_file = os.path.join(BASE_DIR, "output", "pan_cancer_meta_results", f"pan_cancer_conserved_genes{ANALYSIS_SUFFIX}.csv")
-    if not os.path.exists(sig_file):
-        print(f"Error: {sig_file} not found. Please run earlier pipeline steps first.")
-        return
+    if not os.path.exists(signature_csv):
+        raise FileNotFoundError(f"CRITICAL ERROR: {signature_csv} not found.")
         
-    sig_df = pd.read_csv(sig_file)
+    sig_df = pd.read_csv(signature_csv)
     if 'Strictly_Conserved_Gene' in sig_df.columns:
-        metab_genes = sig_df['Strictly_Conserved_Gene'].tolist()
+        metab_genes = sig_df['Strictly_Conserved_Gene'].dropna().tolist()
+    elif 'Gene' in sig_df.columns:
+        metab_genes = sig_df['Gene'].dropna().tolist()
+    elif 'Target' in sig_df.columns:
+        metab_genes = sig_df['Target'].dropna().tolist()
     elif 'gene' in sig_df.columns:
-        metab_genes = sig_df['gene'].tolist()
+        metab_genes = sig_df['gene'].dropna().tolist()
     else:
-        metab_genes = sig_df.iloc[:, 0].tolist()
+        metab_genes = sig_df.iloc[:, 0].dropna().tolist()
         
     # Map to Ensembl IDs via local HGNC database
     import json
@@ -44,8 +49,7 @@ def validate_tcga_signature():
                 
         print(f"Mapped {len(metab_genes)} symbols to {len(valid_ensembl_ids)} Ensembl IDs via local HGNC.")
     else:
-        print(f"Error: {hgnc_path} not found. Cannot map gene symbols to Ensembl IDs.")
-        return
+        raise FileNotFoundError(f"CRITICAL ERROR: {hgnc_path} not found. Cannot map gene symbols to Ensembl IDs.")
         
     cancer_codes = ["BRCA", "COAD", "READ", "LUAD", "LUSC", "SKCM", "OV"]
     all_cancer_metrics = []
@@ -77,18 +81,14 @@ def validate_tcga_signature():
             exp_df = pd.read_csv(exp_file, sep='\t')
             gene_col = exp_df.columns[0]
             
-            # Create a temporary column with stripped Ensembl IDs (removing .15 etc)
             stripped_ids = exp_df[gene_col].astype(str).str.split('.').str[0]
-            
-            # Filter only needed genes using our mapped Ensembl IDs
             mask = stripped_ids.isin(valid_ensembl_ids)
-            exp_df = exp_df[mask]
+            exp_df = exp_df[mask].copy()
             
             if exp_df.empty:
                 print(f"  No signature genes found in {exp_file}. (ID mismatch?)")
                 continue
                 
-            # Replace the Ensembl ID with the stripped version for cleaner matching/scoring if needed
             exp_df.loc[:, gene_col] = stripped_ids[mask]
             
             exp_df = exp_df.set_index(gene_col).T
@@ -161,10 +161,13 @@ def validate_tcga_signature():
         results_df = pd.DataFrame(all_cancer_metrics)
         out_file = os.path.join(out_dir, "true_signature_metrics.csv")
         results_df.to_csv(out_file, index=False)
-        print(f"\nSaved TCGA validation metrics to {out_file}")
+        print(f"\\nSaved TCGA validation metrics to {out_file}")
         print(results_df)
     else:
-        print("\nNo metrics were generated.")
+        print("\\nNo metrics were generated.")
 
 if __name__ == "__main__":
-    validate_tcga_signature()
+    parser = argparse.ArgumentParser(description="TCGA Signature Validation")
+    parser.add_argument('--signature_csv', required=True, help="Path to the signature CSV file")
+    args = parser.parse_args()
+    validate_tcga_signature(args.signature_csv)

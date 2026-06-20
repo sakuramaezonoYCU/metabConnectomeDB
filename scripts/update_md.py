@@ -1,5 +1,10 @@
 import pandas as pd
 import re
+import sys
+import os
+
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX
 
 md_file = 'output/AI_summary_and_insights.md'
 with open(md_file, 'r') as f:
@@ -15,11 +20,11 @@ def csv_to_md_table(csv_path):
         rows.append("| " + " | ".join([str(x) for x in row.values]) + " |")
     return "\n".join([headers, separators] + rows)
 
-# 1. 21-gene signature table
-df_sig = pd.read_csv('output/ai_summary_tables/21_gene_directed_signature_annotation_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv')
-table_md = """> [!NOTE]
+# 1. Conserved signature table
+df_sig = pd.read_csv(f'output/ai_summary_tables/conserved_gene_directed_signature_annotation{ANALYSIS_SUFFIX}.csv')
+table_md = f"""> [!NOTE]
 > **Data Provenance**
-> - **Source File:** `output/ai_summary_tables/21_gene_directed_signature_annotation_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv`
+> - **Source File:** `output/ai_summary_tables/conserved_gene_directed_signature_annotation{ANALYSIS_SUFFIX}.csv`
 > - **Scripts:** `scripts/generate_ai_summary_tables.py`, `scripts/fetch_uniprot_roles.py`, `scripts/fetch_opentargets.py`, `scripts/update_md.py`
 
 """
@@ -35,7 +40,7 @@ for _, row in df_sig.iterrows():
     if link: link = f"[GEPIA]({link})"
     table_md += f"| **{gene}** | {source_db} | {sensor} | {met} | {diseases} | {mrclink} | {link} |\n"
 
-# Replace 21-gene table
+# Replace conserved gene table
 content = re.sub(r'\| Gene \|.*?(?=\n\n)', table_md.strip(), content, count=1, flags=re.DOTALL)
 
 # 2. Version 6/7 Dataset Overview
@@ -60,7 +65,7 @@ content = re.sub(
 # 3. Version 6/7 Subclone Summary
 subclone_defs = """
 **Column Definitions:**
-- **Primary Cells Scored**: The absolute number of malignant cells from the primary tumor that successfully passed quality control and received a 23-gene Metastatic Signature Score.
+- **Primary Cells Scored**: The absolute number of malignant cells from the primary tumor that successfully passed quality control and received a conserved Metastatic Signature Score.
 - **Score Distribution**: The shape of the score distribution across the primary tumor cells, computed mathematically using skewness (Left-skewed: < -0.5, Right-skewed: > +0.5, Symmetric otherwise).
 - **Pre-Metastatic Subclone (%)**: The percentage of primary tumor cells whose signature score is greater than the mean plus one standard deviation (> +1 SD). This represents the highly metastatic "tail" or subclone already present in the primary tumor prior to dissemination."""
 
@@ -91,7 +96,7 @@ subclone_100k = csv_to_md_table('output/ai_summary_tables/subclone_summary_100k.
 subclone_100k_md = subclone_100k + "\n\n" + subclone_defs
 
 content = re.sub(
-    r'(#### Q5: Can the 23-gene pan-cancer signature predict metastatic potential from primary tumor biopsies\?.*?)\| Cancer \| Primary Cells Scored.*?(?=\n\n- \*\*Lung cancer\*\*)',
+    r'(#### Q5: Can the .*?pan-cancer signature predict metastatic potential from primary tumor biopsies\?.*?)\| Cancer \| Primary Cells Scored.*?(?=\n\n- \*\*Lung cancer\*\*)',
     r'\g<1>' + subclone_100k_md.strip() + r'\n\n',
     content,
     count=1,

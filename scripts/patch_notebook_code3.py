@@ -14,7 +14,14 @@ try:
             old_source = cell.source
             
             # Fix signature score pngs
-            cancers = ['breast', 'lung', 'colorectal', 'melanoma', 'ovarian']
+            import sys
+            if '..' not in sys.path: sys.path.append('..')
+            try:
+                from pan_cancer_config import CANCERS_TO_RUN
+                cancers = CANCERS_TO_RUN
+            except ImportError:
+                cancers = ['breast', 'lung', 'colorectal', 'melanoma', 'ovarian']
+                
             for cancer in cancers:
                 target = f"'{cancer}_primary_signature_score.png'"
                 if target in cell.source:

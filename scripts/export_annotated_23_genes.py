@@ -1,6 +1,6 @@
 import sys
 if '..' not in sys.path: sys.path.append('..')
-from pan_cancer_config import ANALYSIS_SUFFIX
+from pan_cancer_config import ANALYSIS_SUFFIX, CANCER_CAP
 import pandas as pd
 import os
 
@@ -8,9 +8,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(os.path.dirname(BASE_DIR), 'output')
 META_RESULTS_DIR = os.path.join(OUTPUT_DIR, 'pan_cancer_meta_results')
 
-CANCERS = ['breast', 'colorectal', 'lung', 'melanoma', 'ovarian']
+CANCERS = list(CANCER_CAP.keys())
 
-# 1. Read 23 genes
+# 1. Read strictly conserved genes
 genes_file = os.path.join(META_RESULTS_DIR, f'pan_cancer_conserved_genes{ANALYSIS_SUFFIX}.csv')
 if not os.path.exists(genes_file):
     print(f"pan_cancer_conserved_genes{ANALYSIS_SUFFIX}.csv not found!")
@@ -58,4 +58,4 @@ df_annotated = df_annotated[cols]
 
 out_file = os.path.join(META_RESULTS_DIR, f'pan_cancer_conserved_genes_with_annotation{ANALYSIS_SUFFIX}.csv')
 df_annotated.to_csv(out_file, index=False)
-print(f"Created annotated 23 genes file at {out_file}")
+print(f"Created annotated strictly conserved genes file at {out_file}")

@@ -11,7 +11,10 @@ OUTPUT_DIR = os.path.join(BASE_DIR, 'output')
 DRUGGABILITY_DIR = os.path.join(OUTPUT_DIR, 'druggability')
 os.makedirs(DRUGGABILITY_DIR, exist_ok=True)
 
-CANCERS = ['breast', 'colorectal', 'lung', 'melanoma', 'ovarian']
+import sys
+if ".." not in sys.path:
+    sys.path.append("..")
+from pan_cancer_config import CANCERS_TO_RUN as CANCERS
 DGIDB_GQL = "https://dgidb.org/api/graphql"
 
 def get_conserved_genes():
@@ -27,12 +30,17 @@ def get_conserved_genes():
             for g in up_genes:
                 gene_counts[g] = gene_counts.get(g, 0) + 1
                 
-    genes_23 = [g for g, c in gene_counts.items() if c == 5]
-    genes_181 = [g for g, c in gene_counts.items() if c >= 4]
+    max_cancers = len(CANCERS)
+    genes_strict = [g for g, c in gene_counts.items() if c == max_cancers]
+    genes_broad = [g for g, c in gene_counts.items() if c >= max_cancers - 1]
     
-    print(f"Found {len(genes_23)} all-5 conserved genes.")
-    print(f"Found {len(genes_181)} >=4 conserved genes.")
-    return genes_23, genes_181
+    if len(genes_strict) == 0:
+        print(f"Fail-safe triggered: 0 strictly conserved genes across all {max_cancers} cancers. Falling back to {max_cancers - 1} cancers.")
+        genes_strict = genes_broad
+    
+    print(f"Found {len(genes_strict)} strictly conserved genes (after potential fallback).")
+    print(f"Found {len(genes_broad)} broadly conserved (>={max_cancers - 1}) genes.")
+    return genes_strict, genes_broad
 
 def query_dgidb_graphql(genes):
     print(f"[DGIdb] Querying {len(genes)} genes...")
@@ -74,22 +82,22 @@ def query_dgidb_graphql(genes):
         except Exception as e:
             print(f"Error querying {chunk}: {e}")
             
-    df = pd.DataFrame(results)
+    df = pd.DataFrame(results, columns=['Gene', 'Drug', 'Database'])
     if not df.empty:
         df = df.drop_duplicates(subset=['Gene', 'Drug'])
     return df
 
 if __name__ == '__main__':
-    genes_23, genes_181 = get_conserved_genes()
+    genes_strict, genes_broad = get_conserved_genes()
     
     print("Querying DGIdb for the strictly conserved pan-cancer genes...")
-    df_23 = query_dgidb_graphql(genes_23)
-    path_23 = os.path.join(DRUGGABILITY_DIR, f'druggable_targets_strictly_conserved{ANALYSIS_SUFFIX}.csv')
-    df_23.to_csv(path_23, index=False)
-    print(f"Saved {path_23} with {len(df_23)} interactions.")
+    df_strict = query_dgidb_graphql(genes_strict)
+    path_strict = os.path.join(DRUGGABILITY_DIR, f'druggable_targets_strictly_conserved{ANALYSIS_SUFFIX}.csv')
+    df_strict.to_csv(path_strict, index=False)
+    print(f"Saved {path_strict} with {len(df_strict)} interactions.")
     
     print("Querying DGIdb for the broadly conserved (>=4) cancer genes...")
-    df_181 = query_dgidb_graphql(genes_181)
-    path_181 = os.path.join(DRUGGABILITY_DIR, f'druggable_targets_broadly_conserved{ANALYSIS_SUFFIX}.csv')
-    df_181.to_csv(path_181, index=False)
-    print(f"Saved {path_181} with {len(df_181)} interactions.")
+    df_broad = query_dgidb_graphql(genes_broad)
+    path_broad = os.path.join(DRUGGABILITY_DIR, f'druggable_targets_broadly_conserved{ANALYSIS_SUFFIX}.csv')
+    df_broad.to_csv(path_broad, index=False)
+    print(f"Saved {path_broad} with {len(df_broad)} interactions.")

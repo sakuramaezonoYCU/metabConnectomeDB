@@ -4,7 +4,17 @@ import numpy as np
 import scipy.stats as stats
 import matplotlib.pyplot as plt
 import seaborn as sns
-from druggability_config import DEPMAP_DATA_PATH, OUTPUT_DIR, OUTPUT_BASENAME
+import json
+from pan_cancer_config import DEPMAP_DATA_PATH, ANALYSIS_SUFFIX
+
+# ---------------------------------------------------------
+# PATH CONFIGURATION
+# ---------------------------------------------------------
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUTPUT_DIR = os.path.join(BASE_DIR, "output", "druggability")
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+OUTPUT_BASENAME = f"druggability_axis{ANALYSIS_SUFFIX}"
 
 def analyze_depmap_synergy(genes):
     """
@@ -69,5 +79,7 @@ def analyze_depmap_synergy(genes):
         return None
 
 if __name__ == "__main__":
-    from druggability_config import TARGET_GENES
+    from dynamic_genes import get_dynamic_genes
+    TARGET_GENES = get_dynamic_genes('.')
+    print(f"Target genes loaded: {TARGET_GENES}")
     analyze_depmap_synergy(TARGET_GENES)

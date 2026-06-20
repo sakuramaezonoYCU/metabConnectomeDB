@@ -13,14 +13,7 @@ def simulate_oxygen_gradient():
     out_dir = os.path.join(output_dir, f"deepdive_conserved_metabGeneSig{ANALYSIS_SUFFIX}", "oxygen_gradient")
     os.makedirs(out_dir, exist_ok=True)
     
-    # Define primary tissues for filtering based on the cancer type
-    cancer_to_primary = {
-        'breast': 'breast|mammary',
-        'colorectal': 'colon|intestine',
-        'lung': 'lung',
-        'melanoma': 'skin',
-        'ovarian': 'ovary'
-    }
+    from pan_cancer_config import CANCER_PRIMARY_TISSUE
     
     # Find all h5ad files
     h5ad_files = glob.glob(os.path.join(output_dir, "*_results", "*100k_whole_transcriptome_2025-11-08.h5ad"))
@@ -67,7 +60,11 @@ def simulate_oxygen_gradient():
         
         df = adata.obs[['tissue_general', 'cell_type', 'hypoxia_score', 'metastatic_score']].copy()
         
-        primary_keyword = cancer_to_primary.get(cancer_prefix, cancer_prefix)
+        primary_val = CANCER_PRIMARY_TISSUE.get(cancer_prefix, cancer_prefix)
+        if isinstance(primary_val, list):
+            primary_keyword = '|'.join(primary_val)
+        else:
+            primary_keyword = primary_val
         
         # Filter for primary tumor cells
         primary_tumor = df[(df['tissue_general'].str.contains(primary_keyword, case=False, na=False)) & 

@@ -302,7 +302,15 @@ else:
     print(res_html.stderr)
 """
 
+print_config_code = """
+print('--- INJECTED PIPELINE CONFIGURATION ---')
+from pan_cancer_config import STRICT_MASK_CANCERS, CANCER_PRIMARY_TISSUE
+print(f'STRICT_MASK_CANCERS: {STRICT_MASK_CANCERS}')
+print(f'CANCER_PRIMARY_TISSUE: {CANCER_PRIMARY_TISSUE}')
+"""
+
 nb['cells'] = [
+    nbf.v4.new_code_cell(print_config_code),
     nbf.v4.new_markdown_cell(markdown_1),
     nbf.v4.new_code_cell(code_1),
     nbf.v4.new_markdown_cell(markdown_2),

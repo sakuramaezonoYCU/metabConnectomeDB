@@ -1,6 +1,10 @@
 import pandas as pd
 import re
 import os
+import sys
+
+if '..' not in sys.path: sys.path.append('..')
+from pan_cancer_config import ANALYSIS_SUFFIX
 
 md_file = 'output/AI_summary_and_insights.md'
 with open(md_file, 'r') as f:
@@ -19,7 +23,7 @@ def df_to_markdown(df):
     return md
 
 # 1. Dataset Overview
-df_overview = pd.read_csv('output/ai_summary_tables/dataset_overview_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv')
+df_overview = pd.read_csv(f'output/ai_summary_tables/dataset_overview{ANALYSIS_SUFFIX}.csv')
 table_overview = df_to_markdown(df_overview)
 # Replace the table starting with | Cancer | Total Candidates |
 content = re.sub(
@@ -30,7 +34,7 @@ content = re.sub(
 )
 
 # 2. Metastatic Enrichment
-df_enrich = pd.read_csv('output/ai_summary_tables/metastatic_enrichment_summary_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv')
+df_enrich = pd.read_csv(f'output/ai_summary_tables/metastatic_enrichment_summary{ANALYSIS_SUFFIX}.csv')
 table_enrich = df_to_markdown(df_enrich)
 # Replace the table starting with | Cancer | Metabolic Target Genes |
 content = re.sub(
@@ -41,7 +45,7 @@ content = re.sub(
 )
 
 # 3. Unique Signatures
-df_unique = pd.read_csv('output/ai_summary_tables/cancer_specific_unique_signatures_Br500k_Co100k_Lu500k_Me100k_Ov100k.csv')
+df_unique = pd.read_csv(f'output/ai_summary_tables/cancer_specific_unique_signatures{ANALYSIS_SUFFIX}.csv')
 table_unique = df_to_markdown(df_unique)
 # Replace the table starting with | Cancer | Unique Metastatic Targets |
 content = re.sub(

@@ -1,3 +1,6 @@
+"""
+Purpose: Identifies the total and unique metabolic target candidates implicated in cell-cell communication (CCC) potential across different tissue microenvironments.
+"""
 import sys
 import os
 import pandas as pd
@@ -8,13 +11,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(os.path.dirname(BASE_DIR), 'output', 'pan_cancer_meta_results')
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-cancers_config = [
-    ('breast', 'breast'),
-    ('colorectal', ['colon', 'large intestine']),
-    ('lung', 'lung'),
-    ('melanoma', 'skin of body'),
-    ('ovarian', 'ovary')
-]
+from pan_cancer_config import CANCER_CAP, CANCER_PRIMARY_TISSUE
+cancers_config = []
+for cancer in CANCER_CAP.keys():
+    tissue = CANCER_PRIMARY_TISSUE.get(cancer, cancer)
+    cancers_config.append((cancer, tissue))
 
 results = []
 
@@ -22,16 +23,12 @@ for prefix, tissue in cancers_config:
     h5ad_path = get_h5ad_path(prefix)
     adata = sc.read_h5ad(h5ad_path, backed='r')
     
-    # Use specific masks to prevent normal epithelial cells from contaminating Colorectal/Melanoma
-    if prefix == 'ovarian':
-        tumor_mask = adata.obs['cell_type'].str.contains('malignant|tumor|epithelial|cancer', case=False, na=False)
-    elif prefix == 'breast':
-        tumor_mask = adata.obs['cell_type'].str.contains('malignant|tumor|epithelial|cancer', case=False, na=False)
-    elif prefix == 'lung':
-        tumor_mask = adata.obs['cell_type'].str.contains('malignant|tumor|epithelial|cancer', case=False, na=False)
-    else:
-        # For Colorectal and Melanoma, keep strict to avoid normal epithelial contamination
+    # Use strict masks by default to prevent normal epithelial contamination
+    from pan_cancer_config import STRICT_MASK_CANCERS
+    if prefix in STRICT_MASK_CANCERS:
         tumor_mask = adata.obs['cell_type'] == 'malignant cell'
+    else:
+        tumor_mask = adata.obs['cell_type'].str.contains('malignant|tumor|epithelial|cancer', case=False, na=False)
         
     if isinstance(tissue, list):
         total_pri = adata[adata.obs['tissue_general'].isin(tissue)]

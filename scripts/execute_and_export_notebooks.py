@@ -1,3 +1,6 @@
+"""
+Purpose: Executes the 3 core notebooks, generating the API networks, resolving the directionality gap, and analyzing drug tractability. It automatically converts the executed .ipynb files into .html reports.
+"""
 import json
 import os
 import sys
@@ -307,17 +310,34 @@ def execute_and_export(notebook_path, html_path, title_text):
     with open(notebook_path, 'r', encoding='utf-8') as f:
         nb = json.load(f)
         
-    try:
-        from IPython.display import display
-    except ImportError:
-        display = print
+    display_events = []
+
+    def fake_display(obj):
+        html_repr = obj._repr_html_() if hasattr(obj, "_repr_html_") else None
+        if html_repr is not None:
+            display_events.append({"text/html": [html_repr]})
+        elif hasattr(obj, "_repr_png_"):
+            png_data = obj._repr_png_()
+            if png_data:
+                b64 = png_data if isinstance(png_data, str) else base64.b64encode(png_data).decode('utf-8')
+                display_events.append({
+                    "image/png": b64,
+                    "text/plain": ["<IPython.core.display.Image object>"]
+                })
+        elif hasattr(obj, "data") and isinstance(obj.data, str):
+            display_events.append({"text/html": [obj.data]})
+        else:
+            print(obj)
 
     global_dict = {
         '__name__': '__main__',
         'plt': plt,
-        'display': display,
+        'display': fake_display,
         'SAVE_AS_HTML': False, # Avoid nested nbconvert subprocess calls!
     }
+    
+    import IPython.display
+    IPython.display.display = fake_display
     
     new_cells = []
     notebook_dir = os.path.dirname(os.path.abspath(notebook_path))
@@ -344,6 +364,8 @@ def execute_and_export(notebook_path, html_path, title_text):
                 # Force SAVE_AS_HTML to False during automated headless execution
                 # to prevent nested/redundant jupyter nbconvert subprocess calls.
                 code = re.sub(r'SAVE_AS_HTML\s*=\s*True', 'SAVE_AS_HTML = False', code)
+                # Prevent plt.show() from destroying the figure in Agg backend before get_fignums captures it
+                code = re.sub(r'plt\.show\(\)', 'pass', code)
                 if not code.strip():
                     cell['outputs'] = []
                     new_cells.append(cell)
@@ -356,6 +378,7 @@ def execute_and_export(notebook_path, html_path, title_text):
                 # Clear active matplotlib figures before executing the cell
                 plt.clf()
                 plt.close('all')
+                display_events.clear()
                 
                 try:
                     with redirect_stdout(stdout_io), redirect_stderr(stderr_io):
@@ -395,6 +418,13 @@ def execute_and_export(notebook_path, html_path, title_text):
                         })
                         plt.close(fig)
                         
+                    for html_content in display_events:
+                        cell_outputs.append({
+                            "output_type": "display_data",
+                            "data": html_content,
+                            "metadata": {}
+                        })
+                        
                 except Exception as e:
                     import traceback
                     tb_lines = traceback.format_exception(type(e), e, e.__traceback__)
@@ -420,7 +450,7 @@ def execute_and_export(notebook_path, html_path, title_text):
             json.dump(nb, f, indent=1)
             
         # Check if the notebook dynamically generated an h5ad_path we should base the HTML output on
-        if 'h5ad_path' in global_dict:
+        if 'cancer_cellxgene_integration' in os.path.basename(notebook_path) and 'h5ad_path' in global_dict:
             resolved_h5ad = global_dict['h5ad_path']
             if not os.path.isabs(resolved_h5ad):
                 resolved_h5ad = os.path.abspath(os.path.join(notebook_dir, resolved_h5ad))
@@ -467,15 +497,6 @@ if __name__ == '__main__':
     pair_analysis_html = os.path.join(os.path.dirname(script_dir), "output", "metab_targetPair_analysis_full_report.html")
     execute_and_export(pair_analysis_nb, pair_analysis_html, "Metabolite-Target Interaction Pair Analysis")
 
-    # cellxgene_nb = os.path.join(script_dir, "cancer_cellxgene_integration.ipynb")
-    # cellxgene_html = os.path.join(os.path.dirname(script_dir), "output", "cancer_cellxgene_integration_full_report.html")
-    # execute_and_export(cellxgene_nb, cellxgene_html, "CellxGene Single-Cell Integration Analysis")
-
-    # Add Druggability Axis Analysis
-    druggability_nb = os.path.join(script_dir, "druggability_axis_analysis.ipynb")
-    # We dynamically read the config to get the correct output path with suffix
-    import sys
-    sys.path.insert(0, script_dir)
-    from druggability_config import OUTPUT_BASENAME
-    druggability_html = os.path.join(os.path.dirname(script_dir), "output", "druggability", f"{OUTPUT_BASENAME}.html")
-    execute_and_export(druggability_nb, druggability_html, "Druggability Axis Analysis")
+    # Only run the core Phase 1 notebooks here.
+    # Advanced phase 3 notebooks (e.g., druggability, visium) should be run separately 
+    # to maintain clear pipeline phases.

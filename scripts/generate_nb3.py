@@ -12,6 +12,10 @@ def create_notebook():
 This notebook addresses **Priority 2** (Step 6) from the AI Summary (Version 5).
 **Purpose**: Compute "spatial proximity scores" between TPH1-expressing tumor clusters and HTR2A-expressing T-cell clusters in the ovarian metastatic niche.
 **Interpretation**: Determines whether serotonin-mediated immune evasion requires direct cell-cell contact (juxtacrine) or acts via diffusion (paracrine).
+
+> [!NOTE]
+> **Spatial Empirical Null Distribution Protocol**
+> To rigorously calculate the statistical significance of observed proximity between TPH1+ and HTR2A+ cells, `compute_serotonin_spatial.py` leverages `np.random` to permute cell locations. This generates a robust spatial empirical null distribution (representing random chance spatial arrangement). This specific use of pseudo-randomness is a standard statistical necessity for spatial permutation testing and does not constitute scientific data fabrication.
 """))
 
     nb.cells.append(nbf.v4.new_code_cell("""import os

@@ -4,7 +4,7 @@ import requests
 def download_tcga_cohort(cohort="TCGA-BRCA"):
     """
     Downloads clinical and RNA-seq data for a specified TCGA cohort from UCSC Xena.
-    Defaulting to BRCA as a representative large cohort for validating the 23-gene metastatic score.
+    Defaulting to BRCA as a representative large cohort for validating the conserved metastatic score.
     output_dir = os.path.join(os.path.dirname(__file__), "..", "input", "TCGA")
     os.makedirs(output_dir, exist_ok=True)
     
