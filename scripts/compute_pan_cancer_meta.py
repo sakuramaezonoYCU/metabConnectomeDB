@@ -11,7 +11,7 @@ OUTPUT_DIR = os.path.join(BASE_DIR, 'output')
 META_RESULTS_DIR = os.path.join(OUTPUT_DIR, 'pan_cancer_meta_results')
 os.makedirs(META_RESULTS_DIR, exist_ok=True)
 
-CANCERS = ['breast', 'colorectal', 'lung', 'melanoma', 'ovarian']
+from pan_cancer_config import CANCERS_TO_RUN as CANCERS
 
 def generate_upset_plot():
     contents = {}
@@ -47,20 +47,55 @@ def generate_upset_plot():
     upset_data = from_contents(contents)
     fig = plt.figure(figsize=(10, 6))
     plot(upset_data, fig=fig, sort_by='degree', sort_categories_by=None)
-    plt.title('Overlap of Up-Regulated Metastatic Metabolic Genes Across 5 Cancers')
+    plt.title(f'Overlap of Up-Regulated Metastatic Metabolic Genes Across {len(CANCERS)} Cancers')
     
     plot_path = os.path.join(META_RESULTS_DIR, f'upset_plot{ANALYSIS_SUFFIX}.png')
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"Saved UpSet plot to {plot_path}")
     
-    # Save the strictly conserved genes to a separate CSV
-    pan_cancer_genes_list = list(pan_cancer_genes)
-    df_pan = pd.DataFrame({'Strictly_Conserved_Gene': pan_cancer_genes_list})
+    # Also check the strict all-cancer combination
+    five_combo_genes = None
+    for c_name in [c.capitalize() for c in CANCERS]:
+        if c_name in contents:
+            genes_set = set(contents[c_name])
+            if five_combo_genes is None:
+                five_combo_genes = genes_set
+            else:
+                five_combo_genes = five_combo_genes.intersection(genes_set)
+                
+    if not five_combo_genes:
+        print(f"Note: There are exactly 0 genes commonly upregulated across all {len(CANCERS)} cancers.")
+        print(f"Applying MAX CANCER - 1 rule: Using the union of {len(CANCERS)-1}-cancer intersections as the primary signature, and saving individual {len(CANCERS)-1}-cancer combinations.")
+        from itertools import combinations
+        combo_genes = set()
+        
+        # Save each combination and aggregate their union
+        for combo in combinations([c.capitalize() for c in CANCERS], len(CANCERS)-1):
+            if all(c in contents for c in combo):
+                c_genes = set(contents[combo[0]])
+                for c in combo[1:]:
+                    c_genes = c_genes.intersection(set(contents[c]))
+                
+                if c_genes:
+                    combo_name = "_".join(combo)
+                    df_combo = pd.DataFrame({'Strictly_Conserved_Gene': list(c_genes)})
+                    combo_csv = os.path.join(META_RESULTS_DIR, f'pan_cancer_signature_{combo_name}{ANALYSIS_SUFFIX}.csv')
+                    df_combo.to_csv(combo_csv, index=False)
+                    print(f"Saved {len(CANCERS)-1}-cancer signature {combo_name} with {len(c_genes)} genes.")
+                    combo_genes.update(c_genes)
+                    
+        final_genes = list(combo_genes)
+        print(f"Saved the union of {len(CANCERS)-1}-cancer combinations ({len(final_genes)} genes) as the primary conserved signature under the MAX CANCER - 1 rule.")
+    else:
+        final_genes = list(five_combo_genes)
+        print(f"Saved strict {len(CANCERS)}-cancer signature ({len(final_genes)} genes) as the primary conserved signature.")
+        
+    df_pan = pd.DataFrame({'Strictly_Conserved_Gene': final_genes})
     pan_csv = os.path.join(META_RESULTS_DIR, f'pan_cancer_conserved_genes{ANALYSIS_SUFFIX}.csv')
     df_pan.to_csv(pan_csv, index=False)
     
-    return pan_cancer_genes_list
+    return final_genes
 
 def generate_network_plot(pan_cancer_genes):
     if not pan_cancer_genes:
