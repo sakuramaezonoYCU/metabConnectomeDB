@@ -102,7 +102,7 @@ def run_validation_phase():
         ),
         (
             "Serotonin Axis Spatial Mapping Notebook",
-            ["scripts/compute_serotonin_spatial.py"],
+            ["scripts/compute_serotonin_htr7_axis.py", "scripts/compute_serotonin_spatial.py"],
             "scripts/generate_serotonin_notebook.py"
         ),
         (

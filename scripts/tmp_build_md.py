@@ -75,91 +75,113 @@ def scrape_notebook_output(html_path, extractors):
             results[k] = f"(Could not find metric for pattern: {pattern[:30]}...)"
     return results
 
-    def ask_gemini_interpretation(markdown_text, phase):
-        """
-        Reads the API key from input/.geminiSecret and queries Gemini for a scientific interpretation of the raw data.
-        """
-        secret_path = os.path.join('input', '.geminiSecret')
-        if not os.path.exists(secret_path):
-            return "\n> [!WARNING]\n> **AI Interpretation Skipped**: `input/.geminiSecret` not found. Please create this file containing your Gemini API key to enable automated AI interpretations.\n"
+cumulative_ai_context = []
+
+def ask_gemini_interpretation(markdown_text, phase):
+    """
+    Reads the API key from input/.geminiSecret and queries Gemini for a scientific interpretation of the raw data.
+    Maintains a cumulative history of past phases for context.
+    """
+    global cumulative_ai_context
+    secret_path = os.path.join('input', '.geminiSecret')
+    if not os.path.exists(secret_path):
+        return "\n> [!WARNING]\n> **AI Interpretation Skipped**: `input/.geminiSecret` not found. Please create this file containing your Gemini API key to enable automated AI interpretations.\n"
+    
+    with open(secret_path, 'r') as f:
+        api_key = f.read().strip()
+    
+    if not api_key or "PASTE_YOUR_GEMINI_API_KEY_HERE" in api_key:
+         return "\n> [!WARNING]\n> **AI Interpretation Skipped**: `input/.geminiSecret` is empty or invalid.\n"
+         
+    try:
+        from google import genai
+        from google.genai import types
+        import time
+        client = genai.Client(api_key=api_key)
         
-        with open(secret_path, 'r') as f:
-            api_key = f.read().strip()
+        # Build cumulative context string
+        context_str = ""
+        if cumulative_ai_context:
+            context_str = "PREVIOUS PHASES CONTEXT & FINDINGS:\n"
+            for past_phase in cumulative_ai_context:
+                context_str += f"--- Phase {past_phase['phase']} ---\n"
+                context_str += f"Raw Data Summary:\n{past_phase['data'][:500]}...\n" # Limit data to avoid context overflow
+                context_str += f"AI Interpretation:\n{past_phase['interpretation']}\n\n"
         
-        if not api_key or "PASTE_YOUR_GEMINI_API_KEY_HERE" in api_key:
-             return "\n> [!WARNING]\n> **AI Interpretation Skipped**: `input/.geminiSecret` is empty or invalid.\n"
-             
-        try:
-            from google import genai
-            from google.genai import types
-            import time
-            client = genai.Client(api_key=api_key)
-            
-            prompt = f"""
-            You are an expert computational biologist analyzing single-cell metabolism and pan-cancer data. 
-            Below is the raw markdown data table output from Phase {phase} of our pipeline.
-            Please provide a highly scientific, data-driven interpretation of these results. 
-            
-            CRITICAL RULES AND SCIENTIFIC INTEGRITY POLICY:
-            1. DO NOT FALSIFY OR MOCK SCIENTIFIC DATA.
-            2. Never guess or fabricate biological mechanisms. If the data is sparse, state that it is sparse.
-            3. Explain findings explicitly referencing the data provided below. Cite real PMIDs where possible.
-            
-            CRITICAL FORMATTING REQUIREMENT:
-            You must structure your response EXACTLY with these three headers:
-            ### 1. NOVEL FINDINGS
-            [Explain findings explicitly referencing the output files listed in the data below. Cite PMIDs where possible to back up biological claims.]
-            
-            ### 2. PROPOSED RESEARCH QUESTIONS
-            [List 2-3 deep biological questions raised by these specific results.]
-            
-            ### 3. SUGGESTED NEXT STEPS
-            [Actionable computational or biological next steps.]
-            
-            Data to interpret:
-            {markdown_text}
-            """
-            
-            attempt = 0
-            max_attempts = 10
-            
-            # Enforce a base delay between API calls across different phases
-            time.sleep(15)
-            
-            while attempt < max_attempts:
-                try:
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=prompt,
-                        config=types.GenerateContentConfig(
-                            safety_settings=[
-                                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                            ]
-                        )
+        prompt = f"""
+        You are an expert computational biologist analyzing single-cell metabolism and pan-cancer data. 
+        Below is the raw markdown data table output from Phase {phase} of our pipeline.
+        Please provide a highly scientific, data-driven interpretation of these results. 
+        
+        {context_str}
+        
+        CRITICAL RULES AND SCIENTIFIC INTEGRITY POLICY:
+        1. DO NOT FALSIFY OR MOCK SCIENTIFIC DATA.
+        2. Never guess or fabricate biological mechanisms. If the data is sparse, state that it is sparse.
+        3. Explain findings explicitly referencing the data provided below. Cite real PMIDs where possible.
+        
+        CRITICAL FORMATTING REQUIREMENT:
+        You must structure your response EXACTLY with these three headers:
+        ### 1. NOVEL FINDINGS
+        [Explain findings explicitly referencing the output files listed in the data below. Cite PMIDs where possible to back up biological claims.]
+        
+        ### 2. PROPOSED RESEARCH QUESTIONS
+        [List 2-3 deep biological questions raised by these specific results.]
+        
+        ### 3. SUGGESTED NEXT STEPS
+        [Actionable computational or biological next steps.]
+        
+        Data to interpret:
+        {markdown_text}
+        """
+        
+        attempt = 0
+        max_attempts = 1
+        
+        # Enforce a base delay between API calls across different phases
+        time.sleep(2)
+        
+        while attempt < max_attempts:
+            try:
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        safety_settings=[
+                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                        ]
                     )
-                    break # Success!
-                except Exception as e:
-                    error_str = str(e)
-                    attempt += 1
-                    if '403' in error_str or '429' in error_str or '503' in error_str or '500' in error_str or '502' in error_str or '504' in error_str:
-                        backoff_time = min(15 * (2 ** (attempt - 1)), 300)
-                        print(f"    [!] Gemini API rate limit/server error ({e}). Retrying in {backoff_time}s (Attempt {attempt}/{max_attempts})...")
-                        time.sleep(backoff_time)
-                    else:
-                        print(f"    [!] Gemini API Error ({e}). Retrying in 30s (Attempt {attempt}/{max_attempts})...")
-                        time.sleep(30)
-            
-            if attempt == max_attempts:
-                return f"\n> [!WARNING]\n> **AI Interpretation Failed**: Reached max attempts ({max_attempts}) due to API errors.\n"
-            
-            # Prefix every line with '> ' to keep it nicely encapsulated in a markdown alert block
-            formatted_text = "> " + response.text.replace('\n', '\n> ')
-            return f"\n> [!NOTE]\n> **Data-Driven AI Interpretation**\n{formatted_text}\n"
-            
-        except ImportError:
+                )
+                break # Success!
+            except Exception as e:
+                error_str = str(e)
+                attempt += 1
+                if '403' in error_str or '429' in error_str or '503' in error_str or '500' in error_str or '502' in error_str or '504' in error_str:
+                    backoff_time = min(15 * (2 ** (attempt - 1)), 300)
+                    print(f"    [!] Gemini API rate limit/server error ({e}). Retrying in {backoff_time}s (Attempt {attempt}/{max_attempts})...")
+                    time.sleep(backoff_time)
+                else:
+                    print(f"    [!] Gemini API Error ({e}). Retrying in 30s (Attempt {attempt}/{max_attempts})...")
+                    time.sleep(30)
+        
+        if attempt == max_attempts:
+            return f"\n> [!WARNING]\n> **AI Interpretation Failed**: Reached max attempts ({max_attempts}) due to API errors.\n"
+        
+        # Save context for future phases
+        cumulative_ai_context.append({
+            'phase': phase,
+            'data': markdown_text,
+            'interpretation': response.text
+        })
+        
+        # Prefix every line with '> ' to keep it nicely encapsulated in a markdown alert block
+        formatted_text = "> " + response.text.replace('\n', '\n> ')
+        return f"\n> [!NOTE]\n> **Data-Driven AI Interpretation**\n{formatted_text}\n"
+        
+    except ImportError:
         return "\n> [!WARNING]\n> **AI Interpretation Skipped**: `google-genai` library not installed. Please run `pip install google-genai`.\n"
     except Exception as e:
         return f"\n> [!WARNING]\n> **AI Interpretation Failed**: Error calling Gemini API: {e}\n"
@@ -388,10 +410,15 @@ def build_phase_4():
                 df_sig = pd.read_csv(sig_path)
                 
                 # IMPORTANT: Strict adherence to data columns (Fixing the Target -> Gene bug)
-                if 'Gene' not in df_sig.columns and 'Target' not in df_sig.columns:
-                    raise KeyError(f"CRITICAL ERROR: Expected 'Gene' or 'Target' column missing from {sig_file}. Halting to prevent data falsification.")
+                if 'Gene' not in df_sig.columns and 'Target' not in df_sig.columns and 'Strictly_Conserved_Gene' not in df_sig.columns:
+                    raise KeyError(f"CRITICAL ERROR: Expected 'Gene', 'Target', or 'Strictly_Conserved_Gene' column missing from {sig_file}. Halting to prevent data falsification.")
                     
-                gene_col = 'Gene' if 'Gene' in df_sig.columns else 'Target'
+                if 'Gene' in df_sig.columns:
+                    gene_col = 'Gene'
+                elif 'Strictly_Conserved_Gene' in df_sig.columns:
+                    gene_col = 'Strictly_Conserved_Gene'
+                else:
+                    gene_col = 'Target'
                 
                 cancers_in_sig = sig_file.replace('pan_cancer_signature_', '').replace(f'{ANALYSIS_SUFFIX}.csv', '').split('_')
                 num_genes = len(df_sig)

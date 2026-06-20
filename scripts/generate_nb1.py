@@ -121,8 +121,12 @@ if os.path.exists(ccc_file):
 **Purpose**: Validate the Conserved Metastatic Metabolic Score on TCGA primary tumor data against distant metastasis-free survival.
 """))
 
-    nb.cells.append(nbf.v4.new_code_cell("""from validate_tcga_signature import validate_tcga_signature
-validate_tcga_signature()
+    nb.cells.append(nbf.v4.new_code_cell("""from pan_cancer_config import ANALYSIS_SUFFIX
+from validate_tcga_signature import validate_tcga_signature
+
+META_RESULTS_DIR = os.path.join("..", "output", "pan_cancer_meta_results")
+strict_sig = os.path.join(META_RESULTS_DIR, f"pan_cancer_conserved_genes{ANALYSIS_SUFFIX}.csv")
+validate_tcga_signature(strict_sig)
 """))
 
     nb.cells.append(nbf.v4.new_markdown_cell("""### Step 5.1: Empirical Validation (Permutation Test)
@@ -131,7 +135,7 @@ validate_tcga_signature()
 
     nb.cells.append(nbf.v4.new_code_cell("""from compute_permutation_null import compute_permutation_null
 # Compute the null distribution (this reads the TCGA file and iterates Cox models)
-compute_permutation_null(n_permutations=100)
+compute_permutation_null(signature_csv=strict_sig, n_permutations=100)
 """))
 
     nb.cells.append(nbf.v4.new_code_cell("""import matplotlib.pyplot as plt

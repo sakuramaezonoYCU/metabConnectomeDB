@@ -13,7 +13,7 @@ except ImportError:
     print("Please install lifelines (pip install lifelines) to run the permutation test.")
     exit(1)
 
-def compute_permutation_null(n_permutations=100, signature_size=23):
+def compute_permutation_null(signature_csv, n_permutations=100):
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     dir_input = os.path.join(BASE_DIR, "input", "TCGA")
     out_dir = os.path.join(BASE_DIR, "output", f"deepdive_conserved_metabGeneSig{ANALYSIS_SUFFIX}", "tcga_validation")
@@ -21,8 +21,16 @@ def compute_permutation_null(n_permutations=100, signature_size=23):
     
     cancer_codes = ["BRCA", "COAD", "READ", "LUAD", "LUSC", "SKCM", "OV"]
     
+    # Determine signature size
+    if not os.path.exists(signature_csv):
+        print(f"Missing {signature_csv}. Cannot determine signature size.")
+        return
+    
+    sig_df = pd.read_csv(signature_csv)
+    signature_size = len(sig_df)
+    print(f"Dynamically determined signature size: {signature_size} from {signature_csv}")
+    
     # 1. We need the list of all available genes to sample from.
-    # We can just read the first column of the BRCA expression file.
     brca_exp = os.path.join(dir_input, "TCGA-BRCA.star_fpkm.tsv.gz")
     if not os.path.exists(brca_exp):
         print(f"Missing {brca_exp}. Cannot determine gene universe.")
@@ -135,4 +143,8 @@ def compute_permutation_null(n_permutations=100, signature_size=23):
         print("No null distribution metrics were calculated.")
 
 if __name__ == "__main__":
-    compute_permutation_null()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--signature_csv', required=True, help="Path to signature CSV")
+    args = parser.parse_args()
+    compute_permutation_null(args.signature_csv)
