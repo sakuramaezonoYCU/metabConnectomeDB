@@ -3,6 +3,7 @@
 This repository processes and merges multiple metabolite and protein databases (such as HMDB, CellPhoneDBv5, MEBOCOST, MetaLigand, MRCLinkDB, scCellFie, NeuronChat, and Cellinker2) to generate consolidated, unified human and mouse datasets called metabConnectomeDB.
 
 Beyond data consolidation, this repository contains a comprehensive suite of computational pipelines and analytical notebooks for multi-omics cancer research. Key capabilities include:
+
 - **Pan-Cancer Meta-Analysis:** Cross-cancer identification of conserved metabolic gene signatures (e.g., the 21-gene Directed Metastatic Signature and the 12-gene STAT3 Core Axis) using large-scale single-cell RNA-seq integration (CellxGene).
 - **Prognostic and Predictive Modeling:** Machine learning classifiers (Random Forest, Cox Proportional Hazards, MLP Neural Networks) trained on clinical cohorts (e.g., METABRIC, TCGA) to evaluate the prognostic power of metabolic signatures.
 - **Spatial Transcriptomics & Metabolomics Integration:** Validation of metabolic interactions (like the Serotonin-TAM immune evasion axis) using physical mass-spectrometry metabolomics and high-resolution spatial transcriptomics (Visium).
@@ -20,12 +21,17 @@ metabConnectomeDB/
 │   ├── execute_and_export_notebooks.py # Exports notebooks to styled HTML reports
 │   ├── run_cancer_pipeline.py          # Executes full single-cancer pipeline
 │   ├── run_all_cancers.py              # Queries CellxGene Census and runs multi-cancer pipeline
+│   ├── run_validation_phase.py         # Automates downstream signature validations
+│   ├── massspec_metabolomics_analysis.py # Verifies signatures via mass-spectrometry
+│   ├── validate_tcga_signature.py      # TCGA Cox Proportional Hazard regressions
+│   ├── verify_spatial.py               # Visium spatial enrichment scoring
+│   ├── generate_predictive_notebook.py # Pre-metastatic subclone scoring
+│   ├── execute_pancancer_notebooks.py  # Downstream HTML report compiler
 │   ├── generate_final_outputs.py
 │   ├── merge_simplify_annotate.sh
 │   ├── parse_md_tables.py              # Utility to extract Markdown tables
 │   ├── standardize_categories.py       # Standardizes metabolite classifications
 │   ├── query_advanced_analysis.py      # Queries external APIs for gene interactions/druggability
-│   ├── druggability_config.py          # Centralized configuration for API URLs and constants
 │   ├── cancer_cellxgene_integration.ipynb         # CellxGene cancer scRNA-seq integration
 │   ├── metab_targetPair_analysis.ipynb            # Metabolite-Target pair analysis
 │   ├── orphan_metabolic_immune_evasion.ipynb      # Orphan metabolite immune evasion mapping
@@ -36,6 +42,12 @@ metabConnectomeDB/
 │   ├── subclass_mapping.csv            # Mapping dictionary for metabolite subclasses
 │   └── superclass_mapping.csv          # Mapping dictionary for metabolite superclasses
 ├── output/                             # Consolidated output CSV files and HTML reports
+│   ├── AI_summary_and_insights.md      # Comprehensive pipeline insights and next steps
+│   ├── *_database_merge_unique_metab*.csv  # Final merged, target-paired, and HMDB-annotated datasets for human and mouse
+│   ├── *_database_merge_metab_statistics.txt # Summary metrics and dataset distributions
+│   ├── [cancer]_results/               # Cancer-specific DE results, CellxGene integration, and orphan candidates
+│   ├── pan_cancer_meta_results/        # Pan-cancer intersection results, signatures, networks, and UpSet plots
+│   └── master_regulator_results/       # TF enrichment results and barplots for master regulator analysis
 ├── environment.yml                     # Conda environment definition
 ├── requirements.txt                    # Pip requirements definition
 └── README.md                           # This documentation
@@ -78,25 +90,64 @@ conda activate metabconnectome
 python -m ipykernel install --user --name metabConnectomeDB --display-name "Python 3.12 (metabConnectomeDB)"
 ```
 
-## ⏳ Pipeline Scripts & Execution Frequency
+## ⏳ Pipeline Execution Architecture & Phases
 
-To help manage your workflow, scripts are divided into **One-Time/Cached** (infrequently run) and **Recurring** (frequently run) categories.
+To guarantee 100% reproducible execution, the pipeline is strictly divided into logical phases.
 
-**One-Time / Cached Setup Scripts (Infrequent Execution):**
+**Phase 0: Core Metabolite Database Curation (Infrequent Execution)**
+This phase curates the generic databases (KEGG, HMDB, CellChat) from `input/databases/`. Re-run only when your raw input datasets change or when you tweak the database merging logic.
+- `merge_simplify_annotate.sh`: The master execution wrapper that sequentially runs the data processing steps below.
+- `fetch_kegg_pathways.py`: Dynamically pulls pathway gene sets from the KEGG REST API based on `pipeline.config.json` specifications.
+- `merge_dbs_claude.py`: Ingests, normalizes, and merges raw `.csv`/`.txt` data.
+- `generate_final_outputs.py`: Filters invalid records and pairs metabolites with targets.
+- `annotate_with_hmdb.py`: Enriches datasets using the `HMDB_metabolites` reference.
+- `annotate_with_databases.py`: Final consolidation step utilizing cached Rhea enrichments.
 
-- `annotate_enzyme_rhea.py`: Handles UniProt API lookups and Rhea SPARQL queries for enzyme product/substrate enrichment. Because it relies heavily on external APIs, it incrementally saves results to local JSON caches in the `input/` directory. Once the caches are built, this script finishes in seconds. You only need to manually delete the caches and re-run this completely if a massive new batch of target genes is introduced or if UniProt/Rhea data drastically updates.
+**Phase 1: Database Exploration and Reporting**
+- `execute_and_export_notebooks.py`: Provides a general exploratory report of the fully integrated Phase 0 database.
 
-**Recurring Pipeline Scripts (Frequent Execution):**
-These scripts should be re-run whenever your raw input datasets change or when you tweak the database merging logic.
+**Phase 2: Single-Cell Transcriptome Integration (Per-Cancer)**
+- `run_all_cancers.py`: Queries CellxGene Census online database dynamically to identify the top metastatic sites and runs parallelized single-cancer pipelines.
+- `run_cancer_pipeline.py`: Executes the complete single-cancer pipeline (DE, LIANA+, Immune Evasion) for specified cancers, executing notebooks and saving reports into `output/[cancer]_results/`.
 
-- `merge_simplify_annotate.sh`: The master execution wrapper that sequentially runs the data processing steps.
-- `merge_dbs_claude.py`: Re-run whenever raw `.csv`/`.txt` data in `input/databases/` is added or modified.
-- `generate_final_outputs.py`: Re-run whenever the dataset filtering logic changes.
-- `annotate_with_hmdb.py`: Re-run if you update the `HMDB_metabolites` reference dictionary.
-- `annotate_with_databases.py`: The final consolidation step. It rapidly triggers the Rhea enrichment (using the caches) and merges `OtherDB`, `Reactions`, `Rhea`, and `Guide to Pharmacology` into the final master CSV outputs. Re-run this whenever any upstream pipeline script changes the dataset.
-- `run_cancer_pipeline.py`: Runs the complete single-cancer pipeline for specified disease filters, executing notebooks and saving reports.
-- `run_all_cancers.py`: Queries CellxGene Census to identify top metastatic sites and runs the entire automated pipeline for all configured cancers.
-- `execute_and_export_notebooks.py`: Run at the very end of your workflow to automatically execute the Jupyter notebooks and export the updated `.html` reports to the `output/` folder.
+**Phase 3: Meta-Analysis & Cross-Cancer Intersections**
+- `extract_dataset_metrics.py`: Extracts cell counts across microenvironments.
+- `count_met_cells.py`: Identifies uniquely targeted orphaned metabolites.
+- `compute_pan_cancer_meta.py`: Computes the target intersection across multiple cancers to identify highly conserved combinations.
+- `generate_ai_summary_tables.py`: Generates the consolidated summary CSV files.
+
+**Phase 4: Pan-Cancer Notebook Compilation**
+- `generate_combined_pan_cancer_notebook.py`: Auto-generates the `pan_cancer_meta_analysis.ipynb` master notebook.
+- `execute_and_export_notebooks.py` (or manual execution): Runs the notebook to visualize the network graph and output standard plots.
+
+**Phase 5: Dynamic Gene Signature Validation (Frequent Execution)**
+This phase is orchestrator-led and validates all dynamically identified (N-1)-cancer combinations generated in Phase 4.
+- `run_validation_phase.py`: The master execution script that automatically identifies all output combination signatures and routes them through the following tests:
+  - `massspec_metabolomics_analysis.py`: Verifies signature genes using mass-spectrometry clinical cohorts.
+  - `validate_tcga_signature.py`: Runs Cox Proportional Hazard regressions on TCGA survival datasets.
+  - `verify_spatial.py`: Applies spatial enrichment scoring and calculates Moran's I on high-resolution Visium slides.
+  - `generate_predictive_notebook.py`: Scores primary tumor cells directly to identify left/right skewed pre-metastatic subclones.
+  - `generate_ml_prognostic_classifier_notebook.py`: Generates the Per-Cancer and Pan-Cancer ML Prognostic Classifier notebooks.
+  - `create_camp_notebook.py`: Generates the CAMP Pan-Cancer metabolomics integration notebook.
+  - `generate_master_regulator_notebook.py`: Generates the Master Regulator TF analysis notebook.
+
+**Phase 6: Advanced Downstream Validation & HTML Export**
+- `execute_pancancer_notebooks.py`: The master driver for the downstream notebook compilation. Executes the following into final HTML reports required by the AI generation phase:
+  - Pan-Cancer Meta Analysis
+  - Predictive Signature Biomarker
+  - Druggability Axis Analysis
+  - Visium Spatial Validation
+  - Deep-Dive Conserved Metab Gene Sig
+  - Serotonin Axis Spatial Mapping
+  - Ovarian Serotonin Immune Evasion
+  - Oxygen Tension Analysis
+  - MITF Regulon Expansion
+  - Per-Cancer and Pan-Cancer ML Prognostic Classifiers
+  - CAMP Pan-Cancer Integration
+  - Master Regulator Analysis
+  
+**Phase 7: AI Reporting**
+- `tmp_build_md.py`: Scrapes the results of Phases 1 through 6 and leverages the Gemini API to produce the final `AI_summary_and_insights.md` pipeline document.
 
 ## 📜 Detailed Scripts Overview
 
@@ -108,6 +159,12 @@ The following details the relationship between scripts, their inputs, internal p
 - **Input:** None (it executes python scripts).
 - **Parameters:** None.
 - **Output:** Triggers the pipeline to generate all final merged and annotated CSVs.
+
+### `fetch_kegg_pathways.py`
+
+- **Role:** Dynamically pulls core metabolic pathway gene sets (e.g. Glycolysis, OXPHOS, HIF-1) directly from the KEGG REST API to ensure 100% programmatic provenance and prevent hardcoding.
+- **Input:** `input/pipeline.config.json` (specifically the `KEGG_PATHWAYS` block).
+- **Output:** `input/kegg_{id}_{name}.json` files containing lists of corresponding HGNC gene symbols.
 
 ### `merge_dbs_claude.py`
 
@@ -219,25 +276,82 @@ The following details the relationship between scripts, their inputs, internal p
 - **Parameters:** `CELLXGENE_CAP` (set via environment variable, defaults to `100000` cells to ensure robust statistical power).
 - **Output:** Fully automated, end-to-end downstream results and HTML reports for all major cancers (Breast, Colorectal, Melanoma, Lung, Ovarian).
 
+### `extract_dataset_metrics.py`
+
+- **Role:** Extracts exactly how many cells were evaluated for the TME and Malignant compartments across primary and metastatic sites.
+- **Input:** Single-Cell `.h5ad` objects.
+- **Output:** `output/pan_cancer_meta_results/cell_type_counts_{suffix}.csv`
+
+### `count_met_cells.py`
+
+- **Role:** Identifies the total and unique metabolic target candidates implicated in cell-cell communication (CCC) potential across different tissue microenvironments.
+- **Output:** Saves results indicating the spread of immune evasion orphan targets.
+
+### `generate_ai_summary_tables.py`
+
+- **Role:** Aggregates all the extracted outputs into formatted CSVs in `output/ai_summary_tables/` for the final AI insights generation.
+- **Input:** Upstream results from differential expression and orphan receptor mapping.
+- **Output:** `output/ai_summary_tables/*_summary.csv`
+
+### `tmp_build_md.py`
+
+- **Role:** Scrapes the exact numbers directly from the generated HTML reports to dynamically build the `AI_summary_and_insights.md`.
+- **Output:** The final `output/AI_summary_and_insights.md` guaranteeing zero hallucinated metrics.
+
 ### `pan_cancer_meta_analysis.ipynb` & Generators
 
-- **Role:** The capstone multi-cancer meta-analysis. Computes the mathematical intersection of DE results across all 5 cancers to derive a strictly conserved metastatic metabolic signature. Includes Network visualizations, druggability scoring, and predictive biomarker scoring from primary datasets.
+- **Role:** The capstone multi-cancer meta-analysis. Computes the mathematical intersection of DE results across all N configured cancers to derive a strictly conserved metastatic metabolic signature. Includes Network visualizations, druggability scoring, and predictive biomarker scoring from primary datasets.
 - **Key Scripts (Run in this exact order if you change cell counts or parameters in `pan_cancer_config.py`):**
-  1. `run_all_cancers.py`: Re-runs the base pipeline for all 5 cancers (generates individual cancer DE results).
-  2. `compute_pan_cancer_meta.py`: Aggregates the 5 single-cancer DE results to generate the strictly conserved gene list, UpSet plot, and network edges.
-  3. `generate_predictive_notebook_all5.py`: Computes the "Metastatic Metabolic Score" across primary vs. metastatic single cells for all 5 cancers, outputting CSVs and PNGs.
+  1. `run_all_cancers.py`: Re-runs the base pipeline for all configured cancers (generates individual cancer DE results).
+  2. `compute_pan_cancer_meta.py`: Intersects the differentially expressed targets across the cancers, outputting `pan_cancer_signature_XXX.csv` combinations using the dynamic >3 intersection algorithm.
+  3. `generate_predictive_notebook_all5.py`: Scores the primary tumor cells of each cancer against their **OWN specific** metastatic signature to identify highly metastatic ("Right-Skewed") subclones present before dissemination.
   4. `generate_combined_pan_cancer_notebook.py`: Auto-generates the final `pan_cancer_meta_analysis.ipynb` notebook logic.
-  5. Finally, execute `pan_cancer_meta_analysis.ipynb` top-to-bottom (or use `execute_and_export_notebooks.py`) to render the final HTML report.
-- **Output:** Master 5-cancer meta-analysis notebook detailing the conserved genes, network graph, druggability analysis, and predictive scores, alongside all underlying CSV data files in `output/pan_cancer_meta_results/`.
+  5. Finally, execute `pan_cancer_meta_analysis.ipynb` top-to-bottom to render the final HTML report.
+- **Output:** Master pan-cancer meta-analysis notebook detailing the conserved genes, network graph, druggability analysis, and predictive scores, alongside all underlying CSV data files in `output/pan_cancer_meta_results/`.
 
 ### `query_advanced_analysis.py`
 
 - **Role:** A utility module used by downstream notebooks to query external databases for advanced target analysis. It enforces strict data integrity by immediately raising `RuntimeError` exceptions rather than returning empty placeholders if an API call to STRING or Open Targets fails.
 - **Input:** Takes lists of target gene symbols (e.g., `["STAT3", "HTR7"]`) as arguments to its internal functions (`query_string_ppi`, `query_tractability`).
-- **Parameters:** Relies on `druggability_config.py` for API URLs (e.g., `OPENTARGETS_API_URL`).
 - **Output:** Returns Pandas DataFrames containing physical interaction scores (from STRING) and tractability assessments (Small Molecule / Antibody druggability from Open Targets).
 
-### `druggability_config.py`
+### `run_validation_phase.py`
+
+- **Role:** Automates the signature validation pipeline (Phase 5/6) across discovered pan-cancer signatures.
+- **Input:** Identifies all `pan_cancer_conserved_genes*.csv` and `pan_cancer_signature_*.csv` files within `output/pan_cancer_meta_results/`.
+- **Output:** Sequentially routes the signatures to MassSpec, TCGA, and Spatial validation scripts, and subsequently triggers predictive biomarker notebook generation.
+
+### `massspec_metabolomics_analysis.py` & `massspec_cross_cohort_comparison.py`
+
+- **Role:** Validates identified signature genes using mass-spectrometry clinical cohorts and performs cross-cohort comparisons.
+- **Input:** `--signature_csv` for analysis, `--signature-name` for cross-cohort comparison.
+- **Output:** Intermediate analysis results in `output/pan_cancer_meta_results/` and generation of the final `massspec_metabolomics_integration_*.ipynb` via `generate_massspec_metabolomics_notebook.py`.
+
+### `validate_tcga_signature.py`
+
+- **Role:** Evaluates signature prognostic power by running Cox Proportional Hazard regressions on TCGA survival datasets.
+- **Input:** `--signature_csv` (path to a signature file).
+- **Output:** TCGA validation metrics and regression summaries.
+
+### `verify_spatial.py`
+
+- **Role:** Applies spatial enrichment scoring and calculates Moran's I on high-resolution Visium slides to validate signatures.
+- **Input:** `--signature_csv` (path to a signature file).
+- **Output:** Spatial validation metrics mapping intra-tumor heterogeneity.
+
+### `generate_predictive_notebook.py`
+
+- **Role:** Dynamically builds a notebook to score primary tumor cells against their specific metastatic signature, finding pre-metastatic subclones.
+- **Input:** Automatically detects signatures.
+- **Output:** Generates `predictive_signature_biomarker.ipynb`.
+
+### `execute_pancancer_notebooks.py`
+
+- **Role:** Downstream master script that builds all final HTML reports from the spatial, pan-cancer, and druggability notebooks.
+- **Input:** None (runs based on outputs present in the environment).
+- **Output:** Generates the final styled HTML reports for AI ingestion.
+
+### `pan_cancer_config.py`
 
 - **Role:** Centralized configuration script to maintain data provenance and prevent hardcoding constants or API endpoints in analysis scripts.
 - **Input:** None.
@@ -249,12 +363,11 @@ The following details the relationship between scripts, their inputs, internal p
 Several targeted Jupyter notebooks dive deep into specific biological questions raised by the pan-cancer analysis:
 
 - **`druggability_axis_analysis.ipynb`**: Investigates the clinical actionability of the highly conserved glutamine-sphingolipid-ketone body axis.
-- **`oxygen_tension_analysis.ipynb`**: Correlates the magnitude of metabolic shifts against the physical oxygen tension of varying metastatic niches (e.g., hypoxic pleural effusions vs. oxygenated brain).
-- **`nr1d2_master_regulator_analysis.ipynb`**: Explores whether the universally upregulated gene NR1D2 acts as the master transcriptional switch for the pan-cancer metastatic signature using ChEA/ENCODE enrichment.
-- **`ovarian_serotonin_immune_evasion.ipynb`**: Specifically investigates the role of up-regulated tumor-derived serotonin receptors in the suppression of local T-cells within the ovarian peritoneal metastatic niche.
+- **`master_regulator_analysis.ipynb`**: Explores whether dynamically discovered upregulated genes act as the master transcriptional switch for the pan-cancer metastatic signature using ChEA/ENCODE enrichment.
 - **`deepdive_conserved_metabGeneSig.ipynb`**: Deep dive into the conserved pan-cancer metabolic gene signature, integrating STAT3 targets, directional cell-cell communication, and validating signatures in TCGA survival cohorts using permutation null distributions.
 - **`mitf_regulon_expansion.ipynb`**: Investigates the expansion of the MITF regulon and its downstream metabolic targets.
 - **`predictive_signature_biomarker.ipynb`**: Explores the pan-cancer predictive capability of the strictly conserved metabolic gene signature.
+- **`oxygen_tension_analysis.ipynb`**: Computationally simulates and models the impact of intratumoral oxygen gradients (e.g., via HIF-1 pathway profiling) on metabolic signatures.
 - **`serotonin_axis_spatial_mapping.ipynb`**: Maps the spatial distribution of the serotonin axis within specific tissue microenvironments.
 - **`visium_spatial_validation.ipynb`**: Validates the spatial axis involving HTR7+ tumor-associated macrophages (TAMs) and HR-repair genes using Visium spatial transcriptomics via spatial co-localization analysis.
 - **`camp_pancancer_integration_*.ipynb`**: Investigates pan-cancer integration for Directed Metastatic Signatures.
@@ -278,3 +391,11 @@ The repository is configured to exclude large data directories:
 - `venv/`, `__pycache__/`, `.ipynb_checkpoints/`: Local environment artifacts.
 
 Ensure that the `input/` directory is populated locally before running the pipeline.
+
+## 📝 Recent Changelog
+
+**[2026-06-20] Dynamic Pan-Cancer Unhardcoding Patch**
+- **Issue:** The AI agents had carelessly hardcoded `CANCERS = ['breast', 'colorectal', 'lung', 'melanoma', 'ovarian']` directly into multiple python scripts, which bypassed the unified `pan_cancer_config.py` and completely ignored the 6th cancer (`kidney`) present in `pipeline.config.json`.
+- **Fix:** Stripped all hardcoded arrays. `compute_pan_cancer_meta.py`, `generate_pan_cancer_notebook.py`, and `tmp_build_md.py` now explicitly import `CANCERS_TO_RUN` from `pan_cancer_config.py`.
+- **Methodology Preservation:** If the N-cancer strict intersection yields 0 conserved genes, the pipeline now dynamically falls back to the (N-1)-cancer combinations to derive the signature, avoiding data falsification while preserving analytical viability.
+- **Documentation:** Updated all `README.md` and `pipeline_execution_checklist.md` references from "5-cancer" and "4-cancer" to the algebraic "N-cancer" and "(N-1)-cancer" to reflect the dynamically scalable architecture.
