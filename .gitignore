@@ -7,3 +7,8 @@ __pycache__/
 .ipynb_checkpoints/
 test_*.py
 fix_*.py
+pipeline.config.json
+
+input/pipeline.config.json
+.geminiSecret
+input/.geminiSecret

@@ -1,17 +1,40 @@
+# Core Data & ML
 pandas
 numpy
-matplotlib
-seaborn
-ipykernel
+scipy
+scikit-learn
+statsmodels
+joblib
+
+# Single-Cell & Spatial
 scanpy
+squidpy
 anndata
 cellxgene-census
 liana
-ipywidgets
+
+# Plotting & Visualization
+matplotlib
+seaborn
 plotly
+upsetplot
+networkx
+
+# Jupyter & Notebooks
+ipykernel
+ipython
+ipywidgets
+nbformat
+nbconvert
+
+# Web & APIs
+requests
+urllib3
+beautifulsoup4
 
 # ML Prognostic Classifier Requirements
 scikit-survival
 lifelines
-scikit-learn
-requests
+
+# Utilities
+tqdm

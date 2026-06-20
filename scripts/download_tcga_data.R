@@ -17,10 +17,10 @@ library(UCSCXenaTools)
 dir_input <- "input/TCGA"
 dir.create(dir_input, recursive = TRUE, showWarnings = FALSE)
 
-# We only need the 5 cancer types currently analyzed in this project:
-# Breast (BRCA), Colorectal (COAD, READ), Lung (LUAD, LUSC), Melanoma (SKCM), Ovarian (OV)
+# We only need the 6 cancer types currently analyzed in this project:
+# Breast (BRCA), Colorectal (COAD, READ), Lung (LUAD, LUSC), Melanoma (SKCM), Ovarian (OV), Kidney (KIRC, KIRP, KICH)
 tcga_cancer_codes <- c(
-  "BRCA", "COAD", "READ", "LUAD", "LUSC", "SKCM", "OV"
+  "BRCA", "COAD", "READ", "LUAD", "LUSC", "SKCM", "OV", "KIRC", "KIRP", "KICH"
 )
 
 #### Step 1: Download TCGA data (gene exp matrix, metadata, survival data) ####
@@ -28,6 +28,15 @@ tcga_cancer_codes <- c(
 downloadTCGARaw <- function(cancer) {
   message("--------------------------------------------------")
   message("Processing TCGA-", cancer, "...")
+  
+  exp_dest <- file.path(dir_input, paste0("TCGA-", cancer, ".star_fpkm.tsv.gz"))
+  surv_dest <- file.path(dir_input, paste0("TCGA-", cancer, ".survival.tsv.gz"))
+  
+  if (file.exists(exp_dest) && file.exists(surv_dest)) {
+    message("Both FPKM and Survival datasets already exist for ", cancer, ". Skipping download.")
+    return(invisible(NULL))
+  }
+  
   df_todo_cancer <- UCSCXenaTools::XenaGenerate(subset = XenaHostNames %in% c("tcgaHub", "gdcHub")) |>
     UCSCXenaTools::XenaFilter(filterDatasets = cancer) 
   
@@ -43,31 +52,39 @@ downloadTCGARaw <- function(cancer) {
     return(FALSE)
   }
   
-  if (has_datasets(exp_query)) {
-    message("Downloading FPKM expression data for ", cancer)
-    UCSCXenaTools::XenaQuery(exp_query) |> 
-      UCSCXenaTools::XenaDownload(destdir = dir_input, force = FALSE)
+  if (!file.exists(exp_dest)) {
+    if (has_datasets(exp_query)) {
+      message("Downloading FPKM expression data for ", cancer)
+      UCSCXenaTools::XenaQuery(exp_query) |> 
+        UCSCXenaTools::XenaDownload(destdir = dir_input, force = FALSE)
+    } else {
+      message("WARNING: FPKM dataset not found for ", cancer)
+    }
   } else {
-    message("WARNING: FPKM dataset not found for ", cancer)
+      message("FPKM dataset already exists for ", cancer, ". Skipping.")
   }
   
   # 2. Download Survival Data
-  surv_filter1 <- paste0("TCGA-", cancer, ".survival.tsv")
-  surv_filter2 <- paste0("survival/", cancer, "_survival.txt")
-  
-  surv_query1 <- df_todo_cancer |> UCSCXenaTools::XenaFilter(filterDatasets = surv_filter1)
-  surv_query2 <- df_todo_cancer |> UCSCXenaTools::XenaFilter(filterDatasets = surv_filter2)
-  
-  if (has_datasets(surv_query1)) {
-    message("Downloading Survival data (GDC format) for ", cancer)
-    UCSCXenaTools::XenaQuery(surv_query1) |> 
-      UCSCXenaTools::XenaDownload(destdir = dir_input, force = FALSE)
-  } else if (has_datasets(surv_query2)) {
-    message("Downloading Survival data (TCGA Hub format) for ", cancer)
-    UCSCXenaTools::XenaQuery(surv_query2) |> 
-      UCSCXenaTools::XenaDownload(destdir = dir_input, force = FALSE)
+  if (!file.exists(surv_dest)) {
+    surv_filter1 <- paste0("TCGA-", cancer, ".survival.tsv")
+    surv_filter2 <- paste0("survival/", cancer, "_survival.txt")
+    
+    surv_query1 <- df_todo_cancer |> UCSCXenaTools::XenaFilter(filterDatasets = surv_filter1)
+    surv_query2 <- df_todo_cancer |> UCSCXenaTools::XenaFilter(filterDatasets = surv_filter2)
+    
+    if (has_datasets(surv_query1)) {
+      message("Downloading Survival data (GDC format) for ", cancer)
+      UCSCXenaTools::XenaQuery(surv_query1) |> 
+        UCSCXenaTools::XenaDownload(destdir = dir_input, force = FALSE)
+    } else if (has_datasets(surv_query2)) {
+      message("Downloading Survival data (TCGA Hub format) for ", cancer)
+      UCSCXenaTools::XenaQuery(surv_query2) |> 
+        UCSCXenaTools::XenaDownload(destdir = dir_input, force = FALSE)
+    } else {
+      message("WARNING: Survival dataset not found for ", cancer)
+    }
   } else {
-    message("WARNING: Survival dataset not found for ", cancer)
+      message("Survival dataset already exists for ", cancer, ". Skipping.")
   }
 }
 
