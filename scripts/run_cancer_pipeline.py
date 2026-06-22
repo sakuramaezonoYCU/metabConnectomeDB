@@ -464,7 +464,13 @@ except Exception:
         original_ipython_display = IPython.display.display
         IPython.display.display = global_dict['display']
         
-        for idx, cell in enumerate(nb.get('cells', [])):
+        try:
+            from tqdm import tqdm
+            cell_iterator = tqdm(enumerate(nb.get('cells', [])), total=len(nb.get('cells', [])), desc=f"Executing {os.path.basename(notebook_path)}", leave=False)
+        except ImportError:
+            cell_iterator = enumerate(nb.get('cells', []))
+            
+        for idx, cell in cell_iterator:
             if cell.get('cell_type') == 'code':
                 source_lines = cell.get('source', [])
                 
