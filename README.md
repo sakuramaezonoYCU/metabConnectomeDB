@@ -399,3 +399,7 @@ Ensure that the `input/` directory is populated locally before running the pipel
 - **Fix:** Stripped all hardcoded arrays. `compute_pan_cancer_meta.py`, `generate_pan_cancer_notebook.py`, and `tmp_build_md.py` now explicitly import `CANCERS_TO_RUN` from `pan_cancer_config.py`.
 - **Methodology Preservation:** If the N-cancer strict intersection yields 0 conserved genes, the pipeline now dynamically falls back to the (N-1)-cancer combinations to derive the signature, avoiding data falsification while preserving analytical viability.
 - **Documentation:** Updated all `README.md` and `pipeline_execution_checklist.md` references from "5-cancer" and "4-cancer" to the algebraic "N-cancer" and "(N-1)-cancer" to reflect the dynamically scalable architecture.
+
+**[2026-06-22] Dynamic KEGG Pathways & Plot Aesthetics Patch**
+- **Issue:** Pathway gene lists for immune-metabolic targets (including TCA/Fumarate) were hardcoded in notebooks, causing missing data mappings. `run_all_cancers.py` threw a `KeyError` due to an `"ovary"` vs `"ovarian"` mismatch in `pipeline.config.json`. Plot axis labels (LIANA+ heatmaps and bubble plots) overlapped severely when processing large numbers of interacting cell types.
+- **Fix:** Switched to dynamic programmatic fetching via `fetch_kegg_pathways.py` and `CANCER_PATHWAYS` json config mapping. Changed violin plots to `stacked_violin` and dynamically scaled Plotly/Matplotlib figsize widths against cell-type array lengths. Fixed `OUTPUT_DIR` injection redundancy in `run_cancer_pipeline.py`.

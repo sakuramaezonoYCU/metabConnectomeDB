@@ -1,0 +1,168 @@
+{
+    "PHASE_1_DATABASE_REPORTING": {
+        "_PHASE_1_COMMENT": "This phase provides a general report of the integrated generic databases (KEGG, HMDB, CellChat) using `execute_and_export_notebooks.py`. No configurable parameters currently exist."
+    },
+    "PHASE_2_SINGLE_CELL_INTEGRATION": {
+        "CENSUS_VERSION": "2025-11-08",
+        "CANCERS_TO_RUN": [
+            "kidney",
+            "breast",
+            "colorectal",
+            "ovarian",
+            "lung",
+            "melanoma"
+        ],
+        "CANCER_CAP": {
+            "breast": "500k",
+            "colorectal": "500k",
+            "lung": "500k",
+            "melanoma": "500k",
+            "ovarian": "500k",
+            "kidney": "500k"
+        },
+        "CANCER_PRIMARY_TISSUE": {
+            "breast": [
+                "breast",
+                "mammary gland"
+            ],
+            "colorectal": [
+                "colon",
+                "large intestine"
+            ],
+            "lung": [
+                "lung"
+            ],
+            "melanoma": [
+                "skin of body"
+            ],
+            "ovarian": [
+                "ovary"
+            ],
+            "kidney": [
+                "kidney"
+            ]
+        },
+        "CANCER_DISEASE_QUERIES": {
+            "breast": "breast cancer",
+            "colorectal": "colorectal cancer, colorectal carcinoma || metastatic malignant neoplasm",
+            "lung": "lung cancer, lung adenocarcinoma",
+            "melanoma": "melanoma, metastatic melanoma, skin melanoma, cutaneous melanoma, malignant melanoma, uveal melanoma",
+            "ovarian": "ovarian cancer, malignant ovarian serous tumor",
+            "kidney": "kidney cancer, nonpapillary renal cell carcinoma, clear cell renal carcinoma, chromophobe renal cell carcinoma, Wilms tumor"
+        }
+    },
+    "PHASE_3_METRICS": {
+        "_STRICT_MASK_CANCERS_COMMENT": "Uses strict 'malignant cell' exact match to prevent normal epithelial cell contamination in highly heterogeneous tissues like skin and gut. Other cancers use fuzzy 'epithelial/tumor' match due to poor annotation in source datasets.",
+        "STRICT_MASK_CANCERS": [
+            "colorectal",
+            "melanoma"
+        ]
+    },
+    "PHASE_4_5_META_VALIDATION": {
+        "OVERRIDE_TARGET_GENES": [],
+        "SKEW_THRESHOLD": 0.5,
+        "SUBCLONE_SD_MULTIPLIER": 1.0,
+        "DGIDB_API_URL": "https://dgidb.org/api/v2/interactions.json",
+        "OPENTARGETS_API_URL": "https://api.platform.opentargets.org/api/v4/graphql",
+        "DISEASES_API_URL": "https://diseases.jensenlab.org/api/v2/entity",
+        "DEPMAP_DATA_PATH": "input/CRISPRGeneEffect.csv"
+    },
+    "PHASE_6_REPORTING": {
+        "CANCER_COLORS": {
+            "breast": "purple",
+            "colorectal": "orange",
+            "lung": "teal",
+            "melanoma": "black",
+            "ovarian": "pink",
+            "kidney": "brown"
+        },
+        "CANCER_PO2_CSV_MAPPING": {
+            "breast": "Breast cancer (10)",
+            "colorectal": "Rectal carcinoma",
+            "lung": "Lung cancer",
+            "melanoma": "Melanoma",
+            "ovarian": "Cervical cancer (12)",
+            "kidney": "Renal cell carcinoma"
+        },
+        "TCGA_MAPPING": {
+            "breast": ["BRCA"],
+            "colorectal": ["COAD", "READ"],
+            "lung": ["LUAD", "LUSC"],
+            "melanoma": ["SKCM"],
+            "ovary": ["OV"],
+            "kidney": ["KIRC", "KIRP", "KICH"]
+        }
+    },
+    "SEROTONIN_AXIS": {
+        "HTR7_TAM_SIGNATURE_FILE": "input/htr7_tam_signature.json",
+        "CURATED_SEROTONIN_TARGETS_FILE": "input/serotonin_curated_targets.json",
+        "REACTOME_PATHWAYS": {
+            "INOSITOL_PATHWAY": {
+                "id": "R-HSA-1483257",
+                "description": "Inositol Phosphate Metabolism"
+            },
+            "HR_REPAIR": {
+                "id": "R-HSA-5663220",
+                "description": "Homologous DNA Pairing and Strand Exchange"
+            },
+            "EV_BIOGENESIS": {
+                "id": "R-HSA-1181150",
+                "description": "Assembly and cell surface presentation of NMDA receptors (EV Machinery proxy)"
+            },
+            "EXHAUSTION_TARGETS": {
+                "id": "R-HSA-8939236",
+                "description": "PD-1 signaling (Exhaustion Proxy)"
+            },
+            "SUPPRESSIVE_LIGAND_TARGETS": {
+                "id": "R-HSA-8939236",
+                "description": "PD-1 signaling (Suppressive Ligands Proxy)"
+            },
+            "TREG_TARGETS": {
+                "id": "R-HSA-388841",
+                "description": "Costimulation by the CD28 family (Treg Proxy)"
+            }
+        }
+    },
+    "KEGG_PATHWAYS": {
+        "GLYCOLYSIS": {
+            "id": "hsa00010",
+            "description": "Glycolysis / Gluconeogenesis pathway, core metabolic shift under hypoxia"
+        },
+        "OXPHOS": {
+            "id": "hsa00190",
+            "description": "Oxidative phosphorylation, baseline metabolic state under normoxia"
+        },
+        "HIF1": {
+            "id": "hsa04066",
+            "description": "HIF-1 Signaling Pathway, master regulator of oxygen homeostasis"
+        },
+        "ARACHIDONIC_ACID": {
+            "id": "hsa00590",
+            "description": "Arachidonic acid metabolism (includes COX-2/PGE2 targets)"
+        },
+        "PURINE": {
+            "id": "hsa00230",
+            "description": "Purine metabolism (includes CD73/Adenosine targets)"
+        },
+        "TRYPTOPHAN": {
+            "id": "hsa00380",
+            "description": "Tryptophan metabolism (includes IDO1/Kynurenine targets)"
+        },
+        "GLUTAMATE": {
+            "id": "hsa00250",
+            "description": "Alanine, aspartate and glutamate metabolism (includes xCT/Glutamate targets)"
+        },
+        "SPHINGOLIPID": {
+            "id": "hsa00600",
+            "description": "Sphingolipid metabolism (includes SPHK1/S1P targets)"
+        },
+        "TCA_CYCLE": {
+            "id": "hsa00020",
+            "description": "Citrate cycle (TCA cycle), includes Fumarate hydratase (FH) targets"
+        }
+    },
+    "ML_PARAMS": {
+        "COXPH_PENALIZER": 0.5,
+        "COXPH_L1_RATIO": 0.1
+    }
+}

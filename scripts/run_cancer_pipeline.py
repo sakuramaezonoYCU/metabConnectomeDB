@@ -543,8 +543,10 @@ print(adata.obs['site'].value_counts())
 
                 if 'OUTPUT_DIR' in global_dict:
                     od_json = json.dumps(global_dict['OUTPUT_DIR'])
-                    code = re.sub(r'^OUTPUT_DIR\s*=.*$|^output_dir\s*=.*$', f'OUTPUT_DIR = {od_json}\noutput_dir = {od_json}', code, flags=re.MULTILINE)
-                    original_code = re.sub(r'^OUTPUT_DIR\s*=.*$|^output_dir\s*=.*$', f'OUTPUT_DIR = {od_json}\noutput_dir = {od_json}', original_code, flags=re.MULTILINE)
+                    code = re.sub(r'^OUTPUT_DIR\s*=.*$', f'OUTPUT_DIR = {od_json}', code, flags=re.MULTILINE)
+                    code = re.sub(r'^output_dir\s*=.*$', f'output_dir = {od_json}', code, flags=re.MULTILINE)
+                    original_code = re.sub(r'^OUTPUT_DIR\s*=.*$', f'OUTPUT_DIR = {od_json}', original_code, flags=re.MULTILINE)
+                    original_code = re.sub(r'^output_dir\s*=.*$', f'output_dir = {od_json}', original_code, flags=re.MULTILINE)
                     
                     # Intercept unique target pairs CSV and point it to the global output directory
                     global_output_dir = os.path.dirname(global_dict['OUTPUT_DIR'])
