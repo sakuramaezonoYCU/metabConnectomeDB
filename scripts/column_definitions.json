@@ -1,0 +1,382 @@
+{
+    "Metabolite_Name": [
+        "Metabolite Properties & Structure",
+        "The standardized common name of the metabolite."
+    ],
+    "Target": [
+        "Target Protein Properties",
+        "The standardized HGNC gene symbol of the target protein (receptor, enzyme, or transporter)."
+    ],
+    "HMDB_ID": [
+        "Metabolite Properties & Structure",
+        "The unique identifier in the Human Metabolome Database (HMDB)."
+    ],
+    "Sensor_Gene": [
+        "Target Protein Properties",
+        "The sensing gene in MEBOCOST, representing the protein interacting with the metabolite."
+    ],
+    "Protein_Name": [
+        "Target Protein Properties",
+        "Full descriptive name of the target protein."
+    ],
+    "Evidence": [
+        "Interaction Evidence & Scores",
+        "Supporting evidence or category for the interaction."
+    ],
+    "Sensor_Type": [
+        "Target Protein Properties",
+        "Functional type of the sensor gene (e.g. Receptor, Transporter, Enzyme)."
+    ],
+    "database": [
+        "Interaction Evidence & Scores",
+        "The source database(s) where this entry originates."
+    ],
+    "Evidence_Score": [
+        "Interaction Evidence & Scores",
+        "Numerical score representing interaction confidence."
+    ],
+    "Text_Evidence": [
+        "Interaction Evidence & Scores",
+        "Literature text snippets or PMIDs showing interaction evidence."
+    ],
+    "blood_concentration": [
+        "Metabolite Localization & Physiology",
+        "Physiological concentration of the metabolite in human blood."
+    ],
+    "Secondary_HMDB_ID": [
+        "Metabolite Properties & Structure",
+        "Alternate HMDB IDs associated with the metabolite."
+    ],
+    "Kegg_ID": [
+        "Metabolite Properties & Structure",
+        "Unique identifier in the Kyoto Encyclopedia of Genes and Genomes (KEGG) database."
+    ],
+    "Synonyms": [
+        "Metabolite Properties & Structure",
+        "Alternative names and chemical synonyms for the metabolite."
+    ],
+    "Organ and components": [
+        "Metabolite Localization & Physiology",
+        "Anatomical organs/components where the metabolite is localized."
+    ],
+    "Cell and elements": [
+        "Metabolite Localization & Physiology",
+        "Cell types where the metabolite is localized."
+    ],
+    "Tissue and substructures": [
+        "Metabolite Localization & Physiology",
+        "Tissue types and substructures where the metabolite is localized."
+    ],
+    "Biofluid and excreta": [
+        "Metabolite Localization & Physiology",
+        "Human biofluids or excretions containing the metabolite."
+    ],
+    "Subcellular": [
+        "Metabolite Localization & Physiology",
+        "Subcellular compartment or organelle localization."
+    ],
+    "Kingdom": [
+        "Metabolite Properties & Structure",
+        "Top-level taxonomic category for the chemical classification of the metabolite."
+    ],
+    "Super_Class": [
+        "Metabolite Properties & Structure",
+        "Broad chemical category of the metabolite (ClassyFire super_class level)."
+    ],
+    "Sub_Class": [
+        "Metabolite Properties & Structure",
+        "Lower-level chemical subclass of the metabolite (ClassyFire sub_class level)."
+    ],
+    "Class": [
+        "Metabolite Properties & Structure",
+        "Standard chemical class of the metabolite."
+    ],
+    "associated_gene": [
+        "Synthesis & Transport Genes",
+        "Metabolic genes associated with the synthesis or transport of the metabolite."
+    ],
+    "Software_Predicted": [
+        "Interaction Evidence & Scores",
+        "Indicator of whether the metabolite's localization or interaction was computationally predicted."
+    ],
+    "BioLocation_Summary": [
+        "Metabolite Localization & Physiology",
+        "Text summary outlining the biological locations of the metabolite."
+    ],
+    "Receptor_Gene_Symbol": [
+        "Target Protein Properties",
+        "HGNC gene symbol of the receptor protein interacting with the metabolite."
+    ],
+    "Transporter": [
+        "Target Protein Properties",
+        "HGNC gene symbol of the transporter protein importing/exporting the metabolite."
+    ],
+    "Enzyme": [
+        "Target Protein Properties",
+        "HGNC gene symbol of the enzyme interacting with or processing the metabolite."
+    ],
+    "Task": [
+        "Metabolic Modeling (scCellFie)",
+        "High-level signaling task or metabolic complex (e.g. in scCellFie or CellPhoneDBv5)."
+    ],
+    "transmembrane": [
+        "Target Protein Properties",
+        "Indicates if the target protein is a transmembrane protein."
+    ],
+    "peripheral": [
+        "Target Protein Properties",
+        "Indicates if the target protein is a peripheral membrane protein."
+    ],
+    "secreted": [
+        "Target Protein Properties",
+        "Indicates if the target protein is secreted into the extracellular space."
+    ],
+    "secreted_desc": [
+        "Target Protein Properties",
+        "Descriptive text detailing the secretion properties of the target protein."
+    ],
+    "secreted_highlight": [
+        "Target Protein Properties",
+        "Highlighted annotation specifying secreted status in MEBOCOST."
+    ],
+    "integrin": [
+        "Target Protein Properties",
+        "Indicates if the target protein belongs to the integrin family."
+    ],
+    "other": [
+        "Target Protein Properties",
+        "Indicates if the target protein has other functional classifications in MEBOCOST."
+    ],
+    "other_desc": [
+        "Target Protein Properties",
+        "Functional description of other classifications in MEBOCOST."
+    ],
+    "pdb_structure": [
+        "Target Protein Properties",
+        "Protein Data Bank (PDB) structural identifier for the metabolite/target."
+    ],
+    "comments_complex": [
+        "Target Protein Properties",
+        "Descriptive comments regarding the protein complex structure."
+    ],
+    "reactome_reaction": [
+        "Metabolic Modeling (scCellFie)",
+        "Reactome reaction database identifier."
+    ],
+    "reactome_complex": [
+        "Target Protein Properties",
+        "Reactome complex database identifier."
+    ],
+    "rhea_reaction": [
+        "Metabolic Modeling (scCellFie)",
+        "Rhea reaction database identifier."
+    ],
+    "curator": [
+        "Interaction Evidence & Scores",
+        "Database curator who verified or uploaded the entry."
+    ],
+    "CellphoneDB_ver": [
+        "Interaction Evidence & Scores",
+        "CellPhoneDBv5 database version supporting this interaction."
+    ],
+    "Uniprot": [
+        "Target Protein Properties",
+        "UniProt accession identifier for the target protein."
+    ],
+    "Protein_Uniprot": [
+        "Target Protein Properties",
+        "UniProt accession identifier for metabolic enzyme/transporter target proteins (historically UNIPROT_ID)."
+    ],
+    "uniprot_1": [
+        "Target Protein Properties",
+        "UniProt accession identifier for the first subunit/protein in a complex."
+    ],
+    "uniprot_2": [
+        "Target Protein Properties",
+        "UniProt accession identifier for the second subunit/protein in a complex."
+    ],
+    "uniprot_3": [
+        "Target Protein Properties",
+        "UniProt accession identifier for the third subunit/protein in a complex."
+    ],
+    "uniprot_4": [
+        "Target Protein Properties",
+        "UniProt accession identifier for the fourth subunit/protein in a complex."
+    ],
+    "Class_source": [
+        "Metabolite Properties & Structure",
+        "Source database for the chemical classification."
+    ],
+    "GEM_id": [
+        "Metabolic Modeling (scCellFie)",
+        "Genome-scale Metabolic Model (GEM) identifier."
+    ],
+    "Cell_Compartment": [
+        "Metabolite Localization & Physiology",
+        "Subcellular cellular compartment where the reaction occurs."
+    ],
+    "Synthetic_genes": [
+        "Synthesis & Transport Genes",
+        "Metabolic genes responsible for synthesizing the metabolite."
+    ],
+    "Synthetic_genes_lv2": [
+        "Synthesis & Transport Genes",
+        "Lower-confidence or level-2 metabolic genes responsible for synthesis."
+    ],
+    "Metaligand_transporter_genes_out": [
+        "Synthesis & Transport Genes",
+        "Genes responsible for exporting or transporting the metabolite (historically Transporter_genes)."
+    ],
+    "Metaligand_transporter_genes_in": [
+        "Synthesis & Transport Genes",
+        "Genes responsible for importing the metabolite into cells (historically Transporter_genes_in)."
+    ],
+    "precursor_transport": [
+        "Synthesis & Transport Genes",
+        "Notes regarding transport of precursor molecules."
+    ],
+    "MRID": [
+        "Interaction Evidence & Scores",
+        "Unique identifier in MRCLinkDB."
+    ],
+    "PubChem CID/SID": [
+        "Metabolite Properties & Structure",
+        "PubChem chemical compound or substance identifier."
+    ],
+    "Molecular Formula": [
+        "Metabolite Properties & Structure",
+        "Standard chemical molecular formula of the metabolite."
+    ],
+    "CHEMICAL_FORMULA": [
+        "Metabolite Properties & Structure",
+        "Standard chemical molecular formula of the metabolite."
+    ],
+    "Canonical SMILES": [
+        "Metabolite Properties & Structure",
+        "Standard Simplified Molecular-Input Line-Entry System (SMILES) representation."
+    ],
+    "SMILES": [
+        "Metabolite Properties & Structure",
+        "Standard Simplified Molecular-Input Line-Entry System (SMILES) representation."
+    ],
+    "Receptor_Gene_ID": [
+        "Target Protein Properties",
+        "Entrez gene identifier for the receptor."
+    ],
+    "Receptor_Uniprot": [
+        "Target Protein Properties",
+        "UniProt accession identifier for the receptor protein."
+    ],
+    "PMID": [
+        "Interaction Evidence & Scores",
+        "PubMed identifier(s) for literature citations supporting the interaction."
+    ],
+    "Other.DB": [
+        "Interaction Evidence & Scores",
+        "References or IDs in other chemical/biological databases."
+    ],
+    "HMDB_Protein_ID": [
+        "Target Protein Properties",
+        "Identifier in other database consolidations (historically HAMDBP_ID)."
+    ],
+    "Enzyme_Full_Name": [
+        "Target Protein Properties",
+        "IUPAC name or common name of the enzyme (historically ENZYME_NAME)."
+    ],
+    "Human_geneID": [
+        "Target Protein Properties",
+        "Entrez Gene ID for the human target."
+    ],
+    "REACTIONS": [
+        "Metabolic Modeling (scCellFie)",
+        "Biochemical reactions associated with the pair."
+    ],
+    "enzyme product/substrate": [
+        "Synthesis & Transport Genes",
+        "Describes if the metabolite is a substrate or product of the target enzyme."
+    ],
+    "Interaction": [
+        "Clinical Oncology & TME Phenotypes",
+        "Direct clinical interaction type (e.g., regulation, activation, inhibition)."
+    ],
+    "Cell type": [
+        "Clinical Oncology & TME Phenotypes",
+        "Clinical immune or somatic cell type mediating the interaction (T-cells, macrophages, etc.)."
+    ],
+    "Experimental subject": [
+        "Clinical Oncology & TME Phenotypes",
+        "Experimental model or cell line used to verify the interaction."
+    ],
+    "Disease": [
+        "Clinical Oncology & TME Phenotypes",
+        "Explicit cancer/tumor clinical disease annotation."
+    ],
+    "Effect": [
+        "Clinical Oncology & TME Phenotypes",
+        "Functional effect of the metabolite on cells (e.g., pro-tumorigenic)."
+    ],
+    "Effect_detail": [
+        "Clinical Oncology & TME Phenotypes",
+        "Detail regarding the functional effect on cells."
+    ],
+    "Target_Gene": [
+        "Target Protein Properties",
+        "General gene symbol identifier (historically Gene_Name)."
+    ],
+    "scCellFie_value": [
+        "Metabolic Modeling (scCellFie)",
+        "Reaction pathway activity score or value."
+    ],
+    "System": [
+        "Metabolic Modeling (scCellFie)",
+        "Top-level metabolic system category in scCellFie (e.g., Carbohydrate metabolism)."
+    ],
+    "Subsystem": [
+        "Metabolic Modeling (scCellFie)",
+        "Metabolic subsystem pathway in scCellFie (e.g., Glycolysis)."
+    ],
+    "ensembl_id": [
+        "Target Protein Properties",
+        "Ensembl gene identifier."
+    ],
+    "sccellfie_threshold": [
+        "Metabolic Modeling (scCellFie)",
+        "Expression threshold value from scCellFie."
+    ],
+    "databases_count": [
+        "Interaction Evidence & Scores",
+        "Number of integrated databases supporting this pair/metabolite."
+    ],
+    "HMDB_Name": [
+        "Metabolite Properties & Structure",
+        "Standardized metabolite name from HMDB."
+    ],
+    "INCHIKEY": [
+        "Metabolite Properties & Structure",
+        "Standard IUPAC International Chemical Identifier key."
+    ],
+    "AVERAGE_MASS": [
+        "Metabolite Properties & Structure",
+        "Average molecular mass of the metabolite."
+    ],
+    "MONO_MASS": [
+        "Metabolite Properties & Structure",
+        "Monoisotopic mass of the metabolite."
+    ],
+    "Pair_Confidence_Tier": [
+        "Interaction Evidence & Scores",
+        "Confidence tier of the specific metabolite-target interaction pair."
+    ],
+    "Metabolite_Confidence_Tier": [
+        "Interaction Evidence & Scores",
+        "Confidence tier of the metabolite itself."
+    ],
+    "Confidence_Tier": [
+        "Interaction Evidence & Scores",
+        "Confidence tier category (Tier 1: high, Tier 2: medium, Tier 3: low) based on database overlap."
+    ],
+    "receptor": [
+        "Target Protein Properties",
+        "Indicates if the target protein acts as a receptor in CellPhoneDBv5 or other source databases."
+    ]
+}
