@@ -4,6 +4,7 @@
     },
     "PHASE_2_SINGLE_CELL_INTEGRATION": {
         "CENSUS_VERSION": "2025-11-08",
+        "DE_TESTING_METHOD": "t-test",
         "CANCERS_TO_RUN": [
             "kidney",
             "breast",

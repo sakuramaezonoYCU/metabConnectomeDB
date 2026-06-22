@@ -42,6 +42,7 @@ KEGG_PATHWAYS = _cfg.get("KEGG_PATHWAYS", {})
 # ── Per-cancer cell-count cap ─────────────────────────────────────────────────
 # Set the cap that was used for each cancer's primary_vs_metastasis DE CSV.
 CANCER_CAP = _p2.get("CANCER_CAP", {})
+DE_TESTING_METHOD = _p2.get("DE_TESTING_METHOD", "t-test")
 
 # ── Cancers to execute in Phase 2 ─────────────────────────────────────────────
 CANCERS_TO_RUN = _p2.get("CANCERS_TO_RUN", list(CANCER_CAP.keys()))
