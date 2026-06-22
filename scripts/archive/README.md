@@ -53,17 +53,9 @@ Scripts that compute specific exploratory metrics or analyses that are either ex
 - `compute_metabolic_switching.py`
 - `compute_nr1d2_enrichment.py`
 - `compute_serotonin_proximity.py`
-- `count_met_cells.py`
 
-### 3. External API Queries & Downloads
-Scripts previously used to download reference data or query external APIs (like OpenTargets, ChEA, or TCGA). The current pipeline likely incorporates these natively or the data is already fetched.
-- `download_chea_data.py`
-- `download_tcga_data.py`
-- `fetch_opentargets.py`
-- `fetch_uniprot_roles.py`
-- `query_advanced_analysis.py`
-- `query_dbs.py`
-- `query_depmap.py`
+
+
 
 ### 4. Custom Notebook Generators & Exporters
 Various scripts that generated specific notebook variants (e.g., specific combinations of cancers or targeted outputs) or helped dump notebook cells to text.
@@ -74,14 +66,14 @@ Various scripts that generated specific notebook variants (e.g., specific combin
 - `generate_nb3.py`
 - `generate_ovarian_serotonin.py`
 - `generate_pan_cancer_notebook.py`
-- `generate_predictive_notebook_all5.py`
+
 - `generate_version_1_metrics.py`
 
 ### 5. Execution Wrappers & Tests
 Ad-hoc test scripts for verifying APIs, network state, data frames, or running specific slices of the pipeline independently.
 - `inspect_ovarian.py`
 - `merge_dbs.py` (Legacy version, replaced by `merge_dbs_claude.py`)
-- `parse_md_tables.py`
+
 - `rerun_phase6_only.py`
 - `run_just_pair_nb.py`
 - `run_just_unique_nb.py`
