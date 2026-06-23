@@ -50,7 +50,10 @@ def df_to_markdown(df):
                 else:
                     formatted_row.append(str(x))
             else:
-                formatted_row.append(str(x))
+                val = str(x)
+                if '|' in val:
+                    val = re.sub(r'\s*\|+\s*', ', ', val)
+                formatted_row.append(val)
         rows.append('| ' + ' | '.join(formatted_row) + ' |')
     return '\n'.join([header, separator] + rows)
 
@@ -309,6 +312,27 @@ def build_phase_2():
         content += f"- **Primary/Metastatic Split:** {s_de['cells_prim']} Primary vs {s_de['cells_met']} Metastatic\n"
         content += f"- **Differential Expression:** Of {s_de['total_analyzed']} metabolic targets tested, **{s_de['up_met']}** were significantly upregulated in metastasis.\n\n"
 
+        # Dynamically inject the new CSVs from the pipeline patches
+        orphan_csv = f"output/{c}_results/immune_evasion_orphan_metabolic_candidates.csv"
+        if os.path.exists(orphan_csv):
+            try:
+                df_orphan = pd.read_csv(orphan_csv)
+                if not df_orphan.empty:
+                    content += f"#### Orphan Metabolic Immune Evasion Candidates\n\n"
+                    content += df_to_markdown(df_orphan.head(5)) + "\n\n"
+            except Exception as e:
+                pass # Avoid hard crashes if CSV is empty or malformed
+
+        upset_csv = f"output/{c}_results/primary_vs_metastatic_convergence_upset_{c}.csv"
+        if os.path.exists(upset_csv):
+            try:
+                df_upset = pd.read_csv(upset_csv)
+                if not df_upset.empty:
+                    content += f"#### Metastatic Convergence (Niche Target Up-Regulation)\n\n"
+                    content += df_to_markdown(df_upset) + "\n\n"
+            except Exception as e:
+                pass
+
     print("Querying Gemini API for Phase 2 Interpretation...")
     interpretation = ask_gemini_interpretation(content, phase=2)
     content += interpretation + '\n---\n'
@@ -319,6 +343,11 @@ def build_phase_3():
     # Phase 3 simply outputs the summary tables from `generate_ai_summary_tables.py`
     print("Building Phase 3 Summary (Pan-Cancer Tables)...")
     content = '## Phase 3: Dataset Summary Tables\n\n'
+
+    content += 'Source: `output/pan_cancer_meta_results/*.csv` and `output/ai_summary_tables/*.csv`\n'
+    content += 'Script: `scripts/generate_ai_summary_tables.py`\n'
+    content += 'Scraper: `scripts/tmp_build_md.py`\n'
+    content += 'Output: Markdown tables generated below\n\n'
 
     content += '### 3.1 Cell Type Composition\n\n'
     counts_csv = f'output/pan_cancer_meta_results/cell_type_counts{ANALYSIS_SUFFIX}.csv'
@@ -360,7 +389,7 @@ def build_phase_3():
     else:
         content += f"*(Pending: {df_ccc_path})*\n\n"
 
-    content += '### 3.3 Immune Evasion and CCC Quantification\n\n'
+    content += '### 3.3 Immune Evasion and CCC Quantification (LIANA+ analysis)\n\n'
     quant_path = f'output/pan_cancer_meta_results/immune_evasion_ccc_quantification{ANALYSIS_SUFFIX}.csv'
     if os.path.exists(quant_path):
         df_quant = pd.read_csv(quant_path)

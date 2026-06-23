@@ -33,8 +33,11 @@ from annotate_enzyme_kegg import run_kegg_enrichment
 # ==============================================================================
 # ⚙️ CONFIGURATION & PATHS
 # ==============================================================================
-INPUT_DATABASES_DIR = "input/databases"
-OUTPUT_DIR = "output"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+
+INPUT_DATABASES_DIR = os.path.join(PROJECT_ROOT, "input", "databases")
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 
 # The 8 target-pair CSV files to enrich
 TARGET_PAIR_FILES = [
@@ -51,10 +54,11 @@ TARGET_PAIR_FILES = [
 ]
 
 # Cache file paths in the input/ directory
-GTOPDB_MAPPING_CACHE = "input/GtP_to_HGNC_mapping.csv"
-GTOPDB_TARGETS_CACHE = "input/guidetopharmacology_targets.json"
-HGNC_APPROVED_CACHE = "input/hgnc_approved_genes.json"
-UNIPROT_CACHE = "input/uniprot_annotations_cache.json"
+GTOPDB_MAPPING_CACHE = os.path.join(PROJECT_ROOT, "input", "GtP_to_HGNC_mapping.csv")
+GTOPDB_TARGETS_CACHE = os.path.join(PROJECT_ROOT, "input", "guidetopharmacology_targets.json")
+GTOPDB_INTERACTIONS = os.path.join(PROJECT_ROOT, "input", "interactions.csv")
+HGNC_APPROVED_CACHE = os.path.join(PROJECT_ROOT, "input", "hgnc_approved_genes.json")
+UNIPROT_CACHE = os.path.join(PROJECT_ROOT, "input", "uniprot_annotations_cache.json")
 
 # URLs for external databases
 GTOPDB_MAPPING_URL = "https://www.guidetopharmacology.org/DATA/GtP_to_HGNC_mapping.csv"

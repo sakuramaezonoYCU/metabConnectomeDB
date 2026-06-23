@@ -72,7 +72,7 @@ def fetch_uniprot_roles():
             
     # Save to CSV
     df = pd.DataFrame(results)
-    out_path = os.path.join(OUTPUT_DIR, 'uniprot_biological_roles.csv')
+    out_path = os.path.join(OUTPUT_DIR, f'uniprot_biological_roles{ANALYSIS_SUFFIX}.csv')
     df.to_csv(out_path, index=False)
     print(f"\nSaved UniProt biological roles to {out_path}")
 

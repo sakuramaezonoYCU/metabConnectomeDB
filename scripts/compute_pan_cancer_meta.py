@@ -54,24 +54,17 @@ def generate_upset_plot():
     plt.close()
     print(f"Saved UpSet plot to {plot_path}")
     
-    # Also check the strict all-cancer combination
-    five_combo_genes = None
-    for c_name in [c.capitalize() for c in CANCERS]:
-        if c_name in contents:
-            genes_set = set(contents[c_name])
-            if five_combo_genes is None:
-                five_combo_genes = genes_set
-            else:
-                five_combo_genes = five_combo_genes.intersection(genes_set)
-                
-    if not five_combo_genes:
-        print(f"Note: There are exactly 0 genes commonly upregulated across all {len(CANCERS)} cancers.")
-        print(f"Applying MAX CANCER - 1 rule: Using the union of {len(CANCERS)-1}-cancer intersections as the primary signature, and saving individual {len(CANCERS)-1}-cancer combinations.")
-        from itertools import combinations
+    from itertools import combinations
+
+    # Dynamically find conserved signatures, relaxing the cancer overlap threshold if <= 1 gene is found
+    target_overlap = len(CANCERS)
+    final_genes = []
+    
+    while target_overlap > 0:
         combo_genes = set()
         
         # Save each combination and aggregate their union
-        for combo in combinations([c.capitalize() for c in CANCERS], len(CANCERS)-1):
+        for combo in combinations([c.capitalize() for c in CANCERS], target_overlap):
             if all(c in contents for c in combo):
                 c_genes = set(contents[combo[0]])
                 for c in combo[1:]:
@@ -82,14 +75,24 @@ def generate_upset_plot():
                     df_combo = pd.DataFrame({'Strictly_Conserved_Gene': list(c_genes)})
                     combo_csv = os.path.join(META_RESULTS_DIR, f'pan_cancer_signature_{combo_name}{ANALYSIS_SUFFIX}.csv')
                     df_combo.to_csv(combo_csv, index=False)
-                    print(f"Saved {len(CANCERS)-1}-cancer signature {combo_name} with {len(c_genes)} genes.")
+                    print(f"Saved {target_overlap}-cancer signature {combo_name} with {len(c_genes)} genes.")
                     combo_genes.update(c_genes)
                     
         final_genes = list(combo_genes)
-        print(f"Saved the union of {len(CANCERS)-1}-cancer combinations ({len(final_genes)} genes) as the primary conserved signature under the MAX CANCER - 1 rule.")
-    else:
-        final_genes = list(five_combo_genes)
-        print(f"Saved strict {len(CANCERS)}-cancer signature ({len(final_genes)} genes) as the primary conserved signature.")
+        
+        if len(final_genes) > 1:
+            if target_overlap == len(CANCERS):
+                print(f"Saved strict {target_overlap}-cancer signature ({len(final_genes)} genes) as the primary conserved signature.")
+            else:
+                print(f"Saved the union of {target_overlap}-cancer combinations ({len(final_genes)} genes) as the primary conserved signature (Relaxation Rule applied).")
+            break
+        else:
+            if target_overlap == len(CANCERS):
+                print(f"Note: There are only {len(final_genes)} genes commonly upregulated across all {len(CANCERS)} cancers, which is insufficient for meaningful network analysis.")
+            else:
+                print(f"Note: There are only {len(final_genes)} genes conserved across {target_overlap} cancers.")
+            print(f"Relaxing threshold to {target_overlap - 1} cancers...")
+            target_overlap -= 1
         
     df_pan = pd.DataFrame({'Strictly_Conserved_Gene': final_genes})
     pan_csv = os.path.join(META_RESULTS_DIR, f'pan_cancer_conserved_genes{ANALYSIS_SUFFIX}.csv')

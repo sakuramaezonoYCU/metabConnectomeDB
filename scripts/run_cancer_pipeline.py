@@ -392,14 +392,6 @@ def patched_set_position(self, pos):
 matplotlib.text.Text.__init__ = patched_text_init
 matplotlib.text.Text.set_position = patched_set_position
 
-# Offline mode bypass for LIANA+ resource fetching in sandboxed environment
-try:
-    import liana
-    def offline_rank_aggregate(*args, **kwargs):
-        raise ValueError("LIANA online database fetch disabled in offline sandbox mode to prevent timeout. Falling back to robust Metabolite-Mediated Cell-Cell Communication Model.")
-    liana.mt.rank_aggregate = offline_rank_aggregate
-except Exception:
-    pass
 
 # Headless bypass for Plotly fig.show() to prevent browser blocks
 try:
@@ -513,7 +505,9 @@ except Exception:
                     # replace it entirely with unified h5ad loading from h5ad_path.
                     # This avoids needing to correctly reconstruct PRIMARY_PREFIX/META_PREFIX filenames.
                     if 'sc.read_h5ad(primary_h5ad_file)' in code or 'sc.read_h5ad(meta_h5ad_file)' in code:
-                        pt = global_dict.get('PRIMARY_TISSUES', ['breast'])
+                        pt = global_dict.get('PRIMARY_TISSUES', None)
+                        if pt is None:
+                            raise RuntimeError("CRITICAL ERROR: PRIMARY_TISSUES must be injected into the globals dict.")
                         pt_json = json.dumps(pt)
                         code = f"""# Pipeline mode: load unified h5ad and split by PRIMARY_TISSUES
 import scanpy as sc, numpy as np
@@ -737,14 +731,15 @@ print(adata.obs['site'].value_counts())
 if __name__ == '__main__':
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
-    if len(sys.argv) < 4:
-        print("Usage: python run_cancer_pipeline.py \"<DISEASE_FILTER>\" \"<TISSUE_FILTER>\" \"<PRIMARY_TISSUES>\"")
-        print("Example: python run_cancer_pipeline.py \"colorectal cancer\" \"colon,liver,lung\" \"colon,large intestine\"")
+    if len(sys.argv) < 5:
+        print("Usage: python run_cancer_pipeline.py \"<CANCER_KEY>\" \"<DISEASE_FILTER>\" \"<TISSUE_FILTER>\" \"<PRIMARY_TISSUES>\"")
+        print("Example: python run_cancer_pipeline.py colorectal \"colorectal cancer\" \"colon,liver,lung\" \"colon,large intestine\"")
         sys.exit(1)
         
-    disease_filter_str = sys.argv[1]
-    tissue_filter_str = sys.argv[2]
-    primary_tissues_str = sys.argv[3]
+    cancer_key = sys.argv[1]
+    disease_filter_str = sys.argv[2]
+    tissue_filter_str = sys.argv[3]
+    primary_tissues_str = sys.argv[4]
     
     disease_filter = [d.strip() for d in disease_filter_str.split(',') if d.strip()]
     if tissue_filter_str.lower() == "all" or tissue_filter_str.lower() == "none" or tissue_filter_str == "":
@@ -769,7 +764,7 @@ if __name__ == '__main__':
         except:
             cap_str = str(cap_val)
     
-    cancer_name_safe = f"{disease_filter[0].split()[0].lower()}_results"
+    cancer_name_safe = f"{cancer_key}_results"
     cancer_output_dir = os.path.abspath(os.path.join(os.path.dirname(script_dir), "output", cancer_name_safe))
     os.makedirs(cancer_output_dir, exist_ok=True)
     
@@ -787,7 +782,8 @@ if __name__ == '__main__':
         'DISEASE_FILTER': disease_filter,
         'TISSUE_FILTER': tissue_filter,
         'OUTPUT_DIR': cancer_output_dir,
-        'CAP': cap_int
+        'CAP': cap_int,
+        'cancer_key': cancer_key
     }
     
     generated_h5ad = execute_and_export(cellxgene_nb, cellxgene_html, f"CellxGene Integration: {disease_filter_str}", inject_globals, skip_if_exists=True)
@@ -806,8 +802,7 @@ if __name__ == '__main__':
         meta_prefix = f"{met_slug}_{cap_str}_whole_transcriptome_2025-11-08"
         all_tissues = tissue_filter if tissue_filter else primary_tissues
         all_slug = "_".join(re.sub(r'[^a-z0-9]+', '-', t.lower()).strip('-') for t in all_tissues)
-        combined_h5ad = os.path.join(cancer_output_dir, 
-                                     f"{all_slug}_{cap_str}_whole_transcriptome_2025-11-08.h5ad")
+        combined_h5ad = generated_h5ad
         print(f"DEBUG tissue_filter={tissue_filter} primary_tissues={primary_tissues}")
         print(f"DEBUG combined_h5ad={combined_h5ad}")
         # Build the tissue slug from all_tissues to make output filenames unique per tissue combination
@@ -825,7 +820,8 @@ if __name__ == '__main__':
             'PRIMARY_PREFIX': primary_prefix,
             'META_PREFIX': meta_prefix,
             'metab_db_path': metab_db_path,
-            'cap_str': cap_str  # Passed so notebooks can include it in output filenames
+            'cap_str': cap_str,  # Passed so notebooks can include it in output filenames
+            'cancer_key': cancer_key
         }
         execute_and_export(pvsm_nb, pvsm_html, f"Primary vs Metastasis: {disease_filter_str}", pvsm_globals, skip_if_exists=True)
         
@@ -840,6 +836,7 @@ if __name__ == '__main__':
             'CANCER_TYPE_NAME': cancer_name_safe,
             'OUTPUT_DIR': cancer_output_dir,
             'PRIMARY_PREFIX': primary_prefix,
-            'META_PREFIX': meta_prefix
+            'META_PREFIX': meta_prefix,
+            'cancer_key': cancer_key
         }
         execute_and_export(orphan_nb, orphan_html, f"Orphan Metabolic Targets: {disease_filter_str}", orphan_globals, skip_if_exists=True)

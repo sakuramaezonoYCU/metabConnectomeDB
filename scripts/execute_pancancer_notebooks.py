@@ -517,7 +517,7 @@ if __name__ == '__main__':
         if os.path.exists(predictive_nb):
             execute_and_export(predictive_nb, predictive_html, "Predictive Signature Biomarker")
         else:
-            print(f"⚠️  WARNING: {predictive_nb} NOT FOUND. Run 'python scripts/generate_predictive_notebook.py' first (Phase 5).")
+            sys.exit(f"CRITICAL ERROR: {predictive_nb} NOT FOUND. Run 'python scripts/generate_predictive_notebook.py' first (Phase 5).")
     except Exception as e:
         sys.exit(f"CRITICAL ERROR - Failed to execute {predictive_nb}: {e}")
 
@@ -540,7 +540,7 @@ if __name__ == '__main__':
             subprocess.run([sys.executable, os.path.join(script_dir, "compute_druggability_targets.py")], check=True)
             execute_and_export(druggability_nb, druggability_html, "Druggability Axis Analysis")
         else:
-            print(f"⚠️  WARNING: {druggability_nb} NOT FOUND. Druggability analysis will be skipped.")
+            sys.exit(f"CRITICAL ERROR: {druggability_nb} NOT FOUND. Druggability analysis will be skipped.")
     except Exception as e:
         sys.exit(f"CRITICAL ERROR - Failed to execute {druggability_nb}: {e}")
 
@@ -551,7 +551,7 @@ if __name__ == '__main__':
         if os.path.exists(visium_nb):
             execute_and_export(visium_nb, visium_html, "Ovarian Visium Spatial Transcriptomics Validation")
         else:
-            print(f"⚠️  WARNING: {visium_nb} NOT FOUND. Run 'python scripts/generate_visium_notebook.py' first (Phase 5).")
+            sys.exit(f"CRITICAL ERROR: {visium_nb} NOT FOUND. Run 'python scripts/generate_visium_notebook.py' first (Phase 5).")
     except Exception as e:
         sys.exit(f"CRITICAL ERROR - Failed to execute {visium_nb}: {e}")
 
@@ -562,7 +562,7 @@ if __name__ == '__main__':
         if os.path.exists(deepdive_nb):
             execute_and_export(deepdive_nb, deepdive_html, "Deep-Dive Conserved Metastatic Metabolic Signature")
         else:
-            print(f"⚠️  WARNING: {deepdive_nb} NOT FOUND. Run 'python scripts/generate_nb1.py' first (Phase 5).")
+            sys.exit(f"CRITICAL ERROR: {deepdive_nb} NOT FOUND. Run 'python scripts/generate_nb1.py' first (Phase 5).")
     except Exception as e:
         sys.exit(f"CRITICAL ERROR - Failed to execute {deepdive_nb}: {e}")
 
@@ -573,7 +573,7 @@ if __name__ == '__main__':
         if os.path.exists(serotonin_nb):
             execute_and_export(serotonin_nb, serotonin_html, "Serotonin Axis Spatial Mapping")
         else:
-            print(f"⚠️  WARNING: {serotonin_nb} NOT FOUND. Run 'python scripts/generate_serotonin_notebook.py' first (Phase 5).")
+            sys.exit(f"CRITICAL ERROR: {serotonin_nb} NOT FOUND. Run 'python scripts/generate_serotonin_notebook.py' first (Phase 5).")
     except Exception as e:
         sys.exit(f"CRITICAL ERROR - Failed to execute {serotonin_nb}: {e}")
 
@@ -592,7 +592,7 @@ if __name__ == '__main__':
         if os.path.exists(ov_serotonin_nb):
             execute_and_export(ov_serotonin_nb, ov_serotonin_html, "Ovarian Serotonin Immune Evasion")
         else:
-            print(f"⚠️  WARNING: {ov_serotonin_nb} NOT FOUND. Run 'python scripts/generate_immune_evasion_notebook.py' first (Phase 5).")
+            sys.exit(f"CRITICAL ERROR: {ov_serotonin_nb} NOT FOUND. Run 'python scripts/generate_immune_evasion_notebook.py' first (Phase 5).")
     except Exception as e:
         sys.exit(f"CRITICAL ERROR - Failed to execute {ov_serotonin_nb}: {e}")
 
@@ -605,7 +605,7 @@ if __name__ == '__main__':
         if os.path.exists(oxygen_nb):
             execute_and_export(oxygen_nb, oxygen_html, "Oxygen Tension Analysis")
         else:
-            print(f"⚠️  WARNING: {oxygen_nb} NOT FOUND. No generator exists; this notebook must be created manually.")
+            sys.exit(f"CRITICAL ERROR: {oxygen_nb} NOT FOUND. No generator exists; this notebook must be created manually.")
     except Exception as e:
         sys.exit(f"CRITICAL ERROR - Failed to execute {oxygen_nb}: {e}")
 
@@ -620,7 +620,7 @@ if __name__ == '__main__':
         if os.path.exists(mitf_nb):
             execute_and_export(mitf_nb, mitf_html, "MITF Regulon Expansion")
         else:
-            print(f"⚠️  WARNING: {mitf_nb} NOT FOUND. Run 'python scripts/generate_nb2.py' first (Phase 5).")
+            sys.exit(f"CRITICAL ERROR: {mitf_nb} NOT FOUND. Run 'python scripts/generate_nb2.py' first (Phase 5).")
     except Exception as e:
         sys.exit(f"CRITICAL ERROR - Failed to execute {mitf_nb}: {e}")
 
@@ -681,7 +681,7 @@ if __name__ == '__main__':
         if os.path.exists(camp_nb):
             execute_and_export(camp_nb, camp_html, "CAMP Pan-Cancer Integration")
         else:
-            print(f"⚠️  WARNING: {camp_nb} NOT FOUND. Run 'python scripts/create_camp_notebook.py' first (Phase 5).")
+            sys.exit(f"CRITICAL ERROR: {camp_nb} NOT FOUND. Run 'python scripts/create_camp_notebook.py' first (Phase 5).")
     except Exception as e:
         sys.exit(f"CRITICAL ERROR - Failed to execute {camp_nb}: {e}")
 
@@ -693,6 +693,6 @@ if __name__ == '__main__':
         if os.path.exists(mr_nb):
             execute_and_export(mr_nb, mr_html, "Master Regulator Analysis")
         else:
-            print(f"⚠️  WARNING: {mr_nb} NOT FOUND. Run 'python scripts/generate_master_regulator_notebook.py' first (Phase 5).")
+            sys.exit(f"CRITICAL ERROR: {mr_nb} NOT FOUND. Run 'python scripts/generate_master_regulator_notebook.py' first (Phase 5).")
     except Exception as e:
         sys.exit(f"CRITICAL ERROR - Failed to execute {mr_nb}: {e}")

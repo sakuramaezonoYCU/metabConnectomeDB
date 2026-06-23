@@ -22,13 +22,9 @@ def get_dynamic_genes(base_dir=None):
     config_path = os.path.join(base_dir, 'pipeline.config.json')
     override_genes = []
     if os.path.exists(config_path):
-        try:
-            with open(config_path, 'r') as f:
-                config = json.load(f)
-                override_genes = config.get("OVERRIDE_TARGET_GENES", [])
-        except Exception as e:
-            print(f"Warning: Could not parse {config_path}: {e}")
-
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+            override_genes = config.get("OVERRIDE_TARGET_GENES", [])
     if override_genes:
         print(f"Using {len(override_genes)} user-overridden target genes from pipeline.config.json.")
         return override_genes
@@ -55,7 +51,7 @@ def get_dynamic_genes(base_dir=None):
     pan_cancer = []
     for g in all_genes:
         count = sum(1 for genes in cancer_genes_map.values() if g in genes)
-        if count > 3:  # Present in 4 or 5 cancers
+        if count >= len(cancer_genes_map) - 1:  # Present in N-1 or N cancers
             pan_cancer.append(g)
             
     return list(pan_cancer)

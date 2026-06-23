@@ -51,7 +51,13 @@ def validate_tcga_signature(signature_csv):
     else:
         raise FileNotFoundError(f"CRITICAL ERROR: {hgnc_path} not found. Cannot map gene symbols to Ensembl IDs.")
         
-    cancer_codes = ["BRCA", "COAD", "READ", "LUAD", "LUSC", "SKCM", "OV"]
+    from pan_cancer_config import TCGA_MAPPING
+    cancer_codes = []
+    for cohorts in TCGA_MAPPING.values():
+        cancer_codes.extend(cohorts)
+    cancer_codes = list(set(cancer_codes))
+    if not cancer_codes:
+        raise RuntimeError("CRITICAL ERROR: TCGA_MAPPING from pan_cancer_config is empty or missing. Cannot validate TCGA signatures without defined cohorts.")
     all_cancer_metrics = []
     
     for cancer in cancer_codes:
@@ -140,6 +146,7 @@ def validate_tcga_signature(signature_csv):
         merged['risk_group'] = (merged['signature_score'] >= median_score).astype(int)
         
         cph = CoxPHFitter()
+        notes = ""
         try:
             cox_df = merged[[time_col, event_col, 'risk_group']]
             cph.fit(cox_df, duration_col=time_col, event_col=event_col)
@@ -147,14 +154,16 @@ def validate_tcga_signature(signature_csv):
             p_val = cph.summary['p']['risk_group']
         except Exception as e:
             print(f"  CoxPH failed: {e}")
-            hr = 1.0
-            p_val = 1.0
+            hr = np.nan
+            p_val = np.nan
+            notes = "FAILED DUE TO COLLINEARITY ISSUES"
             
         all_cancer_metrics.append({
             'TCGA_Cohort': cancer,
             'Hazard_Ratio': hr,
             'P_Value': p_val,
-            'N_Samples': len(merged)
+            'N_Samples': len(merged),
+            'Notes': notes
         })
         
     if all_cancer_metrics:

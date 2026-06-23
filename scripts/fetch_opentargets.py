@@ -75,15 +75,12 @@ def fetch_opentargets_diseases():
             print(f"Fetched {gene}: {diseases_text}")
             
         except Exception as e:
-            print(f"Error fetching {gene}: {e}")
-            results.append({
-                "Gene": gene,
-                "OpenTargets_Diseases": "Error fetching from API"
-            })
+            print(f"CRITICAL ERROR: Failed to fetch {gene} from OpenTargets API: {e}")
+            raise e
             
     # Save to CSV
     df = pd.DataFrame(results)
-    out_path = os.path.join(OUTPUT_DIR, 'opentargets_diseases.csv')
+    out_path = os.path.join(OUTPUT_DIR, f'opentargets_diseases{ANALYSIS_SUFFIX}.csv')
     df.to_csv(out_path, index=False)
     print(f"\nSaved OpenTargets disease associations to {out_path}")
 

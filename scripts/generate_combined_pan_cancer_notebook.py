@@ -3,7 +3,7 @@ import os
 import sys
 
 if '..' not in sys.path: sys.path.append('..')
-from pan_cancer_config import ANALYSIS_SUFFIX
+from pan_cancer_config import ANALYSIS_SUFFIX, CANCERS_TO_RUN
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(os.path.dirname(BASE_DIR), 'output')
@@ -53,22 +53,22 @@ META_RESULTS_DIR = os.path.join(OUTPUT_DIR, 'pan_cancer_meta_results')
 **Inputs / Parameters:**
 {inputs_str}
 
-**Analysis:** We take the intersection of all target genes marked as `Up in Metastasis` across the 5 input files. This yields **strictly conserved pan-cancer metabolic targets**.
+**Analysis:** We take the intersection of all target genes marked as `Up in Metastasis` across the {len(CANCER_CAP)} input files. This yields **strictly conserved pan-cancer metabolic targets**.
 
 **Underlying Data (CSVs):**
 - **UpSet Plot Data:** `output/pan_cancer_meta_results/upset_plot_data{ANALYSIS_SUFFIX}.csv` (contains the raw mapping of which gene belongs to which cancer's Up-Regulated set).
 - **The Conserved Pan-Cancer Genes:** `output/pan_cancer_meta_results/conserved_target_genes.csv` (contains the final intersected list).
 """))
 
-    code_upset = """# 1. Pan-Cancer Overlap (UpSet Plot)
-image_path = os.path.join(META_RESULTS_DIR, f'upset_plot{ANALYSIS_SUFFIX}.png')
+    code_upset = f"""# 1. Pan-Cancer Overlap (UpSet Plot)
+image_path = os.path.join(META_RESULTS_DIR, f'upset_plot{{ANALYSIS_SUFFIX}}.png')
 if os.path.exists(image_path):
     display(Image(filename=image_path))
 else:
-    print(f"Image not found at {image_path}")
+    print(f"Image not found at {{image_path}}")
 
-print("\\nNote: There are exactly 0 genes commonly upregulated across all 5 cancers.")
-print("We have relaxed the strict threshold to generate stratified combinations of 4 out of 5 cancers.")
+print("\\nNote: There are exactly 0 genes commonly upregulated across all {len(CANCER_CAP)} cancers.")
+print("We have relaxed the strict threshold to generate stratified combinations of {len(CANCER_CAP)-1} out of {len(CANCER_CAP)} cancers.")
 """
     nb.cells.append(nbf.v4.new_code_cell(code_upset))
 
@@ -164,6 +164,106 @@ for col in score_cols:
 """
         nb.cells.append(nbf.v4.new_code_cell(code))
 
+
+    # Section 5: Immune Evasion & CCC
+    nb.cells.append(nbf.v4.new_markdown_cell(f"""### 5. Pan-Cancer Immune Evasion & Cell-Cell Communication (CCC)
+
+**Goal:** Quantify the scale of immune evasion and cell-cell communication (CCC) potential across different metastatic niches, and identify strictly conserved ligand-receptor interactions.
+
+**Inputs / Parameters:**
+- **CCC Metrics:** `output/pan_cancer_meta_results/immune_evasion_ccc_quantification_{len(CANCERS_TO_RUN)}MetCan_{{ANALYSIS_SUFFIX}}.csv`
+- **LIANA Networks:** `output/[cancer]_results/[cancer]_*cellxgene_liana_results.csv`
+
+**Analysis:** We aggregate the CCC quantification outputs from Phase 3 to map the scale of the tumor microenvironment interactome. We then compute the intersection of raw LIANA networks across the analyzed cancers to extract a core, conserved Pan-Cancer CCC Signature.
+"""))
+
+    code_ccc = f"""# 5. Pan-Cancer Immune Evasion & CCC
+import matplotlib.pyplot as plt
+import seaborn as sns
+import glob
+import subprocess
+
+ccc_csv = os.path.join(META_RESULTS_DIR, f'immune_evasion_ccc_quantification_{len(CANCERS_TO_RUN)}MetCan_{{ANALYSIS_SUFFIX}}.csv')
+
+try:
+    df_ccc = pd.read_csv(ccc_csv)
+    
+    # Plot Total CCC Links and Overlapping Orphans
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+    sns.barplot(data=df_ccc, x='Cancer', y='Total_Inferred_CCC_Links', ax=ax1, color='lightblue', label='Total CCC Links')
+    
+    ax2 = ax1.twinx()
+    sns.lineplot(data=df_ccc, x='Cancer', y='Overlapping_Orphan_Interactions', ax=ax2, color='darkred', marker='o', linewidth=2, label='Overlapping Orphan Interactions')
+    
+    ax1.set_ylabel('Total Inferred CCC Links')
+    ax2.set_ylabel('Overlapping Orphan Interactions')
+    plt.title('Scale of Tumor Microenvironment Interactome Across Cancers')
+    
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax2.legend(lines + lines2, labels + labels2, loc='upper right')
+    
+    plt.tight_layout()
+    plt.show()
+
+except FileNotFoundError:
+    print(f"⚠️ Warning: CCC Metrics CSV not found at {{ccc_csv}}. Ensure Phase 3 has fully completed.")
+
+# Dynamic LIANA Loading and Intersection
+print("\\n--- Identifying Conserved Pan-Cancer Ligand-Receptor Pairs ---")
+liana_datasets = []
+valid_cancers = []
+
+for cancer in CANCERS_TO_RUN:
+    prefix = cancer.lower()
+    if prefix == 'ovary': prefix = 'ovarian'
+    search_path = os.path.join(OUTPUT_DIR, f"{{prefix}}_results", f"{{prefix}}*cellxgene_liana_results.csv")
+    files = glob.glob(search_path)
+    
+    if not files:
+        print(f"⚠️ LIANA CSV missing for {{cancer}}. Attempting to run fail-safe patch...")
+        subprocess.run([sys.executable, os.path.join(BASE_DIR, "scripts", "patch_liana_csvs.py")])
+        files = glob.glob(search_path)
+        
+    if files:
+        try:
+            df_liana = pd.read_csv(files[0])
+            df_liana['interaction_key'] = df_liana['ligand_complex'] + " -> " + df_liana['receptor_complex']
+            liana_datasets.append(set(df_liana['interaction_key'].dropna()))
+            valid_cancers.append(cancer)
+        except Exception as e:
+            print(f"⚠️ Error loading LIANA CSV for {{cancer}}: {{e}}")
+    else:
+        print(f"⚠️ Fail-safe failed. LIANA CSV for {{cancer}} remains missing. Skipping this cancer for intersection.")
+
+if liana_datasets:
+    # N-1 Relaxation Logic
+    target_overlap = len(valid_cancers)
+    conserved_links = set()
+    
+    while target_overlap > 0:
+        # Find elements that appear in at least 'target_overlap' sets
+        all_links = set.union(*liana_datasets)
+        conserved_links = {{link for link in all_links if sum(1 for s in liana_datasets if link in s) >= target_overlap}}
+        
+        if conserved_links:
+            print(f"✅ Found {{len(conserved_links)}} conserved Ligand-Receptor pairs across {{target_overlap}} out of {{len(valid_cancers)}} valid cancers.")
+            break
+        else:
+            print(f"⚠️ No conserved pairs found across {{target_overlap}} cancers. Relaxing threshold...")
+            target_overlap -= 1
+            
+    if conserved_links:
+        df_conserved_ccc = pd.DataFrame(list(conserved_links), columns=['Conserved_Ligand_Receptor_Pair'])
+        out_path = os.path.join(META_RESULTS_DIR, f'pan_cancer_conserved_ccc_links{{ANALYSIS_SUFFIX}}.csv')
+        df_conserved_ccc.to_csv(out_path, index=False)
+        print(f"Exported Conserved CCC links to: {{out_path}}")
+        from IPython.display import display, HTML
+        display(HTML(df_conserved_ccc.head(20).to_html()))
+else:
+    print("❌ No valid LIANA datasets were loaded. Cannot compute intersection.")
+"""
+    nb.cells.append(nbf.v4.new_code_cell(code_ccc))
 
     # Export code
     export_code = """import subprocess

@@ -195,10 +195,19 @@ def generate_annotated_signature():
         
     sig_df = pd.read_csv(conserved_csv)
     genes = sig_df['Strictly_Conserved_Gene'].tolist()
+    import subprocess
     
+    # The signature genes are dynamic per run, so we always re-fetch the latest 
+    # OpenTargets and UniProt annotations for the current exact signature.
+    print(f"Triggering scripts/fetch_uniprot_roles.py for {len(genes)} dynamic genes...")
+    subprocess.run(["python", "scripts/fetch_uniprot_roles.py"])
+    
+    print(f"Triggering scripts/fetch_opentargets.py for {len(genes)} dynamic genes...")
+    subprocess.run(["python", "scripts/fetch_opentargets.py"])
+
     # Load UniProt biological roles if available
     uniprot_roles = {}
-    uniprot_csv = os.path.join(OUTPUT_DIR, 'uniprot_biological_roles.csv')
+    uniprot_csv = os.path.join(OUTPUT_DIR, f'uniprot_biological_roles{ANALYSIS_SUFFIX}.csv')
     if os.path.exists(uniprot_csv):
         u_df = pd.read_csv(uniprot_csv)
         for _, row in u_df.iterrows():
@@ -206,7 +215,7 @@ def generate_annotated_signature():
             
     # Load OpenTargets diseases if available
     opentargets_diseases = {}
-    ot_csv = os.path.join(OUTPUT_DIR, 'opentargets_diseases.csv')
+    ot_csv = os.path.join(OUTPUT_DIR, f'opentargets_diseases{ANALYSIS_SUFFIX}.csv')
     if os.path.exists(ot_csv):
         ot_df = pd.read_csv(ot_csv)
         for _, row in ot_df.iterrows():
@@ -262,14 +271,16 @@ def generate_annotated_signature():
             flat_types.update([s.strip() for s in str(st).split(',') if s.strip() != 'nan'])
         sensor_str = ", ".join(sorted(list(flat_types)))
         
-        # Get unique rhea reactions
-        if 'rhea_reaction' in gene_data.columns:
+        # Get unique rhea reactions from dynamically enriched columns
+        if 'Rhea_enzyme product/substrate' in gene_data.columns:
+            rhea = gene_data['Rhea_enzyme product/substrate'].dropna().unique()
+        elif 'enzyme product/substrate' in gene_data.columns:
+            rhea = gene_data['enzyme product/substrate'].dropna().unique()
+        elif 'rhea_reaction' in gene_data.columns:
             rhea = gene_data['rhea_reaction'].dropna().unique()
-        elif 'Rhea_ID' in gene_data.columns:
-            rhea = gene_data['Rhea_ID'].dropna().unique()
         else:
             rhea = []
-        rhea_str = ";".join([str(x) for x in rhea])
+        rhea_str = "; ".join([str(x) for x in rhea if pd.notna(x) and str(x).strip() != ''])
         
         # Get unique PMIDs
         pmids = gene_data['PMID'].dropna().unique()

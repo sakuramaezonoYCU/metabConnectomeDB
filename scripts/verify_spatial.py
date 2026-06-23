@@ -147,13 +147,7 @@ def load_visium_from_mtx(sample_dir):
 
 def analyze_sample(sample_dir, sample_name, out_dir, sig_genes, sig_name):
     print(f"\n[{sample_name}] Loading Visium data...")
-    try:
-        adata = load_visium_from_mtx(sample_dir)
-    except Exception as e:
-        import traceback
-        print(f"  -> Failed to load {sample_name}:")
-        traceback.print_exc()
-        return
+    adata = load_visium_from_mtx(sample_dir)
         
     adata.var_names_make_unique()
     

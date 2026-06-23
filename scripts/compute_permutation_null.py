@@ -19,7 +19,13 @@ def compute_permutation_null(signature_csv, n_permutations=100):
     out_dir = os.path.join(BASE_DIR, "output", f"deepdive_conserved_metabGeneSig{ANALYSIS_SUFFIX}", "tcga_validation")
     os.makedirs(out_dir, exist_ok=True)
     
-    cancer_codes = ["BRCA", "COAD", "READ", "LUAD", "LUSC", "SKCM", "OV"]
+    from pan_cancer_config import TCGA_MAPPING
+    cancer_codes = []
+    for cohorts in TCGA_MAPPING.values():
+        cancer_codes.extend(cohorts)
+    cancer_codes = list(set(cancer_codes))
+    if not cancer_codes:
+        raise RuntimeError("CRITICAL ERROR: TCGA_MAPPING from pan_cancer_config is empty or missing. Cannot validate TCGA signatures without defined cohorts.")
     
     # Determine signature size
     if not os.path.exists(signature_csv):
@@ -31,13 +37,15 @@ def compute_permutation_null(signature_csv, n_permutations=100):
     print(f"Dynamically determined signature size: {signature_size} from {signature_csv}")
     
     # 1. We need the list of all available genes to sample from.
-    brca_exp = os.path.join(dir_input, "TCGA-BRCA.star_fpkm.tsv.gz")
-    if not os.path.exists(brca_exp):
-        print(f"Missing {brca_exp}. Cannot determine gene universe.")
-        return
+    # Dynamically grab the first cohort to scan for the gene universe
+    first_cohort = cancer_codes[0]
+    first_exp = os.path.join(dir_input, f"TCGA-{first_cohort}.star_fpkm.tsv.gz")
+    if not os.path.exists(first_exp):
+        raise RuntimeError(f"Missing {first_exp}. Cannot determine gene universe.")
         
     print("Scanning transcriptome for gene universe...")
-    genes_df = pd.read_csv(brca_exp, sep='\t', usecols=[0])
+    genes_df = pd.read_csv(first_exp, sep='\t', usecols=[0])
+    genes_df = genes_df[genes_df.iloc[:, 0].str.startswith('ENSG')]
     gene_col = genes_df.columns[0]
     all_genes = genes_df[gene_col].dropna().unique().tolist()
     print(f"Found {len(all_genes)} unique genes.")
@@ -118,22 +126,18 @@ def compute_permutation_null(signature_csv, n_permutations=100):
             med = merged_base['Score'].median()
             merged_base['Risk_Binary'] = (merged_base['Score'] >= med).astype(int)
             
-            try:
-                cph = CoxPHFitter()
-                fit_df = merged_base[[time_col, event_col, 'Risk_Binary']]
-                cph.fit(fit_df, duration_col=time_col, event_col=event_col)
-                hr = cph.hazard_ratios_['Risk_Binary']
-                p_val = cph.summary['p']['Risk_Binary']
-                
-                all_results.append({
-                    'TCGA_Cohort': cancer,
-                    'Permutation': i,
-                    'Hazard_Ratio': hr,
-                    'P_Value': p_val
-                })
-            except:
-                pass
-                
+            cph = CoxPHFitter()
+            fit_df = merged_base[[time_col, event_col, 'Risk_Binary']]
+            cph.fit(fit_df, duration_col=time_col, event_col=event_col)
+            hr = cph.hazard_ratios_['Risk_Binary']
+            p_val = cph.summary['p']['Risk_Binary']
+            
+            all_results.append({
+                'TCGA_Cohort': cancer,
+                'Permutation': i,
+                'Hazard_Ratio': hr,
+                'P_Value': p_val
+            })
     if all_results:
         results_df = pd.DataFrame(all_results)
         out_file = os.path.join(out_dir, "null_distribution_metrics.csv")

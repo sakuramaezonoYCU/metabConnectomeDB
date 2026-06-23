@@ -81,7 +81,9 @@ def scrape_integration_html(html_file):
     with open(html_file, 'r', encoding='utf-8') as f:
         text = BeautifulSoup(f, 'html.parser').get_text()
 
-    m_ccc = re.search(r"Successfully inferred ([\d,]+) metabolic cell-cell communication links", text)
+    m_ccc = re.search(r"LIANA\+ found ([\d,]+) interactions", text)
+    if not m_ccc:
+        m_ccc = re.search(r"Successfully inferred ([\d,]+) metabolic cell-cell communication links", text)
     if m_ccc: metrics['Total_Inferred_CCC_Links'] = m_ccc.group(1).replace(',', '')
 
     m_cells = re.search(r"Total cells:\s*([\d,]+)", text)

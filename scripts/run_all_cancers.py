@@ -3,14 +3,19 @@ import cellxgene_census
 import sys
 import os
 
-# Set default CAP for CellxGene downloads (number of cells). 100k = 100000 cells.
-# Users can override by setting the environment variable CELLXGENE_CAP before running this script.
-DEFAULT_CAP = "500000"
-os.environ.setdefault('CELLXGENE_CAP', DEFAULT_CAP)
-
 import sys
 if '..' not in sys.path: sys.path.append('..')
 from pan_cancer_config import CANCERS_TO_RUN, CANCER_PRIMARY_TISSUE, CANCER_DISEASE_QUERIES
+import json
+
+config_path = os.path.join(os.path.dirname(__file__), "..", "input", "pipeline.config.json")
+try:
+    with open(config_path, "r") as f:
+        config = json.load(f)
+        cancer_caps = config.get("PHASE_2_SINGLE_CELL_INTEGRATION", {}).get("CANCER_CAP", {})
+except Exception as e:
+    print(f"Warning: Could not read CANCER_CAP from pipeline.config.json: {e}")
+    cancer_caps = {}
 
 print("Querying CellxGene Census for the Top 3 Metastatic Tissues...")
 
@@ -73,9 +78,18 @@ for cancer_key in CANCERS_TO_RUN:
             time.sleep(5)
 
     print(f"Launching parallel pipeline for: {cancer_key} (Output redirected to output/{cancer_key}_pipeline.log)...")
-    cmd = [sys.executable, script_path, disease_query, tissue_filter_str, primary_tissue_str]
+    cmd = [sys.executable, script_path, cancer_key, disease_query, tissue_filter_str, primary_tissue_str]
     env = os.environ.copy()
-    env.setdefault('CELLXGENE_CAP', DEFAULT_CAP)
+    
+    # Use cancer-specific cap strictly from config, falling back to 'all' like the past
+    c_cap = cancer_caps.get(cancer_key, "all")
+    # Clean up 'k' notation to numeric if needed
+    if isinstance(c_cap, str) and c_cap.lower().endswith('k'):
+        c_cap = str(int(c_cap[:-1]) * 1000)
+    elif c_cap == "all":
+        c_cap = "all"
+        
+    env['CELLXGENE_CAP'] = str(c_cap)
     
     # Redirect output to a log file to avoid terminal garble
     log_file = open(f"output/{cancer_key}_pipeline.log", "w")

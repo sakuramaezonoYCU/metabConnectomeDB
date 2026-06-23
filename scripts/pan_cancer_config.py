@@ -149,6 +149,16 @@ def get_h5ad_path(cancer: str) -> str:
         return matches[0]
     return pattern
 
+def get_liana_csv_paths(cancer: str) -> dict:
+    """Returns a dictionary of paths for primary, meta, and full LIANA CSV results."""
+    base_h5ad = get_h5ad_path(cancer)
+    return {
+        "primary": base_h5ad.replace(".h5ad", "_primary_liana_results.csv"),
+        "meta": base_h5ad.replace(".h5ad", "_meta_liana_results.csv"),
+        "full": base_h5ad.replace(".h5ad", "_cellxgene_liana_results.csv")
+    }
+
+
 # Predictive subclone detection thresholds
 SKEW_THRESHOLD = _p45.get("SKEW_THRESHOLD", 0.5)
 SUBCLONE_SD_MULTIPLIER = _p45.get("SUBCLONE_SD_MULTIPLIER", 1.0)
