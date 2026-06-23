@@ -791,6 +791,10 @@ if __name__ == '__main__':
     if generated_h5ad:
         print(f"Running downstream scripts for generated h5ad: {generated_h5ad}")
         
+        print(f"Ensuring LIANA target network is generated via patch script...")
+        import subprocess
+        subprocess.run([sys.executable, os.path.join(script_dir, "patch_liana_csvs.py")])
+        
         import re
         disease_slug = re.sub(r'[^a-z0-9]+', '-', disease_filter_str.lower()).strip('-')
         primary_slug = "_".join(re.sub(r'[^a-z0-9]+', '-', t.lower()).strip('-') for t in primary_tissues)
