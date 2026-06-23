@@ -1,10 +1,9 @@
-import sys
 import os
 import glob
 import re
 import pandas as pd
 from bs4 import BeautifulSoup
-from pan_cancer_config import CANCERS_TO_RUN, ANALYSIS_SUFFIX
+from pan_cancer_config import CANCERS_TO_RUN, ANALYSIS_SUFFIX, get_liana_csv_paths
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(os.path.dirname(BASE_DIR), 'output', 'pan_cancer_meta_results')
@@ -19,33 +18,6 @@ def find_file(folder, suffix):
         return matches[0]
     return None
 
-def extract_regex(pattern, content):
-    match = re.search(pattern, content)
-    if match:
-        val = match.group(1).replace(',', '')
-        try:
-            return int(val)
-        except ValueError:
-            return val
-    return 0
-
-print("Quantifying Immune Evasion and CCC Microenvironments (including HTML-exclusive metrics)...")
-
-for cancer in CANCERS_TO_RUN:
-    cancer_name = cancer.capitalize()
-    from pan_cancer_config import normalize_cancer_name
-    prefix = normalize_cancer_name(cancer)
-    folder = f"{prefix}_results"
-    
-    ccc_file = find_file(folder, 'cellxgene_communication_potential.csv')
-    orphan_file = find_file(folder, 'immune_evasion_orphan_metabolic_candidates.csv')
-    html_file = find_file(folder, 'cancer_cellxgene_integration')
-    orphan_html_file = find_file(folder, 'orphan_immune_')
-    
-    ccc_targets = 0
-    orphan_targets = 0
-    mean_ccc_cell_types = 0.0
-    top_orphan_targets = "None"
 def parse_disease_counts(html_file, cancer, cap):
     """Parses the disease_counts table from the integration HTML."""
     if not os.path.exists(html_file):
@@ -67,7 +39,7 @@ def parse_disease_counts(html_file, cancer, cap):
         print(f"[{cancer.capitalize()}] Warning: Could not parse disease table from {html_file}: {e}")
         return pd.DataFrame()
 
-def scrape_integration_html(html_file):
+def scrape_integration_html(html_file, ccc_file):
     """Scrapes cancer_cellxgene_integration HTML for missing metrics."""
     metrics = {
         'Total_Inferred_CCC_Links': '0',
@@ -75,16 +47,25 @@ def scrape_integration_html(html_file):
         'Cell_Types': '0',
         'Genes_gt_10pct_Detection': '0'
     }
+    
+    if ccc_file and os.path.exists(ccc_file):
+        try:
+            df = pd.read_csv(ccc_file)
+            metrics['Total_Inferred_CCC_Links'] = str(len(df))
+        except Exception as e:
+            pass
+            
     if not os.path.exists(html_file):
         return metrics
 
     with open(html_file, 'r', encoding='utf-8') as f:
         text = BeautifulSoup(f, 'html.parser').get_text()
 
-    m_ccc = re.search(r"LIANA\+ found ([\d,]+) interactions", text)
-    if not m_ccc:
-        m_ccc = re.search(r"Successfully inferred ([\d,]+) metabolic cell-cell communication links", text)
-    if m_ccc: metrics['Total_Inferred_CCC_Links'] = m_ccc.group(1).replace(',', '')
+    if metrics['Total_Inferred_CCC_Links'] == '0':
+        m_ccc = re.search(r"LIANA\+ found ([\d,]+) interactions", text)
+        if not m_ccc:
+            m_ccc = re.search(r"Successfully inferred ([\d,]+) metabolic cell-cell communication links", text)
+        if m_ccc: metrics['Total_Inferred_CCC_Links'] = m_ccc.group(1).replace(',', '')
 
     m_cells = re.search(r"Total cells:\s*([\d,]+)", text)
     if m_cells: metrics['Total_Cells'] = m_cells.group(1).replace(',', '')
@@ -97,25 +78,44 @@ def scrape_integration_html(html_file):
 
     return metrics
 
-def scrape_pvm_html(html_file):
-    """Scrapes primary_vs_metastasis HTML for missing metrics."""
+def scrape_pvm_html(html_file, cancer):
+    """Scrapes primary_vs_metastasis HTML for missing metrics and uses CSVs for LIANA."""
     metrics = {
         'Primary_LIANA_Targets': '0',
         'Meta_LIANA_Targets': '0',
         'Pan_Metastatic_Conserved_Targets': '0',
         'Site_Specific_Upregulated_Summary': 'None'
     }
+    
+    # Use CSV files to get exact LIANA target counts
+    try:
+        paths = get_liana_csv_paths(cancer)
+        
+        if paths['primary'] and os.path.exists(paths['primary']):
+            df_prim = pd.read_csv(paths['primary'])
+            prim_targs = set(df_prim['receptor_complex'].dropna().unique()).union(set(df_prim['ligand_complex'].dropna().unique()))
+            metrics['Primary_LIANA_Targets'] = str(len(prim_targs))
+            
+        if paths['meta'] and os.path.exists(paths['meta']):
+            df_meta = pd.read_csv(paths['meta'])
+            meta_targs = set(df_meta['receptor_complex'].dropna().unique()).union(set(df_meta['ligand_complex'].dropna().unique()))
+            metrics['Meta_LIANA_Targets'] = str(len(meta_targs))
+    except Exception as e:
+        print(f"[{cancer.capitalize()}] Warning: Could not read LIANA CSVs: {e}")
+        
     if not os.path.exists(html_file):
         return metrics
 
     with open(html_file, 'r', encoding='utf-8') as f:
         text = BeautifulSoup(f, 'html.parser').get_text()
 
-    m_prim_liana = re.search(r"Primary LIANA results:\s*([\d,]+)", text)
-    if m_prim_liana: metrics['Primary_LIANA_Targets'] = m_prim_liana.group(1).replace(',', '')
+    if metrics['Primary_LIANA_Targets'] == '0':
+        m_prim_liana = re.search(r"Primary LIANA results:\s*([\d,]+)", text)
+        if m_prim_liana: metrics['Primary_LIANA_Targets'] = m_prim_liana.group(1).replace(',', '')
 
-    m_meta_liana = re.search(r"Meta LIANA results:\s*([\d,]+)", text)
-    if m_meta_liana: metrics['Meta_LIANA_Targets'] = m_meta_liana.group(1).replace(',', '')
+    if metrics['Meta_LIANA_Targets'] == '0':
+        m_meta_liana = re.search(r"Meta LIANA results:\s*([\d,]+)", text)
+        if m_meta_liana: metrics['Meta_LIANA_Targets'] = m_meta_liana.group(1).replace(',', '')
 
     m_cons = re.search(r"Pan-Metastatic Conserved Targets \((\d+) genes\)", text)
     if m_cons: metrics['Pan_Metastatic_Conserved_Targets'] = m_cons.group(1).replace(',', '')
@@ -164,9 +164,10 @@ def quantify_immune_evasion():
             prefix = 'ovarian'
         cancer_dir = os.path.join(results_parent, 'output', f"{prefix}_results")
         
+        ccc_file = find_file(f"{prefix}_results", 'cellxgene_communication_potential.csv')
         int_html = glob.glob(os.path.join(cancer_dir, "cancer_cellxgene_integration*.html"))
         int_html = int_html[0] if int_html else ""
-        int_metrics = scrape_integration_html(int_html)
+        int_metrics = scrape_integration_html(int_html, ccc_file)
         
         disease_df = parse_disease_counts(int_html, cancer, "")
         if not disease_df.empty:
@@ -174,7 +175,7 @@ def quantify_immune_evasion():
             
         pvm_html = glob.glob(os.path.join(cancer_dir, "primary_vs_metastasis_*.html"))
         pvm_html = pvm_html[0] if pvm_html else ""
-        pvm_metrics = scrape_pvm_html(pvm_html)
+        pvm_metrics = scrape_pvm_html(pvm_html, cancer)
         
         omi_html = glob.glob(os.path.join(cancer_dir, "orphan_immune_*.html"))
         omi_html = omi_html[0] if omi_html else ""
@@ -189,7 +190,8 @@ def quantify_immune_evasion():
         pan_cancer_stats.append(stats)
         
         print(f"[{cancer.capitalize()}] CCC Links: {int_metrics['Total_Inferred_CCC_Links']} | "
-              f"Site-Specific Targets: {pvm_metrics['Site_Specific_Upregulated_Summary']} | "
+              f"Primary LIANA Targets: {pvm_metrics['Primary_LIANA_Targets']} | "
+              f"Meta LIANA Targets: {pvm_metrics['Meta_LIANA_Targets']} | "
               f"Conserved Targets: {pvm_metrics['Pan_Metastatic_Conserved_Targets']} | "
               f"Overlapping Orphan: {omi_metrics['Overlapping_Orphan_Interactions']}")
 
