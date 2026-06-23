@@ -109,7 +109,7 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
     - `output/deepdive_conserved_metabGeneSig/deepdive_conserved_metabGeneSig_report.html`
     - `output/serotonin_axis_spatial_mapping_report.html`
     - `output/ovarian_serotonin_immune_evasion_report.html`
-    - `output/oxygen_tension_analysis_report.html`
+    - `output/oxygen_tension_analysis_report.html` (Note: Requires `scripts/compute_metabolic_switching.py` to be present; do not archive this dependency)
     - `output/mitf_regulon_expansion_report.html`
     - `output/[cancer]_ml_prognostic_classifier_report.html`
     - `output/pancancer_ml_prognostic_classifier_report.html`

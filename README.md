@@ -26,6 +26,7 @@ metabConnectomeDB/
 │   ├── validate_tcga_signature.py      # TCGA Cox Proportional Hazard regressions
 │   ├── verify_spatial.py               # Visium spatial enrichment scoring
 │   ├── generate_predictive_notebook.py # Pre-metastatic subclone scoring
+│   ├── compute_metabolic_switching.py  # DO NOT ARCHIVE: Required dependency for oxygen_tension_analysis.ipynb
 │   ├── execute_pancancer_notebooks.py  # Downstream HTML report compiler
 │   ├── generate_final_outputs.py
 │   ├── merge_simplify_annotate.sh
@@ -367,7 +368,7 @@ Several targeted Jupyter notebooks dive deep into specific biological questions 
 - **`deepdive_conserved_metabGeneSig.ipynb`**: Deep dive into the conserved pan-cancer metabolic gene signature, integrating STAT3 targets, directional cell-cell communication, and validating signatures in TCGA survival cohorts using permutation null distributions.
 - **`mitf_regulon_expansion.ipynb`**: Investigates the expansion of the MITF regulon and its downstream metabolic targets.
 - **`predictive_signature_biomarker.ipynb`**: Explores the pan-cancer predictive capability of the strictly conserved metabolic gene signature.
-- **`oxygen_tension_analysis.ipynb`**: Computationally simulates and models the impact of intratumoral oxygen gradients (e.g., via HIF-1 pathway profiling) on metabolic signatures.
+- **`oxygen_tension_analysis.ipynb`**: Computationally simulates and models the impact of intratumoral oxygen gradients (e.g., via HIF-1 pathway profiling) on metabolic signatures. *(Note: This notebook strictly depends on `scripts/compute_metabolic_switching.py`; do not archive it).*
 - **`serotonin_axis_spatial_mapping.ipynb`**: Maps the spatial distribution of the serotonin axis within specific tissue microenvironments.
 - **`visium_spatial_validation.ipynb`**: Validates the spatial axis involving HTR7+ tumor-associated macrophages (TAMs) and HR-repair genes using Visium spatial transcriptomics via spatial co-localization analysis.
 - **`camp_pancancer_integration_*.ipynb`**: Investigates pan-cancer integration for Directed Metastatic Signatures.
