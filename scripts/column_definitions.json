@@ -5,7 +5,15 @@
     ],
     "Target": [
         "Target Protein Properties",
-        "The standardized HGNC gene symbol of the target protein (receptor, enzyme, or transporter)."
+        "The official, canonical HGNC gene symbol of the target protein (receptor, enzyme, or transporter)."
+    ],
+    "Target_original": [
+        "Target Protein Properties",
+        "The unmapped, raw target symbol aggregated directly from the source databases before HGNC canonicalization."
+    ],
+    "Target_Uniprot": [
+        "Target Protein Properties",
+        "The canonical UniProt accession identifier dynamically resolved from the HGNC database for the canonical Target."
     ],
     "HMDB_ID": [
         "Metabolite Properties & Structure",

@@ -117,7 +117,7 @@ This phase curates the generic databases (KEGG, HMDB, CellChat) from `input/data
 - `generate_ai_summary_tables.py`: Generates the consolidated summary CSV files.
 
 **Phase 4: Pan-Cancer Notebook Compilation**
-- `generate_combined_pan_cancer_notebook.py`: Auto-generates the `pan_cancer_meta_analysis.ipynb` master notebook.
+- `generate_combined_pan_cancer_notebook.py`: Auto-generates the `pan_cancer_meta_analysis.ipynb` master notebook. This script integrates Phase 3 CCC and LIANA metrics to construct the Pan-Cancer Immune Evasion network. **Fail-safe:** If a cancer's `_cellxgene_liana_results.csv` is missing during the intersection process, the notebook automatically executes `scripts/patch_liana_csvs.py` on the fly to regenerate it without halting the pipeline.
 - `execute_and_export_notebooks.py` (or manual execution): Runs the notebook to visualize the network graph and output standard plots.
 
 **Phase 5: Dynamic Gene Signature Validation (Frequent Execution)**
@@ -403,3 +403,12 @@ Ensure that the `input/` directory is populated locally before running the pipel
 **[2026-06-22] Dynamic KEGG Pathways & Plot Aesthetics Patch**
 - **Issue:** Pathway gene lists for immune-metabolic targets (including TCA/Fumarate) were hardcoded in notebooks, causing missing data mappings. `run_all_cancers.py` threw a `KeyError` due to an `"ovary"` vs `"ovarian"` mismatch in `pipeline.config.json`. Plot axis labels (LIANA+ heatmaps and bubble plots) overlapped severely when processing large numbers of interacting cell types.
 - **Fix:** Switched to dynamic programmatic fetching via `fetch_kegg_pathways.py` and `CANCER_PATHWAYS` json config mapping. Changed violin plots to `stacked_violin` and dynamically scaled Plotly/Matplotlib figsize widths against cell-type array lengths. Fixed `OUTPUT_DIR` injection redundancy in `run_cancer_pipeline.py`.
+
+**[2026-06-23] Zero-Tolerance Provenance & Visual Exports Patch**
+- **Issue:** Pre-existing fallback logic injected hardcoded data when config files were missing, violating zero-tolerance rules for data falsification. Additionally, secondary visuals like static volcano plots, niche UpSet plots, and orphan multi-panel plots were only displayed inline and never exported. Finally, Section 9 pathway dotplots were heavily squished due to too many genes.
+- **Fix:** Removed hardcoded KEGG pathways fallback and replaced it with a strict `RuntimeError` failure mode. Iterated Section 9 into dynamically scaled individual dotplots per pathway. Added explicit `plt.savefig()` and `csv.writer` code to force all secondary static plots and underlying niche intersection lists to export directly to standalone PDFs and CSVs in the `[cancer]_results/` folder.
+
+**[2026-06-23] HGNC Target Canonicalization Patch**
+- **Issue:** Unreviewed TrEMBL fragments were being fetched by UniProt downstream because the pipeline aggregated raw, potentially obsolete symbols (e.g. `A1BGAS`) directly into the master `Target` column without resolving them to their official canonical names.
+- **Fix:** Implemented an official canonical resolution step in `scripts/generate_final_outputs.py` right before dataset flattening. The script now reads `input/hgnc_approved_genes.json` to build an exhaustive `alias_symbol` and `prev_symbol` to official `symbol` mapping dictionary. 
+- **Data Provenance Preservation:** The raw aggregated symbols are preserved exactly as they were in a new `Target_original` column. The resulting official canonical symbols are output to the `Target` column, and any associated UniProt IDs are placed in a `Target_Uniprot` annotation column, completely protecting downstream target-matching scripts.

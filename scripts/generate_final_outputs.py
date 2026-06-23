@@ -117,11 +117,60 @@ def process_species(species, out_dir):
     avail_targets = [c for c in target_cols if c in df_filtered.columns]
 
     df_pairs = df_filtered.copy()
-    df_pairs['Target'] = np.nan
+    df_pairs['Target_original'] = np.nan
     for tc in avail_targets:
-        df_pairs['Target'] = df_pairs['Target'].fillna(df_pairs[tc])
+        df_pairs['Target_original'] = df_pairs['Target_original'].fillna(df_pairs[tc])
 
-    df_pairs = df_pairs.dropna(subset=['Metabolite_Name', 'Target'])
+    df_pairs = df_pairs.dropna(subset=['Metabolite_Name', 'Target_original'])
+
+    import json
+    import re
+    hgnc_path = os.path.join(out_dir, '..', 'input', 'hgnc_approved_genes.json')
+    alias_map = {}
+    uniprot_map = {}
+    if os.path.exists(hgnc_path):
+        with open(hgnc_path, "r", encoding="utf-8") as f:
+            hgnc_data = json.load(f)
+        for doc in hgnc_data.get("response", {}).get("docs", []):
+            canon = doc.get("symbol")
+            if not canon: continue
+            
+            alias_map[str(canon).upper()] = canon
+            for alias in doc.get("alias_symbol", []):
+                alias_map[str(alias).upper()] = canon
+            for prev in doc.get("prev_symbol", []):
+                alias_map[str(prev).upper()] = canon
+                
+            u_ids = doc.get("uniprot_ids", [])
+            if u_ids:
+                uniprot_map[canon] = str(u_ids[0])
+
+    def map_hgnc_target(raw_val):
+        if pd.isna(raw_val): return np.nan
+        parts = re.split(r'[,/;|]+', str(raw_val))
+        mapped_parts = []
+        for p in parts:
+            p = p.strip()
+            if not p: continue
+            mapped = alias_map.get(p.upper(), p)
+            mapped_parts.append(mapped)
+        if not mapped_parts: return np.nan
+        return " | ".join(sorted(list(set(mapped_parts))))
+
+    def map_target_uniprot(canon_val):
+        if pd.isna(canon_val): return np.nan
+        parts = str(canon_val).split(" | ")
+        u_ids = []
+        for p in parts:
+            p = p.strip()
+            if p in uniprot_map:
+                u_ids.append(uniprot_map[p])
+        if not u_ids: return np.nan
+        return " | ".join(sorted(list(set(u_ids))))
+
+    print("  Canonicalizing Target symbols against HGNC mappings...")
+    df_pairs['Target'] = df_pairs['Target_original'].apply(map_hgnc_target)
+    df_pairs['Target_Uniprot'] = df_pairs['Target'].apply(map_target_uniprot)
 
     def flatten_unique(series):
         st = set(series.dropna().astype(str))

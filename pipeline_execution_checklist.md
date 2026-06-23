@@ -61,10 +61,11 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
 
 *These scripts generate the unified signatures and single-cell subclone scoring.*
 
-- `[ ]` **5. Compute Pan-Cancer Metastatic Signature**
-  - **Command:** `python scripts/compute_pan_cancer_meta.py`
-  - **Purpose:** Intersects the differentially expressed targets across the cancers to identify the strictly conserved signature. **Methodology Note (MAX CANCER - 1 Rule):** If the strict 5-cancer intersection yields 0 genes, the pipeline automatically falls back to utilizing the union of 4-cancer combinations to ensure a robust meta-signature is evaluated downstream. Outputs `pan_cancer_signature_XXX.csv` combinations based on this rule.
-  - **Output Location:** `output/pan_cancer_meta_results/` (CSVs, upset plot png, and network plot png)
+- `[ ]` **5. Compute Pan-Cancer Metastatic Signature & CCC Interactome**
+  - **Command:** `python scripts/compute_pan_cancer_meta.py` (or through `generate_combined_pan_cancer_notebook.py`)
+  - **Purpose:** Intersects the differentially expressed targets across the cancers to identify the strictly conserved signature. **Methodology Note (MAX CANCER - 1 Rule):** If the strict intersection yields 0 genes, the pipeline automatically falls back to utilizing combinations of N-1 cancers to ensure a robust meta-signature is evaluated downstream. 
+  - **Fail-Safe Behavior (LIANA):** During Pan-Cancer Conserved CCC Links intersection, if any cancer is missing its `_cellxgene_liana_results.csv`, the notebook automatically invokes `patch_liana_csvs.py` on the fly to regenerate it and prevent pipeline failure.
+  - **Output Location:** `output/pan_cancer_meta_results/` (CSVs, upset plot png, network plot png, CCC bar charts, and `pan_cancer_conserved_ccc_links.csv`)
   
 - `[ ]` **6. Pre-Metastatic Subclone Resolution**
   - **Command:** `python scripts/generate_predictive_notebook.py`
@@ -74,6 +75,7 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
 - `[ ]` **7. Generate Unified Tabular Summaries**
   - **Command:** `python scripts/generate_ai_summary_tables.py`
   - **Purpose:** Aggregates all the extracted outputs into formatted CSVs in `output/ai_summary_tables/`.
+  - **Fail-Safe Behavior:** Automatically invokes `fetch_opentargets.py` and `fetch_uniprot_roles.py` if the respective annotation data is missing or incomplete for any newly derived pan-cancer signature genes. This ensures external knowledge graphs stay synchronized without manual intervention.
   - **Output Location:** `output/ai_summary_tables/`
 
 ## Phase 5: Dynamic Gene Signature Validation
@@ -154,3 +156,6 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
 | 2026-06-20 | `scripts/generate_ai_summary_tables.py` | **pO2 Fix:** Added missing `normalize_cancer_name` import; fixed Tumor/Normal pO2 lookup logic via `CANCER_PO2_CSV_MAPPING` |
 | 2026-06-20 | `scripts/generate_ml_prognostic_classifier_notebook.py` | **CSV Export:** Notebook already saves `ml_metrics.csv` with schema: Signature, Train_Size, Test_Size, Optimal_Penalizer, CV_C_Index, Test_C_Index |
 | 2026-06-22 | `pipeline.config.json`, `cancer_cellxgene_integration.ipynb`, `run_cancer_pipeline.py` | **Dynamic KEGG & Plot Aesthetics Fix:** Replaced hardcoded immune-metabolic gene targets with dynamic config JSON mapping. Fixed `'ovary'` key mismatch. Implemented `sc.pl.stacked_violin` and mathematically scaled bubble plots/heatmaps to completely eliminate axis label overlap. Fixed redundant `OUTPUT_DIR` script injections. Added TCA Cycle (Fumarate) pathways. |
+| 2026-06-23 | `cancer_cellxgene_integration.ipynb`, `primary_vs_metastasis_comparison.ipynb`, `orphan_metabolic_immune_evasion.ipynb` | **Zero-Tolerance Provenance & Visual Exports Patch:** Removed hardcoded KEGG fallback in integration notebook to enforce hard crash. Split Section 9 squished dotplots into dynamically-sized, pathway-specific plots. Added explicit standalone PDF and CSV exports for previously inline-only visuals (Static Volcano, Niche UpSet, Orphan Multi-Panel Bar). |
+| 2026-06-23 | `generate_combined_pan_cancer_notebook.py` | **Phase 4 LIANA Integration:** Hooked up `immune_evasion_ccc_quantification` and `_cellxgene_liana_results.csv`. Implemented automatic fail-safe to execute `patch_liana_csvs.py` if LIANA results are missing during Pan-Cancer intersection. |
+| 2026-06-23 | `generate_final_outputs.py` | **HGNC Target Canonicalization Patch:** Added canonical resolution mapping via `input/hgnc_approved_genes.json` to process `Target_original` into official `Target` names. This completely eliminates obsolete Uniprot TrEMBL fragmentation downstream. |
