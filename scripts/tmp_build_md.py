@@ -420,11 +420,11 @@ def build_phase_4():
             'relaxed_combos': r"(combinations of \d+ out of \d+ cancers)"
         }
     )
-    content += f"- **Strictly Conserved (All 5 Cancers):** {s_meta['strict_up']}\n"
-    content += f"- **Relaxed Threshold:** Checked for {s_meta['relaxed_combos']}\n\n"
-
     from pan_cancer_config import CANCERS_TO_RUN as CANCERS
     num_cancers = len(CANCERS)
+
+    content += f"- **Strictly Conserved (All {num_cancers} Cancers):** {s_meta['strict_up']}\n"
+    content += f"- **Relaxed Threshold:** Checked for {s_meta['relaxed_combos']}\n\n"
     content += '### 4.2 Conserved Metastatic Gene Signatures\n\n'
     content += '> [!IMPORTANT]\n'
     content += f'> **Methodology Note (MAX CANCER - 1 Rule):** If the strictly conserved signature across all {num_cancers} cancers yields exactly 0 genes, the pipeline automatically falls back to the union of all {num_cancers-1}-cancer combinations. This ensures a robust, viable meta-signature is still evaluated downstream, as per the established project methodology.\n\n'
