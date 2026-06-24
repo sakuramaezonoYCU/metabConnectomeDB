@@ -154,7 +154,22 @@ def run_validation_phase():
     # ML Prognostic Classifier (special: needs --cancer all flag)
     print(f"\n---> ML Prognostic Classifier Notebook <---")
     try:
+        print("  Running TCGA Pan-Cancer cohorts...")
         subprocess.run(["python", "scripts/generate_ml_prognostic_classifier_notebook.py", "--cancer", "all"], check=True, cwd=BASE_DIR)
+        
+        print("  Running METABRIC Breast Cancer cohort (local input/metabric)...")
+        subprocess.run([
+            "python", "scripts/generate_ml_prognostic_classifier_notebook.py",
+            "--database", "metabric",
+            "--cancer", "all"
+        ], check=True, cwd=BASE_DIR)
+
+        print("  Running MBCProject Breast Cancer cohort (local input/mbcproject)...")
+        subprocess.run([
+            "python", "scripts/generate_ml_prognostic_classifier_notebook.py",
+            "--database", "mbcproject",
+            "--cancer", "all"
+        ], check=True, cwd=BASE_DIR)
     except subprocess.CalledProcessError as e:
         print(f"  ❌ CRITICAL ERROR: ML Prognostic Classifier generation failed: {e}")
         sys.exit(1)

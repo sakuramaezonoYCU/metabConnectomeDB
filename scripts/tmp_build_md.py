@@ -566,6 +566,7 @@ def build_phase_5():
 
 
 def build_phase_6():
+    import pandas as pd
     print("Building Phase 6 Summary...")
     content = '## Phase 6: Gene Signature Validation\n\n'
 
@@ -690,6 +691,39 @@ def build_phase_6():
     for title, path in advanced_reports.items():
         if os.path.exists(path):
             content += f"- **{title}**: Generated Successfully (`{path}`)\n"
+            
+            if title == 'Master Regulator Analysis':
+                tf_csv = 'output/master_regulator_results/tf_enrichment_results.csv'
+                if os.path.exists(tf_csv):
+                    import pandas as pd
+                    df_tf = pd.read_csv(tf_csv)
+                    top_tfs = df_tf.head(5)['Transcription Factor'].tolist()
+                    content += f"  - *Top 5 Transcription Factors*: {top_tfs}\n"
+            elif title == 'MITF Regulon Expansion':
+                mitf_csvs = glob.glob('output/mitf_regulon/mitf_metabolic_regulon_genes_*.csv')
+                if mitf_csvs:
+                    import pandas as pd
+                    df_mitf = pd.read_csv(sorted(mitf_csvs)[0])
+                    mitf_genes = df_mitf.iloc[:,0].tolist()
+                    content += f"  - *Expanded MITF Regulon Targets*: {len(mitf_genes)} genes ({mitf_genes[:10]}...)\n"
+            elif title == 'Oxygen Tension Analysis':
+                oxy_csvs = glob.glob('output/oxygen_tension/*.csv')
+                if oxy_csvs:
+                    import pandas as pd
+                    df_oxy = pd.read_csv(sorted(oxy_csvs)[0])
+                    content += f"  - *Oxygen tension data*: Evaluated {df_oxy.shape[0]} items/ratios.\n"
+            elif title == 'CAMP Pan-Cancer Integration':
+                camp_csvs = glob.glob('output/camp_integration/metabolite_immune_covariation_*.csv')
+                if camp_csvs:
+                    import pandas as pd
+                    df_camp = pd.read_csv(sorted(camp_csvs)[0])
+                    content += f"  - *CAMP Covariations*: Evaluated immune correlation across {df_camp.shape[0]} metabolic targets.\n"
+            elif title == 'Serotonin Axis Spatial Mapping':
+                spat_csvs = glob.glob('output/serotonin_axis_spatial_mapping/visium_immune_evasion_summary*.csv')
+                if spat_csvs:
+                    import pandas as pd
+                    df_spat = pd.read_csv(sorted(spat_csvs)[0])
+                    content += f"  - *Spatial Validation*: Scored {df_spat.shape[0]} tissue regions for immune evasion spatial proximity.\n"
         else:
             content += f"- **{title}**: *(Pending: {path})*\n"
     content += '\n'

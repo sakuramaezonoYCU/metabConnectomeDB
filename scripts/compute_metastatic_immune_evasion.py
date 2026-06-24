@@ -30,9 +30,10 @@ def fetch_ovarian_census():
         return adata
     
     # Build the list of genes we actually need for scoring
-    immune_genes = ['CD3E', 'CD4', 'CD8A', 'NCAM1', 'NCR1', 'CD14', 'FCGR3A', 'PTPRC'] + \
-                   cfg.HTR7_TAM_SIGNATURE + \
-                   cfg.SUPPRESSIVE_LIGAND_TARGETS + cfg.EXHAUSTION_TARGETS + cfg.TREG_TARGETS
+    immune_genes = ['CD3E', 'CD4', 'CD8A', 'NCAM1', 'NCR1', 'CD14', 'FCGR3A', 'PTPRC']
+    for gene_list in cfg.SIGNATURES_TO_SCORE.values():
+        immune_genes.extend(gene_list)
+        
     genes_to_fetch = list(set(immune_genes))
     
     print("Downloading full ovarian cancer dataset from CellxGene Census. This may take a while...")
@@ -85,10 +86,8 @@ def main():
     print(f"Loaded {adata.n_obs} cells and {adata.n_vars} genes.")
 
     print("\n2. Scoring Immune Signatures")
-    safely_score_genes(adata, cfg.HTR7_TAM_SIGNATURE, 'HTR7_TAM_Score')
-    safely_score_genes(adata, cfg.EXHAUSTION_TARGETS, 'Exhaustion_Target_Score')
-    safely_score_genes(adata, cfg.SUPPRESSIVE_LIGAND_TARGETS, 'Suppressive_Target_Score')
-    safely_score_genes(adata, cfg.TREG_TARGETS, 'Treg_Target_Score')
+    for score_name, gene_list in cfg.SIGNATURES_TO_SCORE.items():
+        safely_score_genes(adata, gene_list, score_name)
     
     print("\n3. Defining Niches & Tissues")
     # Tissues
