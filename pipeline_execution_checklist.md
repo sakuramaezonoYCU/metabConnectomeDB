@@ -2,6 +2,9 @@
 
 This checklist guarantees a 100% reproducible execution of the pipeline from end-to-end. Every script listed below is fully dynamic, pulling variables directly from `pipeline.config.json` via `pan_cancer_config.py`.
 
+> [!NOTE]
+> **Data Fetching Automation:** You do **NOT** need to manually run `fetch_reactome_pathways.py`, `fetch_opentargets.py`, or similar fetchers. They are automatically sourced and executed as `STEP 0` within `run_cancer_pipeline.py` to guarantee data integrity before analysis. Furthermore, `serotonin_config.py` contains an auto-healing fail-safe that automatically fetches any missing pathway JSONs on the fly during downstream generation.
+
 > [!CAUTION]
 > Do **NOT** modify hardcoded variables within scripts. If parameters need to change (e.g., cell sub-sampling, thresholds), edit `pipeline.config.json` and re-run the pipeline.
 
@@ -14,6 +17,9 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
 ## Phase 0: Core Metabolite Database Curation
 
 *This phase builds the foundational metabolite-target pair catalog that all single-cell scripts query against. It is run once to curate the huge generic databases (KEGG, HMDB, CellChat).*
+
+> [!NOTE]
+> Metabolites are mapped to the official HMDB names while genes are mapped to the official HGNC gene symbols.
 
 - `[ ]` **0a. Curate and Merge Raw Databases**
   - **Command:** `bash scripts/merge_simplify_annotate.sh`
@@ -159,3 +165,4 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
 | 2026-06-23 | `cancer_cellxgene_integration.ipynb`, `primary_vs_metastasis_comparison.ipynb`, `orphan_metabolic_immune_evasion.ipynb` | **Zero-Tolerance Provenance & Visual Exports Patch:** Removed hardcoded KEGG fallback in integration notebook to enforce hard crash. Split Section 9 squished dotplots into dynamically-sized, pathway-specific plots. Added explicit standalone PDF and CSV exports for previously inline-only visuals (Static Volcano, Niche UpSet, Orphan Multi-Panel Bar). |
 | 2026-06-23 | `generate_combined_pan_cancer_notebook.py` | **Phase 4 LIANA Integration:** Hooked up `immune_evasion_ccc_quantification` and `_cellxgene_liana_results.csv`. Implemented automatic fail-safe to execute `patch_liana_csvs.py` if LIANA results are missing during Pan-Cancer intersection. |
 | 2026-06-23 | `generate_final_outputs.py` | **HGNC Target Canonicalization Patch:** Added canonical resolution mapping via `input/hgnc_approved_genes.json` to process `Target_original` into official `Target` names. This completely eliminates obsolete Uniprot TrEMBL fragmentation downstream. |
+| 2026-06-24 | `run_cancer_pipeline.py`, `serotonin_config.py` | **Auto-Fetching & Self-Healing:** Configured the pipeline orchestrator to automatically discover and source all `fetch_*.py` scripts as STEP 0 with a hard-fail condition. Implemented an auto-healing subroutine in `serotonin_config.py` to trigger Reactome/API fetches dynamically if config JSONs are missing, completely removing the need for manual API script executions. |

@@ -736,6 +736,20 @@ if __name__ == '__main__':
         print("Example: python run_cancer_pipeline.py colorectal \"colorectal cancer\" \"colon,liver,lung\" \"colon,large intestine\"")
         sys.exit(1)
         
+    print("================================================================")
+    print("STEP 0: Sourcing data fetchers to guarantee data integrity...")
+    print("================================================================")
+    import subprocess
+    import glob
+    fetch_scripts = glob.glob(os.path.join(script_dir, "fetch_*.py"))
+    for f_script in sorted(fetch_scripts):
+        print(f"--> Running {os.path.basename(f_script)}...")
+        try:
+            subprocess.run([sys.executable, f_script], check=True)
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"CRITICAL ERROR: {os.path.basename(f_script)} failed! Pipeline cannot proceed without guaranteed data integrity. Please check your network or proxy settings.") from e
+    print("All fetchers completed successfully.\\n")
+        
     cancer_key = sys.argv[1]
     disease_filter_str = sys.argv[2]
     tissue_filter_str = sys.argv[3]

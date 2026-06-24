@@ -111,18 +111,44 @@
                 "description": "Assembly and cell surface presentation of NMDA receptors (EV Machinery proxy)"
             },
             "EXHAUSTION_TARGETS": {
-                "id": "R-HSA-8939236",
-                "description": "PD-1 signaling (Exhaustion Proxy)"
+                "id": "R-HSA-418555",
+                "description": "G alpha (s) signalling events (cAMP/PKA-mediated T cell suppression downstream of HTR7/GNAS)"
             },
             "SUPPRESSIVE_LIGAND_TARGETS": {
-                "id": "R-HSA-8939236",
-                "description": "PD-1 signaling (Suppressive Ligands Proxy)"
+                "id": "R-HSA-6783783",
+                "description": "Interleukin-10 signaling (serotonin/cAMP-induced M2 suppressive effectors in TAMs: IL10, ARG1, STAT3)"
+            },
+            "SEROTONIN_RECEPTORS": {
+                "id": "R-HSA-390666",
+                "description": "Serotonin receptors (HTR1-7 family; upstream trigger of serotonin-immune evasion axis)"
             },
             "TREG_TARGETS": {
                 "id": "R-HSA-388841",
                 "description": "Costimulation by the CD28 family (Treg Proxy)"
             }
-        }
+        },
+        "PLOTTING_CONFIG": [
+            {
+                "score_col": "HTR7_TAM_Score",
+                "title": "HTR7+ TAM Signature in Macrophages",
+                "cell_target": "df_macs"
+            },
+            {
+                "score_col": "Suppressive_Target_Score",
+                "title": "Serotonin-Driven Suppressive Ligands in Macrophages",
+                "cell_target": "df_macs"
+            },
+            {
+                "score_col": "Exhaustion_Target_Score",
+                "title": "Serotonin-Driven T Cell Exhaustion in T/NK Cells",
+                "cell_target": "df_tnk"
+            },
+            {
+                "score_col": "Treg_Target_Score",
+                "title": "Treg Targets in T/NK Cells",
+                "cell_target": "df_tnk"
+            }
+        ]
     },
     "KEGG_PATHWAYS": {
         "GLYCOLYSIS": {

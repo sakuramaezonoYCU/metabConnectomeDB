@@ -19,13 +19,10 @@ except FileNotFoundError:
     print("Error: input/pipeline.config.json not found.")
     sys.exit(1)
 
-try:
-    _p3 = pipeline_config.get("PHASE_3_METRICS", {})
-    SKEW_THRESHOLD = _p3.get("SKEW_THRESHOLD", 0.5)
-    SUBCLONE_SD_MULTIPLIER = _p3.get("SUBCLONE_SD_MULTIPLIER", 1.0)
-except Exception:
-    SKEW_THRESHOLD = 0.5
-    SUBCLONE_SD_MULTIPLIER = 1.0
+# Strict config extraction (will hard crash via KeyError if missing)
+_p45 = pipeline_config["PHASE_4_5_META_VALIDATION"]
+SKEW_THRESHOLD = _p45["SKEW_THRESHOLD"]
+SUBCLONE_SD_MULTIPLIER = _p45["SUBCLONE_SD_MULTIPLIER"]
 
 try:
     from pan_cancer_config import ANALYSIS_SUFFIX, CANCER_CAP
@@ -122,6 +119,7 @@ def ask_gemini_interpretation(markdown_text, phase):
         1. DO NOT FALSIFY OR MOCK SCIENTIFIC DATA.
         2. Never guess or fabricate biological mechanisms. If the data is sparse, state that it is sparse.
         3. Explain findings explicitly referencing the data provided below. Cite real PMIDs where possible.
+        4. Make sure you actually summarize the metrics and patterns from the CSV tables. Do NOT just copy and paste the full tables into your response.
         
         CRITICAL FORMATTING REQUIREMENT:
         You must structure your response EXACTLY with these three headers:
@@ -201,6 +199,8 @@ def append_to_md(content):
 def build_phase_1():
     print("Building Phase 1 Summary...")
     content = '## Phase 1: Database Exploration and Reporting\n\n'
+    content += '> [!NOTE]\n'
+    content += '> Metabolites are mapped to the official HMDB names while genes are mapped to the official HGNC gene symbols.\n\n'
     
     # ---------------- metab_targetPair_analysis ----------------
     content += '### 1.1 Core Interaction Network Metrics\n'
@@ -315,23 +315,19 @@ def build_phase_2():
         # Dynamically inject the new CSVs from the pipeline patches
         orphan_csv = f"output/{c}_results/immune_evasion_orphan_metabolic_candidates.csv"
         if os.path.exists(orphan_csv):
-            try:
-                df_orphan = pd.read_csv(orphan_csv)
-                if not df_orphan.empty:
-                    content += f"#### Orphan Metabolic Immune Evasion Candidates\n\n"
-                    content += df_to_markdown(df_orphan.head(5)) + "\n\n"
-            except Exception as e:
-                pass # Avoid hard crashes if CSV is empty or malformed
+            # Strict read. If file exists but is empty/malformed, this will intentionally crash
+            df_orphan = pd.read_csv(orphan_csv)
+            if not df_orphan.empty:
+                content += f"#### Orphan Metabolic Immune Evasion Candidates\n\n"
+                content += df_to_markdown(df_orphan.head(5)) + "\n\n"
 
         upset_csv = f"output/{c}_results/primary_vs_metastatic_convergence_upset_{c}.csv"
         if os.path.exists(upset_csv):
-            try:
-                df_upset = pd.read_csv(upset_csv)
-                if not df_upset.empty:
-                    content += f"#### Metastatic Convergence (Niche Target Up-Regulation)\n\n"
-                    content += df_to_markdown(df_upset) + "\n\n"
-            except Exception as e:
-                pass
+            # Strict read. If file exists but is empty/malformed, this will intentionally crash
+            df_upset = pd.read_csv(upset_csv)
+            if not df_upset.empty:
+                content += f"#### Metastatic Convergence (Niche Target Up-Regulation)\n\n"
+                content += df_to_markdown(df_upset) + "\n\n"
 
     print("Querying Gemini API for Phase 2 Interpretation...")
     interpretation = ask_gemini_interpretation(content, phase=2)
@@ -483,6 +479,16 @@ def build_phase_4():
     if os.path.exists(df_uniq_path):
         content += df_to_markdown(pd.read_csv(df_uniq_path)) + '\n\n'
 
+    content += '### 4.6 Pan-Cancer Conserved CCC Links\n\n'
+    ccc_links_path = f'output/pan_cancer_meta_results/pan_cancer_conserved_ccc_links{ANALYSIS_SUFFIX}.csv'
+    if os.path.exists(ccc_links_path):
+        content += df_to_markdown(pd.read_csv(ccc_links_path).head(10)) + '\n\n'
+
+    content += '### 4.7 Conserved Gene Functional Annotations\n\n'
+    gene_annot_path = f'output/ai_summary_tables/conserved_gene_directed_signature_annotation{ANALYSIS_SUFFIX}.csv'
+    if os.path.exists(gene_annot_path):
+        content += df_to_markdown(pd.read_csv(gene_annot_path)) + '\n\n'
+
     print("Querying Gemini API for Phase 4 Interpretation...")
     interpretation = ask_gemini_interpretation(content, phase=4)
     content += interpretation + '\n---\n'
@@ -616,7 +622,8 @@ def build_phase_6():
     content += '**Methodology:** Each signature\'s spatial coherence is assessed using Visium 10x spatial transcriptomics data. '
     content += 'Moran\'s I (spatial autocorrelation) and its P-value are computed per tissue section. '
     content += 'The table counts samples with significant spatial clustering (Moran\'s I > 0.1 and P < 0.05) and reports the average Moran\'s I. '
-    content += 'Higher Moran\'s I = stronger spatial co-localization of the signature genes in tissue architecture.\n\n'
+    content += '**Interpretation:** Moran\'s I ranges from -1 to 1. Values near 0 indicate random distribution. '
+    content += 'Values > 0.1 = moderate clustering; > 0.3 = strong clustering; > 0.5 = very strong spatial co-localization of the signature genes within the tissue architecture.\n\n'
     spatial_dir = 'output/spatial_verification'
     if os.path.exists(spatial_dir):
         sig_dirs = [d for d in os.listdir(spatial_dir) if os.path.isdir(os.path.join(spatial_dir, d))]
@@ -690,47 +697,52 @@ def build_phase_6():
     # --- Specific Extraction for ML Prognostic Classifier ---
     import glob
     content += "### 6.6 ML Prognostic Classifiers (Clinical OS)\n\n"
-    content += '**Methodology:** Cox Proportional Hazards models were trained on each gene signature against TCGA Overall Survival data. '
-    content += 'The optimal L1/L2 penalizer was selected via 5-fold cross-validation. '
+    content += '**Methodology:** Cox Proportional Hazards models were trained on each gene signature against clinical Overall Survival data. '
+    content += 'The optimal L1/L2 penalizer was selected via 5-fold cross-validation and applied to the final model to prevent overfitting. '
+    content += '**Interpretation of Optimal Penalizer:** A low penalizer (e.g., 0.01 - 0.1) means the gene signature is robust and predictive without much shrinkage. '
+    content += 'A high penalizer (e.g., 0.5 - 1.0) means the model required heavy regularization, suggesting the genes are either highly correlated with each other or weakly predictive on their own. '
     content += 'The table reads the actual `ml_metrics.csv` files from each cohort, sorts all evaluated signatures by Test C-Index, '
     content += 'and displays only the Top 3 best-performing signatures. '
     content += 'C-Index > 0.5 = better than random; > 0.6 = clinically meaningful; > 0.7 = strong discriminative power.\n\n'
     
-    metric_files = glob.glob('output/ml_prognostic_results/tcga/*/ml_metrics.csv')
+    metric_files = glob.glob('output/ml_prognostic_results/*/*/ml_metrics.csv')
     if not metric_files:
         content += "*(No ML metrics CSV files found. Please ensure notebook execution finished.)*\n\n"
     else:
         for m_file in sorted(metric_files):
             cohort = os.path.basename(os.path.dirname(m_file))
-            content += f"#### Cohort: {cohort.upper()}\n"
+            dataset_source = os.path.basename(os.path.dirname(os.path.dirname(m_file)))
+            content += f"#### Cohort: {dataset_source.upper()} - {cohort.upper()}\n"
             content += f"*(Full metrics available in: `{m_file}`)*\n\n"
             
-            try:
-                df = pd.read_csv(m_file)
-                total_sigs = len(df)
-                if total_sigs == 0:
-                    content += "*(No signatures were successfully evaluated)*\n\n"
-                    continue
-                
-                # Sort by Test C-Index descending and grab Top 3
-                df_sorted = df.sort_values(by="Test_C_Index", ascending=False).head(3)
-                
-                # Calculate Median
-                median_test = df["Test_C_Index"].median()
-                median_cv = df["CV_C_Index"].median()
-                
-                content += f"**Aggregate Performance ({total_sigs} signatures evaluated):**\n"
-                content += f"- Median CV C-Index: {median_cv:.3f}\n"
-                content += f"- Median Test C-Index: {median_test:.3f}\n\n"
-                
-                content += "**Top 3 Performing Signatures (by Test C-Index):**\n"
-                content += df_to_markdown(df_sorted) + "\n\n"
-            except Exception as e:
-                content += f"*(Error reading {m_file}: {e})*\n\n"
+            # Strict read. If file exists but is empty/malformed, this will intentionally crash
+            df = pd.read_csv(m_file)
+            total_sigs = len(df)
+            if total_sigs == 0:
+                content += "*(No signatures were successfully evaluated)*\n\n"
+                continue
+            
+            # Sort by Test C-Index descending and grab Top 3
+            df_sorted = df.sort_values(by="Test_C_Index", ascending=False).head(3)
+            
+            # Calculate Median
+            median_test = df["Test_C_Index"].median()
+            median_cv = df["CV_C_Index"].median()
+            
+            content += f"**Aggregate Performance ({total_sigs} signatures evaluated):**\n"
+            content += f"- Median CV C-Index: {median_cv:.3f}\n"
+            content += f"- Median Test C-Index: {median_test:.3f}\n\n"
+            
+            content += "**Top 3 Performing Signatures (by Test C-Index):**\n"
+            content += df_to_markdown(df_sorted) + "\n\n"
 
     # --- Specific Extraction for Ovarian Serotonin Immune Evasion ---
     ov_html = 'output/ovarian_serotonin_immune_evasion_report.html'
     content += "### 6.7 Ovarian Serotonin Immune Evasion\n\n"
+    content += 'Source: `output/ovarian_results/` and Serotonin/TAM annotations\n'
+    content += 'Script: `scripts/ovarian_serotonin_immune_evasion.ipynb`\n'
+    content += 'Scraper: `scripts/tmp_build_md.py`\n'
+    content += f'Output: `{ov_html}`\n\n'
     if os.path.exists(ov_html):
         s_ov = scrape_notebook_output(ov_html, {
             'total_cells': r"Total cells loaded:\s*([\d,]+)",
@@ -739,7 +751,47 @@ def build_phase_6():
         content += f"- **Total Spatial/scRNA Cells Loaded:** {s_ov['total_cells']}\n"
         content += f"- **Raw Dataset Shape:** {s_ov['h5ad_shape']}\n\n"
     else:
-        content += f"*(Pending: {ov_html})*\n\n"
+        content += f"*(Pending HTML: {ov_html})*\n\n"
+
+    content += "**Primary vs Metastatic Immune Evasion Niche Summary:**\n"
+    macs_csv = 'output/serotonin_axis_spatial_mapping/plot_data_macs.csv'
+    tnk_csv = 'output/serotonin_axis_spatial_mapping/plot_data_tnk.csv'
+    
+    if os.path.exists(macs_csv) and os.path.exists(tnk_csv):
+        df_macs = pd.read_csv(macs_csv)
+        df_tnk = pd.read_csv(tnk_csv)
+        
+        try:
+            plot_config = pipeline_config.get("SEROTONIN_AXIS", {}).get("PLOTTING_CONFIG", [])
+            if plot_config:
+                for p_cfg in plot_config:
+                    score_col = p_cfg['score_col']
+                    title = p_cfg['title']
+                    target = p_cfg['cell_target']
+                    
+                    df = df_macs if target == 'df_macs' else df_tnk
+                    if score_col in df.columns:
+                        prim_mean = df[df['Niche'] == 'Primary'][score_col].mean()
+                        met_mean = df[df['Niche'] == 'Metastatic'][score_col].mean()
+                        content += f"- **{title}:** {prim_mean:.3f} (Primary) vs {met_mean:.3f} (Metastatic).\n"
+                content += "\n"
+            else:
+                content += "*(No PLOTTING_CONFIG found in pipeline config)*\n\n"
+        except Exception as e:
+            content += f"*(Error computing summary statistics: {e})*\n\n"
+    else:
+        content += "*(Pending: plot_data_macs.csv and plot_data_tnk.csv)*\n\n"
+
+    content += "**Visium Spatial Pearson Correlation (HTR7 vs Immune Suppression):**\n"
+    v_csv = 'output/serotonin_axis_spatial_mapping/visium_immune_evasion_summary.csv'
+    if os.path.exists(v_csv):
+        v_df = pd.read_csv(v_csv)
+        avg_r = v_df['Pearson_R'].mean()
+        avg_p = v_df['Pearson_P'].mean()
+        num_samples = len(v_df)
+        content += f"- **Aggregated over {num_samples} Spatial Samples:** Mean Pearson R = {avg_r:.3f}, Mean P-value = {avg_p:.2e}\n\n"
+    else:
+        content += "*(Pending: visium_immune_evasion_summary.csv)*\n\n"
 
     print("Querying Gemini API for Phase 6 Interpretation...")
     interpretation = ask_gemini_interpretation(content, phase=6)

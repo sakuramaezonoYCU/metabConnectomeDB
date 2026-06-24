@@ -1,4 +1,9 @@
 import nbformat as nbf
+import sys
+import os
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from scripts import serotonin_config as cfg
 
 nb = nbf.v4.new_notebook()
 
@@ -71,6 +76,15 @@ df_tnk['Niche'] = df_tnk.apply(get_niche, axis=1)
 df_macs = df_macs[df_macs['Niche'].isin(['Primary', 'Metastatic'])]
 df_tnk = df_tnk[df_tnk['Niche'].isin(['Primary', 'Metastatic'])]
 
+# Save plotting data to CSVs so the summary script can use them
+macs_csv = os.path.join(DATA_DIR, 'plot_data_macs.csv')
+tnk_csv = os.path.join(DATA_DIR, 'plot_data_tnk.csv')
+df_macs.to_csv(macs_csv)
+df_tnk.to_csv(tnk_csv)
+print(f"Saved {len(df_macs)} macrophages to {macs_csv}")
+print(f"Saved {len(df_tnk)} T/NK cells to {tnk_csv}")
+
+
 # Optionally, you can load the raw .h5ad matrix here for deeper gene-level analysis
 print(f"\\nLooking for raw scRNA-seq AnnData matrix at: {H5AD_PATH}")
 if os.path.exists(H5AD_PATH):
@@ -91,11 +105,21 @@ To visualize the distribution of immune evasion scores across niches and calcula
 
 ### Interpretation
 A highly significant p-value (p < 0.05) combined with a positive shift in the violin plot confirms that the metastatic niche is actively upregulating these immune evasion and serotonin signatures compared to the primary tumor."""
-code_3 = """from scipy.stats import mannwhitneyu
+import math
 
-fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+# Load plotting config from serotonin_config
+plot_config = cfg.serotonin_axis.get('PLOTTING_CONFIG', [])
+num_plots = len(plot_config)
+cols = 2
+rows = math.ceil(num_plots / cols)
+
+code_3 = f"""from scipy.stats import mannwhitneyu
+
+fig, axes = plt.subplots({rows}, {cols}, figsize=(15, 6 * {rows}))
+axes = axes.flatten()
 
 def plot_with_pval(data, x, y, ax, title):
+    import seaborn as sns
     sns.violinplot(data=data, x=x, y=y, palette=['#1f77b4', '#d62728'], ax=ax)
     
     # Calculate P-value
@@ -104,27 +128,27 @@ def plot_with_pval(data, x, y, ax, title):
     
     if len(group_primary) > 0 and len(group_meta) > 0:
         stat, pval = mannwhitneyu(group_primary, group_meta, alternative='two-sided')
-        pval_str = f"P = {pval:.2e}" if pval < 0.001 else f"P = {pval:.4f}"
-        ax.set_title(f"{title}\\n({pval_str})")
+        pval_str = f"P = {{pval:.2e}}" if pval < 0.001 else f"P = {{pval:.4f}}"
+        ax.set_title(f"{{title}}\\n({{pval_str}})")
     else:
         ax.set_title(title)
     ax.set_ylabel("Score")
 
-# 1. HTR7 TAM Score in Macrophages
-plot_with_pval(df_macs, 'Niche', 'HTR7_TAM_Score', axes[0,0], "HTR7+ TAM Signature in Macrophages")
-
-# 2. Suppressive Ligands in Macrophages
-plot_with_pval(df_macs, 'Niche', 'Suppressive_Target_Score', axes[0,1], "Suppressive Ligands (CD274, PDCD1LG2) in Macrophages")
-
-# 3. Exhaustion in T/NK Cells
-plot_with_pval(df_tnk, 'Niche', 'Exhaustion_Target_Score', axes[1,0], "Exhaustion Targets in T/NK Cells")
-
-# 4. Treg Target Score in T cells
-plot_with_pval(df_tnk, 'Niche', 'Treg_Target_Score', axes[1,1], "Treg Target (IL2RA) in T/NK Cells")
-
-plt.tight_layout()
-plt.show()
 """
+
+for i, p_cfg in enumerate(plot_config):
+    score_col = p_cfg['score_col']
+    title = p_cfg['title']
+    target_df = p_cfg['cell_target']
+    code_3 += f"# {i+1}. {title}\n"
+    code_3 += f"plot_with_pval({target_df}, 'Niche', '{score_col}', axes[{i}], '{title}')\n\n"
+
+# Turn off any unused subplots
+for j in range(num_plots, rows * cols):
+    code_3 += f"axes[{j}].axis('off')\n"
+
+code_3 += "plt.tight_layout()\nplt.show()\n"
+
 
 # ---------------------------------------------------------
 # Cell 4: Visium Spatial Transcriptomics
