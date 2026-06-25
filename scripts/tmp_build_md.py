@@ -126,29 +126,25 @@ def upload_papers_once(client):
             print(f"        ✗ Failed to upload {pdf_name}: {e}")
     return _uploaded_paper_handles
 
-_uploaded_html_cache = {}  # Global cache mapping filepath -> Gemini File handle
-
-def upload_html_files(client, html_paths):
-    """Uploads a list of HTML report files to Gemini File API with global caching."""
-    global _uploaded_html_cache
-    handles = []
-    for path in html_paths:
-        if not os.path.exists(path):
-            continue
-            
-        if path in _uploaded_html_cache:
-            handles.append(_uploaded_html_cache[path])
-            continue
-            
-        try:
-            handle = client.files.upload(file=path)
-            _uploaded_html_cache[path] = handle
-            handles.append(handle)
-            print(f"        ✓ Uploaded HTML: {os.path.basename(path)}")
-            time.sleep(4)  # Rate limit (15 RPM free tier)
-        except Exception as e:
-            print(f"        ✗ Failed to upload {os.path.basename(path)}: {e}")
-    return handles
+def _parse_html_to_text(html_path):
+    """
+    Parses an HTML file locally using BeautifulSoup to extract only text and tables.
+    Strips all scripts, styles, and embedded images (which consume millions of tokens).
+    """
+    try:
+        from bs4 import BeautifulSoup
+        with open(html_path, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        soup = BeautifulSoup(html_content, 'html.parser')
+        # Remove non-text elements
+        for script in soup(["script", "style", "img", "svg"]):
+            script.extract()
+        # Extract text with line breaks
+        text = soup.get_text(separator='\n', strip=True)
+        return text
+    except Exception as e:
+        print(f"        ✗ Failed to parse HTML {os.path.basename(html_path)}: {e}")
+        return ""
 
 
 # ==============================================================================
@@ -280,7 +276,7 @@ def _batch_semantic_verify_pmids(client, items_to_verify):
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-2.5-flash',
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.0,
@@ -416,13 +412,18 @@ def ask_gemini_interpretation(markdown_text, phase, html_paths=None):
         # Upload reference papers (cached after first call)
         paper_handles = upload_papers_once(client)
         
-        # Upload phase-specific HTML reports
-        html_handles = []
+        # Parse phase-specific HTML reports locally into text
+        parsed_html_texts = ""
         if html_paths:
             existing_paths = [p for p in html_paths if os.path.exists(p)]
             if existing_paths:
-                print(f"    [📊] Uploading {len(existing_paths)} HTML reports for Phase {phase}...")
-                html_handles = upload_html_files(client, existing_paths)
+                print(f"    [📊] Parsing {len(existing_paths)} HTML reports locally to extract text and tables...")
+                for path in existing_paths:
+                    parsed_text = _parse_html_to_text(path)
+                    if parsed_text:
+                        parsed_html_texts += f"\n\n--- EXTRACTED DATA FROM HTML REPORT: {os.path.basename(path)} ---\n"
+                        # Limit to first 25000 chars per file just in case it's still large
+                        parsed_html_texts += parsed_text[:25000] + "\n..."
         
         # Build cumulative context string (condensed to avoid token bloat)
         context_str = ""
@@ -436,11 +437,11 @@ def ask_gemini_interpretation(markdown_text, phase, html_paths=None):
         # Build the file context description
         file_context_note = ""
         if paper_handles:
-            file_context_note += f"\nYou have been provided {len(paper_handles)} reference PDF papers. "
+            file_context_note += f"\nYou have been provided {len(paper_handles)} reference PDF papers (via File API). "
             file_context_note += "Cross-reference your interpretation against findings in these papers. "
             file_context_note += "When citing findings from these papers, use their actual PMIDs.\n"
-        if html_handles:
-            file_context_note += f"\nYou have been provided {len(html_handles)} Jupyter notebook HTML reports from this phase. "
+        if parsed_html_texts:
+            file_context_note += f"\nBelow, you are provided with text extracted from {len(existing_paths)} Jupyter notebook HTML reports. "
             file_context_note += "These contain the FULL analytical outputs including plots, statistical tests, and intermediate results. "
             file_context_note += "Reference specific results, figures, and statistical outputs from these reports in your interpretation.\n"
         
@@ -477,20 +478,20 @@ RESPONSE FORMAT (use these exact headers):
 
 Data to interpret:
 {markdown_text}
+
+{parsed_html_texts}
 """
         
-        # Build the contents list: prompt text + uploaded files
-        contents = [prompt] + paper_handles + html_handles
+        # We only pass paper_handles into the contents array now, not HTMLs
+        contents = paper_handles + [prompt]
         
-        attempt = 0
+        attempt = 1
         max_attempts = 5
-        
-        time.sleep(2)
         
         while attempt < max_attempts:
             try:
                 response = client.models.generate_content(
-                    model='gemini-2.0-flash',
+                    model='gemini-2.5-flash',
                     contents=contents,
                     config=types.GenerateContentConfig(
                         safety_settings=[
