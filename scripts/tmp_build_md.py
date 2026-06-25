@@ -276,7 +276,7 @@ def _batch_semantic_verify_pmids(client, items_to_verify):
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-1.5-flash',
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.0,
@@ -491,7 +491,7 @@ Data to interpret:
         while attempt < max_attempts:
             try:
                 response = client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model='gemini-1.5-flash',
                     contents=contents,
                     config=types.GenerateContentConfig(
                         safety_settings=[
