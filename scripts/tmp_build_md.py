@@ -552,6 +552,172 @@ Data to interpret:
     except Exception as e:
         return f"\n> [!WARNING]\n> **AI Interpretation Failed**: Error calling Gemini API: {e}\n"
 
+
+def ask_gemini_batch_interpretation(phase_data_map):
+    """
+    Sends ALL phase data in a SINGLE API request and returns per-phase interpretations.
+    
+    phase_data_map: dict of {phase_num: (markdown_content, html_paths_list)}
+    Returns: dict of {phase_num: formatted_interpretation_string}
+    
+    This approach uses exactly 1 API request instead of 6, completely bypassing
+    the gemini-2.5-flash 20-request/day free tier limit.
+    """
+    client = _get_gemini_client()
+    if client is None:
+        return {p: "\n> [!WARNING]\n> **AI Interpretation Skipped**: `input/.geminiSecret` not found or invalid.\n" for p in phase_data_map}
+    
+    try:
+        from google.genai import types
+        
+        # Upload reference papers (cached after first call)
+        paper_handles = upload_papers_once(client)
+        
+        # Build the mega-prompt with all phase data
+        all_phases_text = ""
+        for phase_num in sorted(phase_data_map.keys()):
+            content, html_paths = phase_data_map[phase_num]
+            all_phases_text += f"\n\n{'='*80}\n"
+            all_phases_text += f"PHASE {phase_num} DATA\n"
+            all_phases_text += f"{'='*80}\n\n"
+            all_phases_text += content
+            
+            # Parse and append HTML text for this phase
+            if html_paths:
+                existing = [p for p in html_paths if os.path.exists(p)]
+                if existing:
+                    print(f"    [📊] Parsing {len(existing)} HTML reports for Phase {phase_num}...")
+                    for path in existing:
+                        parsed_text = _parse_html_to_text(path)
+                        if parsed_text:
+                            all_phases_text += f"\n--- EXTRACTED DATA FROM HTML REPORT: {os.path.basename(path)} ---\n"
+                            all_phases_text += parsed_text[:25000] + "\n"
+        
+        phase_numbers = sorted(phase_data_map.keys())
+        
+        file_context_note = ""
+        if paper_handles:
+            file_context_note += f"\nYou have been provided {len(paper_handles)} reference PDF papers (via File API). "
+            file_context_note += "Cross-reference your interpretation against findings in these papers. "
+            file_context_note += "When citing findings from these papers, use their actual PMIDs.\n"
+        
+        prompt = f"""You are an expert computational biologist analyzing single-cell metabolism and pan-cancer data.
+Below is the COMPLETE raw data from ALL {len(phase_numbers)} phases of our metabConnectomeDB pipeline.
+
+{file_context_note}
+
+YOUR TASK:
+For EACH phase, provide a deeply scientific, data-driven interpretation. You MUST:
+1. Synthesize the key quantitative findings for that phase (do NOT just copy tables — highlight the most significant results).
+2. Explain the biological significance, cross-referencing with the provided PDF literature where applicable.
+3. As you interpret later phases, actively reference and build upon findings from earlier phases (cumulative insight).
+4. When citing external literature, format PMIDs exactly as: PMID:12345678
+   - Only cite PMIDs you are confident are real and relevant.
+   - Every PMID you cite will be programmatically verified against PubMed.
+
+SCIENTIFIC INTEGRITY POLICY (ABSOLUTE):
+- DO NOT fabricate, guess, or mock any data, metrics, or biological mechanisms.
+- If the data is sparse or inconclusive, state that explicitly.
+- Do NOT claim causation from correlational data.
+- Only reference biological mechanisms that are directly supported by the data tables, the provided HTML reports, or the provided PDF literature.
+
+RESPONSE FORMAT (CRITICAL — you MUST use these exact delimiters for each phase):
+
+For each phase, output:
+
+=== PHASE N INTERPRETATION ===
+### 1. NOVEL FINDINGS
+[Synthesize the most important findings for this phase. Reference specific metrics. Cross-reference with literature.]
+
+### 2. PROPOSED RESEARCH QUESTIONS
+[List 2-3 deep biological questions raised by this phase's results.]
+
+### 3. SUGGESTED NEXT STEPS
+[Actionable computational or experimental next steps grounded in the data.]
+=== END PHASE N ===
+
+Replace N with the actual phase number ({', '.join(str(p) for p in phase_numbers)}).
+You MUST produce one delimited block for EACH phase listed above.
+
+{all_phases_text}
+"""
+        
+        contents = paper_handles + [prompt]
+        
+        print(f"    [🤖] Sending single batch request for {len(phase_numbers)} phases...")
+        attempt = 1
+        max_attempts = 5
+        
+        while attempt < max_attempts:
+            try:
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        safety_settings=[
+                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                        ]
+                    )
+                )
+                break
+            except Exception as e:
+                error_str = str(e)
+                attempt += 1
+                if any(code in error_str for code in ['403', '429', '503', '500', '502', '504']):
+                    backoff_time = min(15 * (2 ** (attempt - 1)), 300)
+                    print(f"    [!] Gemini API error ({e}). Retrying in {backoff_time}s (Attempt {attempt}/{max_attempts})...")
+                    time.sleep(backoff_time)
+                else:
+                    print(f"    [!] Gemini API Error ({e}). Retrying in 30s (Attempt {attempt}/{max_attempts})...")
+                    time.sleep(30)
+        
+        if attempt == max_attempts:
+            return {p: "\n> [!WARNING]\n> **AI Interpretation Failed**: Reached max attempts due to API errors.\n" for p in phase_data_map}
+        
+        raw_response = response.text
+        print(f"    [✓] Received batch response ({len(raw_response)} chars)")
+        
+        # === PMID Verification Pass (single pass on entire response) ===
+        print(f"    [🔬] Running PMID verification pass on batch response...")
+        verified_response, verification_summary = verify_and_format_pmids(raw_response, client)
+        
+        # Split the response into per-phase blocks
+        results = {}
+        for phase_num in phase_numbers:
+            start_marker = f"=== PHASE {phase_num} INTERPRETATION ==="
+            end_marker = f"=== END PHASE {phase_num} ==="
+            
+            start_idx = verified_response.find(start_marker)
+            end_idx = verified_response.find(end_marker)
+            
+            if start_idx != -1 and end_idx != -1:
+                phase_text = verified_response[start_idx + len(start_marker):end_idx].strip()
+            elif start_idx != -1:
+                # End marker missing — grab until next phase or end
+                next_start = verified_response.find(f"=== PHASE", start_idx + len(start_marker))
+                if next_start != -1:
+                    phase_text = verified_response[start_idx + len(start_marker):next_start].strip()
+                else:
+                    phase_text = verified_response[start_idx + len(start_marker):].strip()
+            else:
+                phase_text = f"*Phase {phase_num} interpretation not found in batch response.*"
+            
+            # Format as markdown blockquote
+            formatted_text = "> " + phase_text.replace('\n', '\n> ')
+            verification_note = f"\n> \n> ---\n> *{verification_summary}*"
+            results[phase_num] = f"\n> [!NOTE]\n> **Data-Driven AI Interpretation (with PMID Verification)**\n{formatted_text}{verification_note}\n"
+        
+        return results
+        
+    except ImportError:
+        return {p: "\n> [!WARNING]\n> **AI Interpretation Skipped**: `google-genai` library not installed.\n" for p in phase_data_map}
+    except Exception as e:
+        return {p: f"\n> [!WARNING]\n> **AI Interpretation Failed**: Error calling Gemini API: {e}\n" for p in phase_data_map}
+
+
 def append_to_md(content):
     if not os.path.exists(MD_OUT_PATH):
         with open(MD_OUT_PATH, 'w') as f:
@@ -631,9 +797,7 @@ def build_phase_1():
         'output/metab_targetPair_analysis_full_report.html',
         'output/unique_metab_data_exploration_full_report.html',
     ]
-    interpretation = ask_gemini_interpretation(content, phase=1, html_paths=phase1_htmls)
-    content += interpretation + '\n---\n'
-    append_to_md(content)
+    return content, phase1_htmls
 
 
 def build_phase_2():
@@ -705,9 +869,7 @@ def build_phase_2():
         cap = CANCER_CAP[c]
         phase2_htmls += glob.glob(f"output/{c}_results/primary_vs_metastasis_*_{cap}.html")
         phase2_htmls += glob.glob(f"output/{c}_results/orphan_immune_*_{cap}.html")
-    interpretation = ask_gemini_interpretation(content, phase=2, html_paths=phase2_htmls)
-    content += interpretation + '\n---\n'
-    append_to_md(content)
+    return content, phase2_htmls
 
 def build_phase_3():
     # Because Phase 2 & 3 are conceptually merged in the output as requested by the user,
@@ -772,9 +934,7 @@ def build_phase_3():
     phase3_htmls = [
         f'output/pan_cancer_meta_results/pan_cancer_meta_analysis_report.html',
     ]
-    interpretation = ask_gemini_interpretation(content, phase=3, html_paths=phase3_htmls)
-    content += interpretation + '\n---\n'
-    append_to_md(content)
+    return content, phase3_htmls
 
 def build_phase_4():
     print("Building Phase 4 Summary...")
@@ -872,9 +1032,7 @@ def build_phase_4():
     phase4_htmls = [
         'output/pan_cancer_meta_results/pan_cancer_meta_analysis_report.html',
     ] + glob.glob(f'output/pan_cancer_meta_results/predictive_signature_biomarker_*.html')
-    interpretation = ask_gemini_interpretation(content, phase=4, html_paths=phase4_htmls)
-    content += interpretation + '\n---\n'
-    append_to_md(content)
+    return content, phase4_htmls
 
 def build_phase_5():
     print("Building Phase 5 Summary...")
@@ -944,9 +1102,7 @@ def build_phase_5():
     print("Querying Gemini API for Phase 5 Interpretation...")
     import glob
     phase5_htmls = glob.glob('output/druggability/druggability_axis_*.html')
-    interpretation = ask_gemini_interpretation(content, phase=5, html_paths=phase5_htmls)
-    content += interpretation + '\n---\n'
-    append_to_md(content)
+    return content, phase5_htmls
 
 
 def build_phase_6():
@@ -1290,9 +1446,7 @@ def build_phase_6():
         'output/camp_pancancer_integration_report.html',
         'output/deepdive_conserved_metabGeneSig/deepdive_conserved_metabGeneSig_report.html',
     ] + glob.glob('output/*_ml_prognostic_classifier_report.html')
-    interpretation = ask_gemini_interpretation(content, phase=6, html_paths=phase6_htmls)
-    content += interpretation + '\n---\n'
-    append_to_md(content)
+    return content, phase6_htmls
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Modular AI Summary & Insight Builder")
@@ -1343,15 +1497,38 @@ if __name__ == '__main__':
                 os.remove(CONTEXT_FILE)
         phases_to_run = ['all'] if args.phase == 'all' else [args.phase]
 
+    phase_data = {}
     if '1' in phases_to_run or 'all' in phases_to_run:
-        build_phase_1()
+        phase_data[1] = build_phase_1()
     if '2' in phases_to_run or 'all' in phases_to_run:
-        build_phase_2()
+        phase_data[2] = build_phase_2()
     if '3' in phases_to_run or 'all' in phases_to_run:
-        build_phase_3()
+        phase_data[3] = build_phase_3()
     if '4' in phases_to_run or 'all' in phases_to_run:
-        build_phase_4()
+        phase_data[4] = build_phase_4()
     if '5' in phases_to_run or 'all' in phases_to_run:
-        build_phase_5()
+        phase_data[5] = build_phase_5()
     if '6' in phases_to_run or 'all' in phases_to_run:
-        build_phase_6()
+        phase_data[6] = build_phase_6()
+    
+    if not phase_data:
+        print("No phase data collected. Exiting.")
+        sys.exit(1)
+    
+    # === SINGLE BATCH API CALL ===
+    print(f"\n{'='*60}")
+    print(f"Sending ALL {len(phase_data)} phases to Gemini in a SINGLE API request...")
+    print(f"{'='*60}")
+    
+    interpretations = ask_gemini_batch_interpretation(
+        {p: (content, htmls) for p, (content, htmls) in phase_data.items()}
+    )
+    
+    # === STITCH interpretations back into phase content and write MD ===
+    for phase_num in sorted(phase_data.keys()):
+        content, _ = phase_data[phase_num]
+        interp = interpretations.get(phase_num, "\n> [!WARNING]\n> **AI Interpretation Missing**\n")
+        content += interp + '\n---\n'
+        append_to_md(content)
+    
+    print(f"\n✓ AI Summary written to {MD_OUT_PATH}")
