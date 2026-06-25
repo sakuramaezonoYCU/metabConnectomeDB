@@ -121,20 +121,31 @@ def upload_papers_once(client):
             handle = client.files.upload(file=pdf_path)
             _uploaded_paper_handles.append(handle)
             print(f"        ✓ Uploaded: {pdf_name}")
+            time.sleep(4)  # Rate limit (15 RPM free tier)
         except Exception as e:
             print(f"        ✗ Failed to upload {pdf_name}: {e}")
     return _uploaded_paper_handles
 
+_uploaded_html_cache = {}  # Global cache mapping filepath -> Gemini File handle
+
 def upload_html_files(client, html_paths):
-    """Uploads a list of HTML report files to Gemini File API."""
+    """Uploads a list of HTML report files to Gemini File API with global caching."""
+    global _uploaded_html_cache
     handles = []
     for path in html_paths:
         if not os.path.exists(path):
             continue
+            
+        if path in _uploaded_html_cache:
+            handles.append(_uploaded_html_cache[path])
+            continue
+            
         try:
             handle = client.files.upload(file=path)
+            _uploaded_html_cache[path] = handle
             handles.append(handle)
             print(f"        ✓ Uploaded HTML: {os.path.basename(path)}")
+            time.sleep(4)  # Rate limit (15 RPM free tier)
         except Exception as e:
             print(f"        ✗ Failed to upload {os.path.basename(path)}: {e}")
     return handles
