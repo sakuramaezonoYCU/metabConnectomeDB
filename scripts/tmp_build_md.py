@@ -79,7 +79,14 @@ def scrape_notebook_output(html_path, extractors):
             results[k] = f"(Could not find metric for pattern: {pattern[:30]}...)"
     return results
 
+CONTEXT_FILE = 'output/.cumulative_ai_context.json'
 cumulative_ai_context = []
+if os.path.exists(CONTEXT_FILE):
+    try:
+        with open(CONTEXT_FILE, 'r') as f:
+            cumulative_ai_context = json.load(f)
+    except Exception as e:
+        print(f"Warning: Failed to load existing context: {e}")
 
 # ==============================================================================
 # 📄 GEMINI FILE API: Upload papers/ PDFs once and cache handles
@@ -529,6 +536,11 @@ Data to interpret:
             'data': markdown_text,
             'interpretation': raw_response
         })
+        try:
+            with open(CONTEXT_FILE, 'w') as f:
+                json.dump(cumulative_ai_context, f)
+        except Exception as e:
+            print(f"Warning: Failed to save context: {e}")
         
         # Prefix every line with '> ' for markdown alert block
         formatted_text = "> " + verified_response.replace('\n', '\n> ')
@@ -1327,6 +1339,8 @@ if __name__ == '__main__':
         if args.reset or args.phase == 'all':
             if os.path.exists(MD_OUT_PATH):
                 os.remove(MD_OUT_PATH)
+            if os.path.exists(CONTEXT_FILE):
+                os.remove(CONTEXT_FILE)
         phases_to_run = ['all'] if args.phase == 'all' else [args.phase]
 
     if '1' in phases_to_run or 'all' in phases_to_run:
