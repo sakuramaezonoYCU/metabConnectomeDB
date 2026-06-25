@@ -241,52 +241,64 @@ def _fetch_pubmed_abstracts(pmid_list, ncbi_api_key=None):
     
     return results
 
-def _semantic_verify_pmid(client, claim, pmid, title, abstract):
+def _batch_semantic_verify_pmids(client, items_to_verify):
     """
-    Uses a secondary Gemini call to verify that the abstract actually supports the claim.
-    Returns True if verified, False otherwise.
+    Uses a single secondary Gemini call to batch verify multiple PMIDs.
+    items_to_verify is a list of dicts: [{'pmid': '...', 'claim': '...', 'title': '...', 'abstract': '...'}]
+    Returns a dict mapping PMID to boolean: {'12345678': True, '87654321': False}
     """
+    if not items_to_verify:
+        return {}
+        
     from google.genai import types
+    import json
     
-    verification_prompt = f"""You are a scientific citation auditor. Your ONLY job is to determine if a cited paper actually supports the claim made about it.
-
-CLAIM MADE IN THE REPORT:
-"{claim}"
-
-CITED PAPER (PMID: {pmid}):
-Title: {title}
-Abstract: {abstract}
-
-QUESTION: Does this paper's title and abstract provide evidence that supports or is directly relevant to the claim above?
-
-Answer ONLY with one of:
-- YES - if the paper is clearly relevant to and supports the claim
-- NO - if the paper does not support the claim, is about a different topic, or the claim misrepresents the paper's findings
-
-Your answer (YES or NO):"""
+    prompt = "You are a scientific citation auditor. Your ONLY job is to determine if cited papers actually support the claims made about them.\n\n"
+    prompt += "Below is a list of claims and the corresponding cited paper's title and abstract.\n"
+    prompt += "For each item, answer YES if the abstract provides evidence that supports or is directly relevant to the claim, or NO if it does not.\n\n"
+    
+    for i, item in enumerate(items_to_verify):
+        prompt += f"--- ITEM {i+1} ---\n"
+        prompt += f"PMID: {item['pmid']}\n"
+        prompt += f"CLAIM: \"{item['claim']}\"\n"
+        prompt += f"PAPER TITLE: {item['title']}\n"
+        prompt += f"PAPER ABSTRACT: {item['abstract']}\n\n"
+        
+    prompt += "Output your response as a valid JSON object where the keys are the PMIDs (as strings) and the values are boolean (true for YES, false for NO). "
+    prompt += "Do not include markdown blocks or any other text. Output strict JSON only, e.g. {\"12345678\": true, \"87654321\": false}."
 
     try:
         response = client.models.generate_content(
             model='gemini-2.5-flash',
-            contents=verification_prompt,
+            contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.0,
-                max_output_tokens=10,
+                response_mime_type="application/json",
             )
         )
-        answer = response.text.strip().upper()
-        return answer.startswith("YES")
+        
+        # Parse the JSON response
+        text = response.text.strip()
+        if text.startswith("```json"):
+            text = text[7:]
+        if text.endswith("```"):
+            text = text[:-3]
+        
+        results = json.loads(text.strip())
+        
+        # Ensure all PMIDs are strings in the results
+        return {str(k): bool(v) for k, v in results.items()}
     except Exception as e:
-        print(f"        [!] Semantic verification failed for PMID:{pmid}: {e}")
-        # On failure, conservatively reject (do not assume valid)
-        return False
+        print(f"        [!] Batch semantic verification failed: {e}")
+        # On failure, conservatively reject all
+        return {str(item['pmid']): False for item in items_to_verify}
 
 def verify_and_format_pmids(text, client):
     """
     Post-processes AI-generated text to:
     1. Extract all cited PMIDs
     2. Verify they exist via NCBI E-Fetch
-    3. Semantically verify the claim matches the paper's abstract
+    3. Semantically verify the claim matches the paper's abstract (in one batch call)
     4. Format valid PMIDs as clickable links with titles
     5. Flag invalid/hallucinated PMIDs
     
@@ -303,12 +315,12 @@ def verify_and_format_pmids(text, client):
     ncbi_key = _load_ncbi_api_key()
     abstracts = _fetch_pubmed_abstracts(unique_pmids, ncbi_key)
     
+    # Prepare batch for semantic verification
+    items_to_verify = []
+    replacements = {}
     verified_count = 0
     failed_count = 0
     verification_log = []
-    
-    # Track replacements to avoid double-replacing
-    replacements = {}
     
     for claim_info in claims:
         pmid = claim_info['pmid']
@@ -322,25 +334,37 @@ def verify_and_format_pmids(text, client):
             replacements[original_match] = f"~~{original_match}~~ [⚠️ PMID Not Found in PubMed]"
             failed_count += 1
             verification_log.append(f"  ✗ {original_match}: Does not exist in PubMed database")
-            continue
-        
-        # PMID exists — now run semantic verification
-        time.sleep(1)  # Rate limit between verification calls
-        is_valid = _semantic_verify_pmid(
-            client, claim_text, pmid, paper_data['title'], paper_data['abstract']
-        )
-        
-        if is_valid:
-            # Format as a clickable, verified link with the real paper title
-            clean_title = paper_data['title'].rstrip('.')
-            link = f"[PMID:{pmid} - {clean_title}](https://pubmed.ncbi.nlm.nih.gov/{pmid}/)"
-            replacements[original_match] = link
-            verified_count += 1
-            verification_log.append(f"  ✓ PMID:{pmid} — \"{clean_title}\" — Claim verified")
         else:
-            replacements[original_match] = f"~~{original_match}~~ [⚠️ Citation does not support claim — removed]"
-            failed_count += 1
-            verification_log.append(f"  ✗ PMID:{pmid} — \"{paper_data['title']}\" — Claim NOT supported by abstract")
+            items_to_verify.append({
+                'pmid': pmid,
+                'claim': claim_text,
+                'title': paper_data['title'],
+                'abstract': paper_data['abstract'],
+                'original_match': original_match
+            })
+            
+    # Run batch semantic verification
+    if items_to_verify:
+        print(f"    [🔬] Running batch semantic verification for {len(items_to_verify)} citations...")
+        time.sleep(2)  # Short delay before hitting Gemini again
+        verification_results = _batch_semantic_verify_pmids(client, items_to_verify)
+        
+        for item in items_to_verify:
+            pmid = item['pmid']
+            original_match = item['original_match']
+            title = item['title']
+            is_valid = verification_results.get(pmid, False)
+            
+            if is_valid:
+                clean_title = title.rstrip('.')
+                link = f"[PMID:{pmid} - {clean_title}](https://pubmed.ncbi.nlm.nih.gov/{pmid}/)"
+                replacements[original_match] = link
+                verified_count += 1
+                verification_log.append(f"  ✓ PMID:{pmid} — \"{clean_title}\" — Claim verified")
+            else:
+                replacements[original_match] = f"~~{original_match}~~ [⚠️ Citation does not support claim — removed]"
+                failed_count += 1
+                verification_log.append(f"  ✗ PMID:{pmid} — \"{title}\" — Claim NOT supported by abstract")
     
     # Apply replacements to text
     processed_text = text
