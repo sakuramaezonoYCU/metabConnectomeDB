@@ -132,8 +132,10 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
     - Reads the actual CSV/output files directly (no HTML scraping for validated data)
     - Computes summary metrics (e.g., Top 5 signatures by significance, median C-Index, detection rates)
     - Includes methodology notes explaining how each metric was derived
-    - Sends the condensed summary to Gemini API for AI interpretation
-    - Includes 503/UNAVAILABLE retry logic with exponential backoff
+    - Uploads reference PDFs from `papers/` directory and phase-specific Jupyter HTML reports to Gemini via the File API for deep biological cross-referencing
+    - Sends the condensed summary + uploaded files to Gemini API for AI interpretation
+    - Post-processes every AI response through a **PMID Verification Pipeline** that: (1) extracts all cited PMIDs, (2) verifies them via NCBI E-Fetch API, (3) runs a secondary semantic verification LLM call to confirm the paper's abstract supports the claim, and (4) formats verified PMIDs as clickable `[PMID:X - Title](url)` links while flagging hallucinated citations
+    - Includes 503/UNAVAILABLE retry logic with exponential backoff (up to 5 retries)
   - **Flags:**
     - `--phase all` — Builds all phases (1–6) sequentially
     - `--phase 6` — Builds only Phase 6 (useful for testing)
@@ -142,6 +144,8 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
 
 > [!NOTE]
 > **Phase 7 Data Flow:** `tmp_build_md.py` reads directly from:
+> - `papers/*.pdf` (Reference literature uploaded via Gemini File API for cross-referencing)
+> - `output/**/*.html` (Phase-specific Jupyter notebook HTML reports uploaded via Gemini File API)
 > - `output/ai_summary_tables/*.csv` (Phases 1–5 summaries from `generate_ai_summary_tables.py`)
 > - `output/tcga_validation/*/true_signature_metrics.csv` (Phase 6.1 TCGA)
 > - `output/pan_cancer_meta_results/pre_metastatic_subclone_summary*.csv` (Phase 6.2 Subclones)
@@ -167,3 +171,4 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
 | 2026-06-23 | `generate_final_outputs.py` | **HGNC Target Canonicalization Patch:** Added canonical resolution mapping via `input/hgnc_approved_genes.json` to process `Target_original` into official `Target` names. This completely eliminates obsolete Uniprot TrEMBL fragmentation downstream. |
 | 2026-06-24 | `run_cancer_pipeline.py`, `serotonin_config.py` | **Auto-Fetching & Self-Healing:** Configured the pipeline orchestrator to automatically discover and source all `fetch_*.py` scripts as STEP 0 with a hard-fail condition. Implemented an auto-healing subroutine in `serotonin_config.py` to trigger Reactome/API fetches dynamically if config JSONs are missing, completely removing the need for manual API script executions. |
 | 2026-06-25 | `tmp_build_md.py`, `compute_metabolic_switching.py`, `master_regulator_analysis.ipynb` | **Downstream Extraction Integrity Patch:** Rewrote the `tmp_build_md.py` scraper to explicitly extract statistical metrics (P-values, HRs, target counts) from actual CSV outputs rather than falsely reporting simple file existence. Fixed the computation script to properly save the oxygen tension results, and reverted the Master Regulator notebook back to its dynamically un-hardcoded state to ensure complete data provenance. |
+| 2026-06-25 | `tmp_build_md.py` | **Deep Research & PMID Verification Patch:** Integrated Gemini File API to upload `papers/*.pdf` reference literature and phase-specific Jupyter HTML reports for deep biological cross-referencing. Implemented a 3-stage PMID Verification Pipeline: (1) NCBI E-Fetch existence check, (2) semantic verification via secondary LLM call comparing the claim against the paper's abstract, (3) formatting verified PMIDs as clickable markdown links with titles. Hallucinated or unsupported citations are automatically flagged and removed. |

@@ -5,6 +5,8 @@ import json
 import re
 import argparse
 import numpy as np
+import time
+import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 
 if 'scripts' not in sys.path and '.' not in sys.path:
@@ -31,6 +33,8 @@ except Exception as e:
     raise ImportError(f"Failed to load dynamic parameters from pan_cancer_config. Hardcoding parameters is strictly prohibited. Error: {e}")
 
 MD_OUT_PATH = 'output/AI_summary_and_insights.md'
+PAPERS_DIR = 'papers'
+NCBI_API_KEY_FILE = 'input/ncbi_api_key.txt'
 
 def df_to_markdown(df):
     header = '| ' + ' | '.join(df.columns) + ' |'
@@ -77,76 +81,382 @@ def scrape_notebook_output(html_path, extractors):
 
 cumulative_ai_context = []
 
-def ask_gemini_interpretation(markdown_text, phase):
-    """
-    Reads the API key from input/.geminiSecret and queries Gemini for a scientific interpretation of the raw data.
-    Maintains a cumulative history of past phases for context.
-    """
-    global cumulative_ai_context
+# ==============================================================================
+# 📄 GEMINI FILE API: Upload papers/ PDFs once and cache handles
+# ==============================================================================
+_uploaded_paper_handles = None  # Global cache
+
+def _get_gemini_client():
+    """Returns a configured Gemini client. Hard-crashes if secret is missing."""
     secret_path = os.path.join('input', '.geminiSecret')
     if not os.path.exists(secret_path):
-        return "\n> [!WARNING]\n> **AI Interpretation Skipped**: `input/.geminiSecret` not found. Please create this file containing your Gemini API key to enable automated AI interpretations.\n"
-    
+        return None
     with open(secret_path, 'r') as f:
         api_key = f.read().strip()
-    
     if not api_key or "PASTE_YOUR_GEMINI_API_KEY_HERE" in api_key:
-         return "\n> [!WARNING]\n> **AI Interpretation Skipped**: `input/.geminiSecret` is empty or invalid.\n"
+        return None
+    from google import genai
+    return genai.Client(api_key=api_key)
+
+def upload_papers_once(client):
+    """Uploads all PDFs from papers/ directory to Gemini File API. Cached globally."""
+    global _uploaded_paper_handles
+    if _uploaded_paper_handles is not None:
+        return _uploaded_paper_handles
+
+    _uploaded_paper_handles = []
+    if not os.path.isdir(PAPERS_DIR):
+        print(f"    [i] No '{PAPERS_DIR}/' directory found. Skipping literature upload.")
+        return _uploaded_paper_handles
+
+    pdf_files = sorted([f for f in os.listdir(PAPERS_DIR) if f.endswith('.pdf')])
+    if not pdf_files:
+        print(f"    [i] No PDFs found in '{PAPERS_DIR}/'. Skipping literature upload.")
+        return _uploaded_paper_handles
+
+    print(f"    [📄] Uploading {len(pdf_files)} reference PDFs to Gemini File API...")
+    for pdf_name in pdf_files:
+        pdf_path = os.path.join(PAPERS_DIR, pdf_name)
+        try:
+            handle = client.files.upload(file=pdf_path)
+            _uploaded_paper_handles.append(handle)
+            print(f"        ✓ Uploaded: {pdf_name}")
+        except Exception as e:
+            print(f"        ✗ Failed to upload {pdf_name}: {e}")
+    return _uploaded_paper_handles
+
+def upload_html_files(client, html_paths):
+    """Uploads a list of HTML report files to Gemini File API."""
+    handles = []
+    for path in html_paths:
+        if not os.path.exists(path):
+            continue
+        try:
+            handle = client.files.upload(file=path)
+            handles.append(handle)
+            print(f"        ✓ Uploaded HTML: {os.path.basename(path)}")
+        except Exception as e:
+            print(f"        ✗ Failed to upload {os.path.basename(path)}: {e}")
+    return handles
+
+
+# ==============================================================================
+# 🔬 PMID VERIFICATION: NCBI E-Fetch + Semantic Validation
+# ==============================================================================
+
+def _load_ncbi_api_key():
+    """Returns the NCBI API key if available, else None."""
+    if os.path.exists(NCBI_API_KEY_FILE):
+        try:
+            with open(NCBI_API_KEY_FILE, 'r') as f:
+                key = f.read().strip()
+            return key if key else None
+        except Exception:
+            return None
+    return None
+
+def _extract_pmid_claims(text):
+    """
+    Extracts (pmid, surrounding_claim_sentence) pairs from AI-generated text.
+    Returns a list of dicts: [{'pmid': '12345678', 'claim': 'The sentence containing the PMID.', 'match': 'PMID:12345678'}]
+    """
+    results = []
+    # Find all PMID references in various formats
+    pmid_pattern = re.compile(r'(?:PMID\s*:?\s*(\d{5,})|PubMed\s*(?:ID)?\s*:?\s*(\d{5,}))', re.IGNORECASE)
+    
+    # Split text into sentences for claim extraction
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    
+    for sentence in sentences:
+        for match in pmid_pattern.finditer(sentence):
+            pmid = match.group(1) or match.group(2)
+            results.append({
+                'pmid': pmid,
+                'claim': sentence.strip(),
+                'match': match.group(0)
+            })
+    return results
+
+def _fetch_pubmed_abstracts(pmid_list, ncbi_api_key=None):
+    """
+    Batch-fetches Title and Abstract from NCBI E-Fetch for a list of PMIDs.
+    Returns a dict: {pmid: {'title': ..., 'abstract': ...}} or {pmid: None} if not found.
+    """
+    import requests
+    
+    if not pmid_list:
+        return {}
+    
+    base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+    results = {}
+    
+    # Batch up to 50 at a time
+    batch_size = 50
+    for i in range(0, len(pmid_list), batch_size):
+        batch = pmid_list[i:i + batch_size]
+        params = {
+            "db": "pubmed",
+            "id": ",".join(batch),
+            "retmode": "xml"
+        }
+        if ncbi_api_key:
+            params["api_key"] = ncbi_api_key
+        
+        try:
+            response = requests.get(base_url, params=params, timeout=20)
+            response.raise_for_status()
+            root = ET.fromstring(response.text)
+            
+            found_pmids = set()
+            for article in root.findall(".//PubmedArticle"):
+                pmid_node = article.find(".//MedlineCitation/PMID")
+                if pmid_node is None or not pmid_node.text:
+                    continue
+                pmid = pmid_node.text.strip()
+                found_pmids.add(pmid)
+                
+                title = article.findtext(".//ArticleTitle", default="N/A").strip()
+                abstract_texts = []
+                for abs_text in article.findall(".//AbstractText"):
+                    if abs_text.text:
+                        abstract_texts.append(abs_text.text.strip())
+                abstract = " ".join(abstract_texts) if abstract_texts else "No abstract available"
+                
+                results[pmid] = {'title': title, 'abstract': abstract}
+            
+            # Mark PMIDs not found as None
+            for pmid in batch:
+                if pmid not in found_pmids:
+                    results[pmid] = None
+                    
+        except Exception as e:
+            print(f"        [!] NCBI E-Fetch error: {e}")
+            for pmid in batch:
+                if pmid not in results:
+                    results[pmid] = None
+        
+        # Respect NCBI rate limits
+        delay = 0.12 if ncbi_api_key else 0.35
+        time.sleep(delay)
+    
+    return results
+
+def _semantic_verify_pmid(client, claim, pmid, title, abstract):
+    """
+    Uses a secondary Gemini call to verify that the abstract actually supports the claim.
+    Returns True if verified, False otherwise.
+    """
+    from google.genai import types
+    
+    verification_prompt = f"""You are a scientific citation auditor. Your ONLY job is to determine if a cited paper actually supports the claim made about it.
+
+CLAIM MADE IN THE REPORT:
+"{claim}"
+
+CITED PAPER (PMID: {pmid}):
+Title: {title}
+Abstract: {abstract}
+
+QUESTION: Does this paper's title and abstract provide evidence that supports or is directly relevant to the claim above?
+
+Answer ONLY with one of:
+- YES - if the paper is clearly relevant to and supports the claim
+- NO - if the paper does not support the claim, is about a different topic, or the claim misrepresents the paper's findings
+
+Your answer (YES or NO):"""
+
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=verification_prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.0,
+                max_output_tokens=10,
+            )
+        )
+        answer = response.text.strip().upper()
+        return answer.startswith("YES")
+    except Exception as e:
+        print(f"        [!] Semantic verification failed for PMID:{pmid}: {e}")
+        # On failure, conservatively reject (do not assume valid)
+        return False
+
+def verify_and_format_pmids(text, client):
+    """
+    Post-processes AI-generated text to:
+    1. Extract all cited PMIDs
+    2. Verify they exist via NCBI E-Fetch
+    3. Semantically verify the claim matches the paper's abstract
+    4. Format valid PMIDs as clickable links with titles
+    5. Flag invalid/hallucinated PMIDs
+    
+    Returns the cleaned text with verified links and a verification summary.
+    """
+    claims = _extract_pmid_claims(text)
+    if not claims:
+        return text, "No PMIDs cited."
+    
+    # Deduplicate PMIDs for batch fetching
+    unique_pmids = list(set(c['pmid'] for c in claims))
+    print(f"    [🔬] Verifying {len(unique_pmids)} unique PMIDs against NCBI PubMed...")
+    
+    ncbi_key = _load_ncbi_api_key()
+    abstracts = _fetch_pubmed_abstracts(unique_pmids, ncbi_key)
+    
+    verified_count = 0
+    failed_count = 0
+    verification_log = []
+    
+    # Track replacements to avoid double-replacing
+    replacements = {}
+    
+    for claim_info in claims:
+        pmid = claim_info['pmid']
+        claim_text = claim_info['claim']
+        original_match = claim_info['match']
+        
+        paper_data = abstracts.get(pmid)
+        
+        if paper_data is None:
+            # PMID does not exist in PubMed at all
+            replacements[original_match] = f"~~{original_match}~~ [⚠️ PMID Not Found in PubMed]"
+            failed_count += 1
+            verification_log.append(f"  ✗ {original_match}: Does not exist in PubMed database")
+            continue
+        
+        # PMID exists — now run semantic verification
+        time.sleep(1)  # Rate limit between verification calls
+        is_valid = _semantic_verify_pmid(
+            client, claim_text, pmid, paper_data['title'], paper_data['abstract']
+        )
+        
+        if is_valid:
+            # Format as a clickable, verified link with the real paper title
+            clean_title = paper_data['title'].rstrip('.')
+            link = f"[PMID:{pmid} - {clean_title}](https://pubmed.ncbi.nlm.nih.gov/{pmid}/)"
+            replacements[original_match] = link
+            verified_count += 1
+            verification_log.append(f"  ✓ PMID:{pmid} — \"{clean_title}\" — Claim verified")
+        else:
+            replacements[original_match] = f"~~{original_match}~~ [⚠️ Citation does not support claim — removed]"
+            failed_count += 1
+            verification_log.append(f"  ✗ PMID:{pmid} — \"{paper_data['title']}\" — Claim NOT supported by abstract")
+    
+    # Apply replacements to text
+    processed_text = text
+    for original, replacement in replacements.items():
+        processed_text = processed_text.replace(original, replacement)
+    
+    summary = f"PMID Verification: {verified_count} verified, {failed_count} removed/flagged out of {len(claims)} citations."
+    print(f"    [🔬] {summary}")
+    for log_line in verification_log:
+        print(f"        {log_line}")
+    
+    return processed_text, summary
+
+
+# ==============================================================================
+# 🤖 GEMINI INTERPRETATION: Deep Research with File API + PMID Verification
+# ==============================================================================
+
+def ask_gemini_interpretation(markdown_text, phase, html_paths=None):
+    """
+    Queries Gemini for a scientific interpretation of the raw data.
+    
+    Enhancements over original:
+    - Uploads PDFs from papers/ directory for deep biological cross-referencing
+    - Uploads relevant HTML reports for the current phase
+    - Post-processes response to verify all cited PMIDs via NCBI E-Fetch
+    - Semantically validates that cited papers actually support the claims made
+    """
+    global cumulative_ai_context
+    
+    client = _get_gemini_client()
+    if client is None:
+        return "\n> [!WARNING]\n> **AI Interpretation Skipped**: `input/.geminiSecret` not found or invalid.\n"
          
     try:
-        from google import genai
         from google.genai import types
-        import time
-        client = genai.Client(api_key=api_key)
         
-        # Build cumulative context string
+        # Upload reference papers (cached after first call)
+        paper_handles = upload_papers_once(client)
+        
+        # Upload phase-specific HTML reports
+        html_handles = []
+        if html_paths:
+            existing_paths = [p for p in html_paths if os.path.exists(p)]
+            if existing_paths:
+                print(f"    [📊] Uploading {len(existing_paths)} HTML reports for Phase {phase}...")
+                html_handles = upload_html_files(client, existing_paths)
+        
+        # Build cumulative context string (condensed to avoid token bloat)
         context_str = ""
         if cumulative_ai_context:
             context_str = "PREVIOUS PHASES CONTEXT & FINDINGS:\n"
             for past_phase in cumulative_ai_context:
                 context_str += f"--- Phase {past_phase['phase']} ---\n"
-                context_str += f"Raw Data Summary:\n{past_phase['data'][:500]}...\n" # Limit data to avoid context overflow
-                context_str += f"AI Interpretation:\n{past_phase['interpretation']}\n\n"
+                context_str += f"Raw Data Summary:\n{past_phase['data'][:500]}...\n"
+                context_str += f"AI Interpretation:\n{past_phase['interpretation'][:1000]}...\n\n"
         
-        prompt = f"""
-        You are an expert computational biologist analyzing single-cell metabolism and pan-cancer data. 
-        Below is the raw markdown data table output from Phase {phase} of our pipeline.
-        Please provide a highly scientific, data-driven interpretation of these results. 
+        # Build the file context description
+        file_context_note = ""
+        if paper_handles:
+            file_context_note += f"\nYou have been provided {len(paper_handles)} reference PDF papers. "
+            file_context_note += "Cross-reference your interpretation against findings in these papers. "
+            file_context_note += "When citing findings from these papers, use their actual PMIDs.\n"
+        if html_handles:
+            file_context_note += f"\nYou have been provided {len(html_handles)} Jupyter notebook HTML reports from this phase. "
+            file_context_note += "These contain the FULL analytical outputs including plots, statistical tests, and intermediate results. "
+            file_context_note += "Reference specific results, figures, and statistical outputs from these reports in your interpretation.\n"
         
-        {context_str}
+        prompt = f"""You are an expert computational biologist analyzing single-cell metabolism and pan-cancer data.
+Below is the raw markdown data summary from Phase {phase} of our metabConnectomeDB pipeline.
+
+{file_context_note}
+
+{context_str}
+
+YOUR TASK:
+Provide a deeply scientific, data-driven interpretation of the results below. You MUST:
+1. Summarize the key quantitative findings (do NOT just copy tables — synthesize patterns and highlight the most significant results).
+2. Explain the biological significance of these findings, cross-referencing with the provided PDF literature and HTML reports where applicable.
+3. When citing external literature to support biological claims, format PMIDs exactly as: PMID:12345678
+   - Only cite PMIDs you are confident are real and relevant.
+   - Every PMID you cite will be programmatically verified against PubMed. Hallucinated or irrelevant citations will be automatically removed.
+
+SCIENTIFIC INTEGRITY POLICY (ABSOLUTE):
+- DO NOT fabricate, guess, or mock any data, metrics, or biological mechanisms.
+- If the data is sparse or inconclusive, state that explicitly.
+- Do NOT claim causation from correlational data.
+- Only reference biological mechanisms that are directly supported by the data tables, the provided HTML reports, or the provided PDF literature.
+
+RESPONSE FORMAT (use these exact headers):
+### 1. NOVEL FINDINGS
+[Synthesize the most important findings. Reference specific metrics from the data. Cross-reference with the provided literature PDFs and HTML reports.]
+
+### 2. PROPOSED RESEARCH QUESTIONS
+[List 2-3 deep biological questions raised by these specific results.]
+
+### 3. SUGGESTED NEXT STEPS
+[Actionable computational or experimental next steps grounded in the data.]
+
+Data to interpret:
+{markdown_text}
+"""
         
-        CRITICAL RULES AND SCIENTIFIC INTEGRITY POLICY:
-        1. DO NOT FALSIFY OR MOCK SCIENTIFIC DATA.
-        2. Never guess or fabricate biological mechanisms. If the data is sparse, state that it is sparse.
-        3. Explain findings explicitly referencing the data provided below. Cite real PMIDs where possible.
-        4. Make sure you actually summarize the metrics and patterns from the CSV tables. Do NOT just copy and paste the full tables into your response.
-        
-        CRITICAL FORMATTING REQUIREMENT:
-        You must structure your response EXACTLY with these three headers:
-        ### 1. NOVEL FINDINGS
-        [Explain findings explicitly referencing the output files listed in the data below. Cite PMIDs where possible to back up biological claims.]
-        
-        ### 2. PROPOSED RESEARCH QUESTIONS
-        [List 2-3 deep biological questions raised by these specific results.]
-        
-        ### 3. SUGGESTED NEXT STEPS
-        [Actionable computational or biological next steps.]
-        
-        Data to interpret:
-        {markdown_text}
-        """
+        # Build the contents list: prompt text + uploaded files
+        contents = [prompt] + paper_handles + html_handles
         
         attempt = 0
-        max_attempts = 1
+        max_attempts = 5
         
-        # Enforce a base delay between API calls across different phases
         time.sleep(2)
         
         while attempt < max_attempts:
             try:
                 response = client.models.generate_content(
                     model='gemini-2.5-flash',
-                    contents=prompt,
+                    contents=contents,
                     config=types.GenerateContentConfig(
                         safety_settings=[
                             types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
@@ -156,13 +466,13 @@ def ask_gemini_interpretation(markdown_text, phase):
                         ]
                     )
                 )
-                break # Success!
+                break  # Success!
             except Exception as e:
                 error_str = str(e)
                 attempt += 1
-                if '403' in error_str or '429' in error_str or '503' in error_str or '500' in error_str or '502' in error_str or '504' in error_str:
+                if any(code in error_str for code in ['403', '429', '503', '500', '502', '504']):
                     backoff_time = min(15 * (2 ** (attempt - 1)), 300)
-                    print(f"    [!] Gemini API rate limit/server error ({e}). Retrying in {backoff_time}s (Attempt {attempt}/{max_attempts})...")
+                    print(f"    [!] Gemini API error ({e}). Retrying in {backoff_time}s (Attempt {attempt}/{max_attempts})...")
                     time.sleep(backoff_time)
                 else:
                     print(f"    [!] Gemini API Error ({e}). Retrying in 30s (Attempt {attempt}/{max_attempts})...")
@@ -171,16 +481,23 @@ def ask_gemini_interpretation(markdown_text, phase):
         if attempt == max_attempts:
             return f"\n> [!WARNING]\n> **AI Interpretation Failed**: Reached max attempts ({max_attempts}) due to API errors.\n"
         
-        # Save context for future phases
+        raw_response = response.text
+        
+        # === PMID Verification Pass ===
+        print(f"    [🔬] Running PMID verification pass on Phase {phase} response...")
+        verified_response, verification_summary = verify_and_format_pmids(raw_response, client)
+        
+        # Save context for future phases (use raw response for context, verified for output)
         cumulative_ai_context.append({
             'phase': phase,
             'data': markdown_text,
-            'interpretation': response.text
+            'interpretation': raw_response
         })
         
-        # Prefix every line with '> ' to keep it nicely encapsulated in a markdown alert block
-        formatted_text = "> " + response.text.replace('\n', '\n> ')
-        return f"\n> [!NOTE]\n> **Data-Driven AI Interpretation**\n{formatted_text}\n"
+        # Prefix every line with '> ' for markdown alert block
+        formatted_text = "> " + verified_response.replace('\n', '\n> ')
+        verification_note = f"\n> \n> ---\n> *{verification_summary}*"
+        return f"\n> [!NOTE]\n> **Data-Driven AI Interpretation (with PMID Verification)**\n{formatted_text}{verification_note}\n"
         
     except ImportError:
         return "\n> [!WARNING]\n> **AI Interpretation Skipped**: `google-genai` library not installed. Please run `pip install google-genai`.\n"
@@ -262,7 +579,11 @@ def build_phase_1():
     content += f"- **Elemental Composition:** Nitrogen-containing: {s2_metrics['nitrogen']} | Sulfur-containing: {s2_metrics['sulfur']}\n\n"
 
     print("Querying Gemini API for Phase 1 Interpretation...")
-    interpretation = ask_gemini_interpretation(content, phase=1)
+    phase1_htmls = [
+        'output/metab_targetPair_analysis_full_report.html',
+        'output/unique_metab_data_exploration_full_report.html',
+    ]
+    interpretation = ask_gemini_interpretation(content, phase=1, html_paths=phase1_htmls)
     content += interpretation + '\n---\n'
     append_to_md(content)
 
@@ -330,7 +651,13 @@ def build_phase_2():
                 content += df_to_markdown(df_upset) + "\n\n"
 
     print("Querying Gemini API for Phase 2 Interpretation...")
-    interpretation = ask_gemini_interpretation(content, phase=2)
+    import glob
+    phase2_htmls = []
+    for c in CANCERS:
+        cap = CANCER_CAP[c]
+        phase2_htmls += glob.glob(f"output/{c}_results/primary_vs_metastasis_*_{cap}.html")
+        phase2_htmls += glob.glob(f"output/{c}_results/orphan_immune_*_{cap}.html")
+    interpretation = ask_gemini_interpretation(content, phase=2, html_paths=phase2_htmls)
     content += interpretation + '\n---\n'
     append_to_md(content)
 
@@ -394,7 +721,10 @@ def build_phase_3():
         content += f"*(Pending: {quant_path})*\n\n"
 
     print("Querying Gemini API for Phase 3 Interpretation...")
-    interpretation = ask_gemini_interpretation(content, phase=3)
+    phase3_htmls = [
+        f'output/pan_cancer_meta_results/pan_cancer_meta_analysis_report.html',
+    ]
+    interpretation = ask_gemini_interpretation(content, phase=3, html_paths=phase3_htmls)
     content += interpretation + '\n---\n'
     append_to_md(content)
 
@@ -490,7 +820,11 @@ def build_phase_4():
         content += df_to_markdown(pd.read_csv(gene_annot_path)) + '\n\n'
 
     print("Querying Gemini API for Phase 4 Interpretation...")
-    interpretation = ask_gemini_interpretation(content, phase=4)
+    import glob
+    phase4_htmls = [
+        'output/pan_cancer_meta_results/pan_cancer_meta_analysis_report.html',
+    ] + glob.glob(f'output/pan_cancer_meta_results/predictive_signature_biomarker_*.html')
+    interpretation = ask_gemini_interpretation(content, phase=4, html_paths=phase4_htmls)
     content += interpretation + '\n---\n'
     append_to_md(content)
 
@@ -560,7 +894,9 @@ def build_phase_5():
         content += f"*(Pending: {drug_csv})*\n\n"
 
     print("Querying Gemini API for Phase 5 Interpretation...")
-    interpretation = ask_gemini_interpretation(content, phase=5)
+    import glob
+    phase5_htmls = glob.glob('output/druggability/druggability_axis_*.html')
+    interpretation = ask_gemini_interpretation(content, phase=5, html_paths=phase5_htmls)
     content += interpretation + '\n---\n'
     append_to_md(content)
 
@@ -895,7 +1231,18 @@ def build_phase_6():
         content += "*(Pending: visium_immune_evasion_summary.csv)*\n\n"
 
     print("Querying Gemini API for Phase 6 Interpretation...")
-    interpretation = ask_gemini_interpretation(content, phase=6)
+    import glob
+    phase6_htmls = [
+        'output/visium_spatial_validation_report.html',
+        'output/ovarian_serotonin_immune_evasion_report.html',
+        'output/oxygen_tension_analysis_report.html',
+        'output/mitf_regulon_expansion_report.html',
+        'output/serotonin_axis_spatial_mapping_report.html',
+        'output/master_regulator_analysis_report.html',
+        'output/camp_pancancer_integration_report.html',
+        'output/deepdive_conserved_metabGeneSig/deepdive_conserved_metabGeneSig_report.html',
+    ] + glob.glob('output/*_ml_prognostic_classifier_report.html')
+    interpretation = ask_gemini_interpretation(content, phase=6, html_paths=phase6_htmls)
     content += interpretation + '\n---\n'
     append_to_md(content)
 
