@@ -692,38 +692,105 @@ def build_phase_6():
         if os.path.exists(path):
             content += f"- **{title}**: Generated Successfully (`{path}`)\n"
             
-            if title == 'Master Regulator Analysis':
+            if title == 'Druggability Axis Analysis':
+                drug_targets = glob.glob('output/druggability/druggable_targets_strictly_conserved_*.csv')
+                if drug_targets:
+                    df_drug = pd.read_csv(sorted(drug_targets)[0])
+                    if not df_drug.empty and 'Gene' in df_drug.columns:
+                        gene_counts = df_drug['Gene'].value_counts()
+                        content += f"  - *Strictly Conserved Druggable Targets*: {len(gene_counts)} genes targeted.\n"
+                        for gene, count in gene_counts.items():
+                            content += f"    - **{gene}**: {count} available drugs/compounds.\n"
+                
+                interactions = glob.glob('output/druggability/druggability_axis_*_drug_targets.csv')
+                if interactions:
+                    df_int = pd.read_csv(sorted(interactions)[0])
+                    total_interactions = len(df_int)
+                    content += f"  - *Total Database Interactions Found*: {total_interactions}\n"
+
+            elif title == 'Master Regulator Analysis':
                 tf_csv = 'output/master_regulator_results/tf_enrichment_results.csv'
                 if os.path.exists(tf_csv):
                     import pandas as pd
                     df_tf = pd.read_csv(tf_csv)
-                    top_tfs = df_tf.head(5)['Transcription Factor'].tolist()
-                    content += f"  - *Top 5 Transcription Factors*: {top_tfs}\n"
+                    content += "  - *Top 5 Transcription Factors*:\n"
+                    top_tfs = df_tf.head(5)
+                    for _, row in top_tfs.iterrows():
+                        tf = row['Transcription Factor']
+                        pval = row['Adjusted P-value']
+                        score = row['Combined Score']
+                        genes = row['Overlapping Genes']
+                        content += f"    - **{tf}**: Adj P-Value = {pval:.2e}, Score = {score:.1f}. Regulates: {genes}\n"
+
             elif title == 'MITF Regulon Expansion':
-                mitf_csvs = glob.glob('output/mitf_regulon/mitf_metabolic_regulon_genes_*.csv')
+                mitf_csvs = glob.glob('output/mitf_regulon/mitf_metabolic_regulon_pairs*.csv')
                 if mitf_csvs:
                     import pandas as pd
                     df_mitf = pd.read_csv(sorted(mitf_csvs)[0])
-                    mitf_genes = df_mitf.iloc[:,0].tolist()
-                    content += f"  - *Expanded MITF Regulon Targets*: {len(mitf_genes)} genes ({mitf_genes[:10]}...)\n"
+                    if 'Metabolite_Name' in df_mitf.columns:
+                        top_metabs = df_mitf['Metabolite_Name'].value_counts().head(5)
+                        content += f"  - *Top 5 Metabolites Regulated by MITF Network*:\n"
+                        for metab, count in top_metabs.items():
+                            targets = df_mitf[df_mitf['Metabolite_Name'] == metab]['Target'].unique()
+                            content += f"    - **{metab}**: Regulated via {len(targets)} enzymes (e.g., {', '.join(targets[:3])})\n"
+                    
             elif title == 'Oxygen Tension Analysis':
-                oxy_csvs = glob.glob('output/oxygen_tension/*.csv')
+                oxy_csvs = glob.glob('output/oxygen_tension/oxygen_tension_correlation_results.csv')
                 if oxy_csvs:
                     import pandas as pd
                     df_oxy = pd.read_csv(sorted(oxy_csvs)[0])
-                    content += f"  - *Oxygen tension data*: Evaluated {df_oxy.shape[0]} items/ratios.\n"
+                    content += f"  - *Metabolic Adaptation Profiles*:\n"
+                    for _, row in df_oxy.iterrows():
+                        content += f"    - **{row['Cancer']}**: OXPHOS/Glycolysis Ratio = {row['OXPHOS_Glycolysis_Ratio']:.3f}, HIF1 LFC = {row['Mean_HIF1_LFC']:.3f}\n"
+
             elif title == 'CAMP Pan-Cancer Integration':
                 camp_csvs = glob.glob('output/camp_integration/metabolite_immune_covariation_*.csv')
                 if camp_csvs:
                     import pandas as pd
                     df_camp = pd.read_csv(sorted(camp_csvs)[0])
-                    content += f"  - *CAMP Covariations*: Evaluated immune correlation across {df_camp.shape[0]} metabolic targets.\n"
+                    if 'Unnamed: 0' in df_camp.columns:
+                        df_camp = df_camp.set_index('Unnamed: 0')
+                    corrs = df_camp.unstack().reset_index()
+                    corrs.columns = ['Immune_Cell', 'Metabolite', 'Correlation']
+                    
+                    pos_corrs = corrs.sort_values('Correlation', ascending=False).head(3)
+                    neg_corrs = corrs.sort_values('Correlation', ascending=True).head(3)
+                    
+                    content += f"  - *Top Positive (Immune-Activating) Covariations*:\n"
+                    for _, row in pos_corrs.iterrows():
+                        content += f"    - **{row['Metabolite']}** with **{row['Immune_Cell']}**: R = {row['Correlation']:.3f}\n"
+                    
+                    content += f"  - *Top Negative (Immune-Suppressing) Covariations*:\n"
+                    for _, row in neg_corrs.iterrows():
+                        content += f"    - **{row['Metabolite']}** with **{row['Immune_Cell']}**: R = {row['Correlation']:.3f}\n"
+
             elif title == 'Serotonin Axis Spatial Mapping':
-                spat_csvs = glob.glob('output/serotonin_axis_spatial_mapping/visium_immune_evasion_summary*.csv')
+                spat_csvs = glob.glob('output/serotonin_axis_spatial_mapping/primary_vs_metastatic_immune_evasion_summary.csv')
                 if spat_csvs:
                     import pandas as pd
                     df_spat = pd.read_csv(sorted(spat_csvs)[0])
-                    content += f"  - *Spatial Validation*: Scored {df_spat.shape[0]} tissue regions for immune evasion spatial proximity.\n"
+                    content += f"  - *Spatial TME Shifts (Primary → Metastatic)*:\n"
+                    prim = df_spat[df_spat['Niche'] == 'Primary'].iloc[0] if not df_spat[df_spat['Niche'] == 'Primary'].empty else None
+                    met = df_spat[df_spat['Niche'] == 'Metastatic'].iloc[0] if not df_spat[df_spat['Niche'] == 'Metastatic'].empty else None
+                    
+                    if prim is not None and met is not None:
+                        content += f"    - **Macrophage Count**: {prim['Macrophage_Count']} → {met['Macrophage_Count']}\n"
+                        content += f"    - **T/NK Cell Count**: {prim['T_NK_Count']} → {met['T_NK_Count']}\n"
+                        content += f"    - **Exhaustion Score**: {prim['Mean_Exhaustion_Score']:.3f} → {met['Mean_Exhaustion_Score']:.3f}\n"
+                        content += f"    - **Treg Score**: {prim['Mean_Treg_Score']:.3f} → {met['Mean_Treg_Score']:.3f}\n"
+
+            elif title == 'Deep-Dive Conserved Metab Gene Sig':
+                tcga_csvs = glob.glob('output/tcga_validation/*/true_signature_metrics.csv')
+                if tcga_csvs:
+                    import pandas as pd
+                    df_tcga = pd.read_csv(sorted(tcga_csvs)[0])
+                    content += f"  - *TCGA Survival Validation*:\n"
+                    if 'P_Value' in df_tcga.columns:
+                        top_tcga = df_tcga.sort_values('P_Value').head(3)
+                        for _, row in top_tcga.iterrows():
+                            # The signature metrics has "TCGA_Cohort", "Hazard_Ratio", "P_Value", "N_Samples"
+                            # I'll just skip 'Significance_Level' since I didn't see it in the subset above
+                            content += f"    - **{row['TCGA_Cohort']}**: HR = {row['Hazard_Ratio']:.3f}, P = {row['P_Value']:.2e}\n"
         else:
             content += f"- **{title}**: *(Pending: {path})*\n"
     content += '\n'

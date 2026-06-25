@@ -101,7 +101,15 @@ def compute_enrichment_ratios():
             "HIF1_Genes_Found": len(hif1_df)
         })
         
-    return pd.DataFrame(results)
+    df_results = pd.DataFrame(results)
+    try:
+        out_dir = os.path.join(BASE_DIR, "output", "oxygen_tension")
+        os.makedirs(out_dir, exist_ok=True)
+        df_results.to_csv(os.path.join(out_dir, "oxygen_tension_correlation_results.csv"), index=False)
+    except Exception as e:
+        print(f"[Warning] Failed to save oxygen tension results to CSV: {e}")
+        
+    return df_results
 
 if __name__ == "__main__":
     df_res = compute_enrichment_ratios()
