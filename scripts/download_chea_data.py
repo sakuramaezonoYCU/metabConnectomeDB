@@ -26,6 +26,7 @@ def download_chea():
     except Exception as e:
         print(f"Error downloading ChEA 2022: {e}")
         return None
+        raise
 
 if __name__ == "__main__":
     download_chea()

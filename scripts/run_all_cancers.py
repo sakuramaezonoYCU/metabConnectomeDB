@@ -16,6 +16,7 @@ try:
 except Exception as e:
     print(f"Warning: Could not read CANCER_CAP from pipeline.config.json: {e}")
     cancer_caps = {}
+    raise
 
 print("Querying CellxGene Census for the Top 3 Metastatic Tissues...")
 

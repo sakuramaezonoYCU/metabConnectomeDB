@@ -23,7 +23,7 @@ def run_validation_phase():
     if os.path.exists(strict_sig):
         signatures.append(strict_sig)
         
-    # 4-cancer combinations
+    # N-cancer combinations
     combo_sigs = glob.glob(os.path.join(META_RESULTS_DIR, f"pan_cancer_signature_*{ANALYSIS_SUFFIX}.csv"))
     signatures.extend(combo_sigs)
     
@@ -153,22 +153,28 @@ def run_validation_phase():
 
     # ML Prognostic Classifier (special: needs --cancer all flag)
     print(f"\n---> ML Prognostic Classifier Notebook <---")
+    CANCER_FLAG = "--cancer"
+    CANCER_ALL_ARG = "all"
+    DB_FLAG = "--database"
+    DB_METABRIC = "metabric"
+    DB_MBCPROJECT = "mbcproject"
+
     try:
         print("  Running TCGA Pan-Cancer cohorts...")
-        subprocess.run(["python", "scripts/generate_ml_prognostic_classifier_notebook.py", "--cancer", "all"], check=True, cwd=BASE_DIR)
+        subprocess.run(["python", "scripts/generate_ml_prognostic_classifier_notebook.py", CANCER_FLAG, CANCER_ALL_ARG], check=True, cwd=BASE_DIR)
         
         print("  Running METABRIC Breast Cancer cohort (local input/metabric)...")
         subprocess.run([
             "python", "scripts/generate_ml_prognostic_classifier_notebook.py",
-            "--database", "metabric",
-            "--cancer", "all"
+            DB_FLAG, DB_METABRIC,
+            CANCER_FLAG, CANCER_ALL_ARG
         ], check=True, cwd=BASE_DIR)
 
         print("  Running MBCProject Breast Cancer cohort (local input/mbcproject)...")
         subprocess.run([
             "python", "scripts/generate_ml_prognostic_classifier_notebook.py",
-            "--database", "mbcproject",
-            "--cancer", "all"
+            DB_FLAG, DB_MBCPROJECT,
+            CANCER_FLAG, CANCER_ALL_ARG
         ], check=True, cwd=BASE_DIR)
     except subprocess.CalledProcessError as e:
         print(f"  ❌ CRITICAL ERROR: ML Prognostic Classifier generation failed: {e}")

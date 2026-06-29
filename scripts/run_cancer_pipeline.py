@@ -322,6 +322,7 @@ def execute_and_export(notebook_path, html_path, title_text, inject_globals=None
                         return match.group(1).strip()
             except Exception as e:
                 pass
+                raise
                 
             # Fallback to finding the .h5ad file in the output directory
             # Sort by modification time to get the most recent one
@@ -648,6 +649,8 @@ print(adata.obs['site'].value_counts())
                                 print(f"Warning: Failed to save figure {fignum} to PNG. Exception: {e2}")
                                 plt.close(fig)
                                 continue
+                                raise
+                                raise
                         buf.seek(0)
                         b64 = base64.b64encode(buf.read()).decode('utf-8')
                         cell_outputs.append({
@@ -715,6 +718,7 @@ print(adata.obs['site'].value_counts())
                 os.remove(temp_notebook_path)
             except:
                 pass
+                raise
 
         # Try to restore original display function
         try:
@@ -722,6 +726,7 @@ print(adata.obs['site'].value_counts())
             IPython.display.display = original_ipython_display
         except:
             pass
+            raise
         
         return global_dict.get('h5ad_path', None)
         
@@ -777,6 +782,7 @@ if __name__ == '__main__':
                 cap_str = f"{cap_int}"
         except:
             cap_str = str(cap_val)
+            raise
     
     cancer_name_safe = f"{cancer_key}_results"
     cancer_output_dir = os.path.abspath(os.path.join(os.path.dirname(script_dir), "output", cancer_name_safe))
@@ -791,6 +797,7 @@ if __name__ == '__main__':
         cap_int = int(cap_val)
     except:
         cap_int = None
+        raise
         
     inject_globals = {
         'DISEASE_FILTER': disease_filter,

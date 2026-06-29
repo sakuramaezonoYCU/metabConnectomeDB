@@ -61,7 +61,7 @@ def query_dgidb(genes):
     except Exception as e:
         import warnings
         warnings.warn(f"[DGIdb Error] Failed to query DGIdb: {e}")
-        return pd.DataFrame()
+        raise
 
 def query_open_targets(genes):
     """
@@ -99,6 +99,7 @@ def query_open_targets(genes):
             import warnings
             warnings.warn(f"Error resolving {gene}: {e}")
             continue
+            raise
             
     print(f"[OpenTargets] Resolved IDs: {symbol_to_id}")
     
@@ -161,6 +162,7 @@ def query_open_targets(genes):
             import warnings
             warnings.warn(f"[OpenTargets Error] Failed fetching drugs for {gene}: {e}")
             continue
+            raise
             
             
     print(f"[OpenTargets] Found {len(results)} known drug indications.")
@@ -205,6 +207,7 @@ def query_diseases(genes):
             import warnings
             warnings.warn(f"[DISEASES Error] Error resolving {gene}: {e}")
             continue
+            raise
             
     for gene, ensembl_id in symbol_to_id.items():
         query_assoc = """
@@ -245,6 +248,7 @@ def query_diseases(genes):
             import warnings
             warnings.warn(f"[DISEASES Error] Failed fetching diseases for {gene}: {e}")
             continue
+            raise
 
     df = pd.DataFrame(results)
     print(f"[DISEASES] Found disease associations for {len(df)} genes.")

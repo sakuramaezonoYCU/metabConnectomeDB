@@ -69,6 +69,7 @@ def fetch_uniprot_roles():
                 "Gene": gene,
                 "UniProt_Biological_Role": "Error fetching from API."
             })
+            raise
             
     # Save to CSV
     df = pd.DataFrame(results)

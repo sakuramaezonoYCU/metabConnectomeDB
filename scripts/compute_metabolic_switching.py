@@ -28,7 +28,8 @@ def compute_enrichment_ratios():
         po2_df = pd.read_csv(csv_path)
     except Exception as e:
         print(f"[Error] Failed to read {csv_path}: {e}")
-        po2_df = pd.DataFrame()
+        po2_df = pd.DataFrame(columns=[])
+        raise
 
     for raw_cancer in CANCERS_TO_RUN:
         cancer = normalize_cancer_name(raw_cancer)
@@ -43,6 +44,7 @@ def compute_enrichment_ratios():
         except Exception as e:
             print(f"[Error] Failed to read {file_path}: {e}")
             continue
+            raise
             
         # Ensure gene names are uppercase for string matching
         df['names'] = df['names'].str.upper()
@@ -77,10 +79,12 @@ def compute_enrichment_ratios():
                     o2_tumour = float(row['Median % oxygen_tumour'].values[0])
                 except Exception:
                     pass
+                    raise
                 try:
                     o2_normal = float(row['Median % oxygen_normal'].values[0])
                 except Exception:
                     pass
+                    raise
                 pmid = str(row['Reference'].values[0]).replace('"', '')
                 
                 # Default empty normal tissue to 6.0 average
@@ -108,6 +112,7 @@ def compute_enrichment_ratios():
         df_results.to_csv(os.path.join(out_dir, "oxygen_tension_correlation_results.csv"), index=False)
     except Exception as e:
         print(f"[Warning] Failed to save oxygen tension results to CSV: {e}")
+        raise
         
     return df_results
 

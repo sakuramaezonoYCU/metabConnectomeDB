@@ -57,6 +57,10 @@ if __name__ == "__main__":
         filename = f"kegg_{kegg_id}_{pathway_key}.json"
         out_path = os.path.join(INPUT_DIR, filename)
         
+        if os.path.exists(out_path):
+            print(f"Skipping {pathway_key} - {out_path} already exists.")
+            continue
+            
         genes = fetch_kegg_genes(kegg_id)
         with open(out_path, 'w') as f:
             json.dump(genes, f, indent=4)

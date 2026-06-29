@@ -55,7 +55,9 @@ SIGNATURE_NAME = "Pan_Cancer_Directed_Metastatic_Signature"
 # Which cohorts to load. 
 # Available TCGA-like in CAMP: 'BRCA1', 'BRCA2', 'COAD', 'DLBCL', 'GBM', 'HCC', 'HurthleCC', 'ICC', 'OV', 'PDAC', 'PRAD', 'ccRCC1', 'ccRCC2', 'ccRCC3', 'ccRCC4'
 # Leave as None to load all available inside the directory.
-TARGET_COHORTS = ['BRCA1', 'BRCA2', 'COAD', 'OV', 'PRAD', 'GBM', 'PDAC']
+import json
+with open("../input/pipeline.config.json") as __f:
+    TARGET_COHORTS = json.load(__f)["CAMP_INTEGRATION"]["TARGET_COHORTS"]
 
 # Paths
 try:

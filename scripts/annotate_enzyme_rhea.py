@@ -30,8 +30,15 @@ import os
 import re
 import json
 import time
+import requests
 import pandas as pd
 import numpy as np
+
+# Load config to get TARGET_PAIR_FILES
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "input", "pipeline.config.json"), "r") as f:
+    PIPELINE_CONFIG = json.load(f)
+
+TARGET_PAIR_BASENAMES = PIPELINE_CONFIG.get("ANNOTATION_DATABASES", {}).get("TARGET_PAIR_FILES", [])
 
 try:
     import requests
@@ -58,18 +65,10 @@ UNIPROT_API_BASE = "https://rest.uniprot.org/uniprotkb"
 RHEA_SPARQL_ENDPOINT = "https://sparql.rhea-db.org/sparql"
 
 # Species configuration
-SPECIES_CONFIG = {
-    "human": {
-        "organism_id": "9606",
-        "bridgedb_species": "Human",
-        "label": "Homo sapiens",
-    },
-    "mouse": {
-        "organism_id": "10090",
-        "bridgedb_species": "Mouse",
-        "label": "Mus musculus",
-    },
-}
+import json
+with open(os.path.join(PROJECT_ROOT, "input", "pipeline.config.json"), "r") as __f:
+    __cfg = json.load(__f)
+SPECIES_CONFIG = __cfg.get("ANNOTATION_DATABASES", {}).get("SPECIES_CONFIG", {})
 
 # Rate limiting
 BRIDGEDB_DELAY = 0.2   # seconds between BridgeDb requests
@@ -105,6 +104,7 @@ def _http_get_json(url, headers=None, timeout=30):
                 return json.loads(resp.read().decode())
         except Exception as e:
             print(f"  -> Error on attempt {attempt + 1}: {e}")
+            raise
         time.sleep(2)
     return None
 
@@ -129,6 +129,7 @@ def _http_get_text(url, headers=None, timeout=30):
                 return resp.read().decode()
         except Exception as e:
             print(f"  -> Error on attempt {attempt + 1}: {e}")
+            raise
         time.sleep(2)
     return None
 
@@ -141,6 +142,7 @@ def _load_json_cache(path):
                 return json.load(f)
         except Exception as e:
             print(f"  Warning: could not parse cache '{path}': {e}")
+            raise
     return {}
 
 
@@ -383,6 +385,7 @@ SELECT ?accession ?side ?chebi WHERE {{
         except Exception as e:
             print(f"    -> SPARQL batch error: {e}. Falling back to individual queries...")
             result = None
+            raise
         
         if result:
             # Parse batch results
@@ -467,6 +470,7 @@ SELECT ?side ?chebi WHERE {{
             result = json.loads(resp.read().decode())
     except Exception:
         result = None
+        raise
     
     cache[rid] = {"substrates": [], "products": []}
     if result:
@@ -557,16 +561,10 @@ def run_rhea_enrichment(target_pair_files=None):
     if target_pair_files is None:
         input_db_dir = os.path.join(PROJECT_ROOT, "input", "databases")
         output_dir = os.path.join(PROJECT_ROOT, "output")
-        target_pair_files = [
-            os.path.join(input_db_dir, "human_database_merge_unique_metab_target_pairs.csv"),
-            os.path.join(input_db_dir, "human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv"),
-            os.path.join(input_db_dir, "mouse_database_merge_unique_metab_target_pairs.csv"),
-            os.path.join(input_db_dir, "mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv"),
-            os.path.join(output_dir, "human_database_merge_unique_metab_target_pairs.csv"),
-            os.path.join(output_dir, "human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv"),
-            os.path.join(output_dir, "mouse_database_merge_unique_metab_target_pairs.csv"),
-            os.path.join(output_dir, "mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv"),
-        ]
+        target_pair_files = []
+        for _f in TARGET_PAIR_BASENAMES:
+            target_pair_files.append(os.path.join(input_db_dir, _f))
+            target_pair_files.append(os.path.join(output_dir, _f))
     
     # ── Collect all unique HMDB IDs and target symbols across all files ──
     print("\n📊 Step 0: Scanning all target-pair files for unique identifiers...")
@@ -584,6 +582,7 @@ def run_rhea_enrichment(target_pair_files=None):
             all_targets.update(df["Target"].dropna().unique())
         except Exception as e:
             print(f"  Warning: could not scan '{fp}': {e}")
+            raise e
     
     print(f"  Found {len(all_hmdb_ids)} unique HMDB IDs and {len(all_targets)} unique targets across {len(existing_files)} files.")
     

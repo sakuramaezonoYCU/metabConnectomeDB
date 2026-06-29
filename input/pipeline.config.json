@@ -68,6 +68,16 @@
         "DISEASES_API_URL": "https://diseases.jensenlab.org/api/v2/entity",
         "DEPMAP_DATA_PATH": "input/CRISPRGeneEffect.csv"
     },
+    "PHASE_5_VALIDATION": {
+        "ML_PROGNOSTIC_DATABASES": [
+            "tcga",
+            "metabric",
+            "mbcproject"
+        ],
+        "DEFAULT_EVENT_VALUES": {
+            "mbcproject": 1
+        }
+    },
     "PHASE_6_REPORTING": {
         "CANCER_COLORS": {
             "breast": "purple",
@@ -86,12 +96,28 @@
             "kidney": "Renal cell carcinoma"
         },
         "TCGA_MAPPING": {
-            "breast": ["BRCA"],
-            "colorectal": ["COAD", "READ"],
-            "lung": ["LUAD", "LUSC"],
-            "melanoma": ["SKCM"],
-            "ovary": ["OV"],
-            "kidney": ["KIRC", "KIRP", "KICH"]
+            "breast": [
+                "BRCA"
+            ],
+            "colorectal": [
+                "COAD",
+                "READ"
+            ],
+            "lung": [
+                "LUAD",
+                "LUSC"
+            ],
+            "melanoma": [
+                "SKCM"
+            ],
+            "ovary": [
+                "OV"
+            ],
+            "kidney": [
+                "KIRC",
+                "KIRP",
+                "KICH"
+            ]
         }
     },
     "SEROTONIN_AXIS": {
@@ -191,5 +217,43 @@
     "ML_PARAMS": {
         "COXPH_PENALIZER": 0.5,
         "COXPH_L1_RATIO": 0.1
+    },
+    "CAMP_INTEGRATION": {
+        "TARGET_COHORTS": [
+            "BRCA1",
+            "BRCA2",
+            "COAD",
+            "OV",
+            "PRAD",
+            "GBM",
+            "PDAC"
+        ]
+    },
+    "ANNOTATION_DATABASES": {
+        "SPECIES_CONFIG": {
+            "human": {
+                "organism_id": "9606",
+                "bridgedb_species": "Human",
+                "label": "Homo sapiens"
+            },
+            "mouse": {
+                "organism_id": "10090",
+                "bridgedb_species": "Mouse",
+                "label": "Mus musculus"
+            }
+        },
+        "TARGET_PAIR_FILES": [
+            "human_database_merge_unique_metab_target_pairs.csv",
+            "human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv",
+            "mouse_database_merge_unique_metab_target_pairs.csv",
+            "mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv"
+        ]
+    },
+    "MASTER_REGULATOR": {
+        "ENRICHR_LIBRARIES": [
+            "ChEA_2022",
+            "ENCODE_and_ChEA_Consensus_TFs_from_ChIP-X",
+            "TRRUST_Transcription_Factors_2019"
+        ]
     }
 }

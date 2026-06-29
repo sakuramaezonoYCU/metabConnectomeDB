@@ -31,6 +31,7 @@ for prefix, tissue, title_name in cancers_config:
     except Exception as e:
         print(f"Could not load {h5ad_path}: {e}")
         continue
+        raise
     
     obs = adata.obs
     

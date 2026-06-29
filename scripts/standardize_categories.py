@@ -26,6 +26,7 @@ try:
                     SUPERCLASS_UNIFICATION_MAP[raw_val] = std_val
 except Exception as e:
     print(f"Warning: Failed to load superclass mapping CSV from {superclass_csv_path}: {e}")
+    raise
 
 
 # Dynamically load the mapping dictionary for Sub_Class
@@ -44,6 +45,7 @@ try:
                     SUBCLASS_UNIFICATION_MAP[raw_val] = std_val
 except Exception as e:
     print(f"Warning: Failed to load subclass mapping CSV from {subclass_csv_path}: {e}")
+    raise
 
 
 def standardize_superclass(val):

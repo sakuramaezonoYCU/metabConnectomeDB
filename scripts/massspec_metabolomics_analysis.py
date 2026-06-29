@@ -92,7 +92,7 @@ def run_differential_abundance(ms_df, match_df, meta_results_dir):
     if match_df.empty:
         print("No matched metabolites. Skipping Differential Abundance.")
         pd.DataFrame(columns=['Cancer', 'Metabolite', 'Tumor_Samples', 'Normal_Samples', 'Log2FC', 'P_Value', 'FDR']).to_csv(os.path.join(meta_results_dir, 'differential_abundance_per_cancer.csv'), index=False)
-        return pd.DataFrame(), pd.DataFrame(), {}
+        return pd.DataFrame(columns=[]), pd.DataFrame(columns=[]), {}
         
     matched_ms_names = match_df['ms_metabolite'].tolist()
     # Filter ms_df to only matched metabolites
@@ -150,6 +150,7 @@ def run_differential_abundance(ms_df, match_df, meta_results_dir):
                 })
             except Exception:
                 pass
+                raise
                 
     res_df = pd.DataFrame(results)
     if not res_df.empty:

@@ -87,6 +87,7 @@ def compute_permutation_null(signature_csv, n_permutations=100):
         except Exception as e:
             print(f"  Error reading {exp_file}: {e}")
             continue
+            raise
             
         # Load Survival
         try:
@@ -97,6 +98,7 @@ def compute_permutation_null(signature_csv, n_permutations=100):
             surv_df = surv_df.rename(columns={sample_col: 'sample'})
         except Exception as e:
             continue
+            raise
             
         # Merge
         merged_base = pd.merge(exp_df, surv_df, on='sample', how='inner')

@@ -6,6 +6,12 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import pandas as pd
 from typing import Dict, List, Set, Tuple
 
+# Load config to get TARGET_PAIR_FILES
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "input", "pipeline.config.json"), "r") as f:
+    PIPELINE_CONFIG = json.load(f)
+
+TARGET_PAIR_BASENAMES = PIPELINE_CONFIG.get("ANNOTATION_DATABASES", {}).get("TARGET_PAIR_FILES", [])
+
 def load_json_cache(filepath: str) -> dict:
     if os.path.exists(filepath):
         with open(filepath, 'r') as f:
@@ -50,11 +56,10 @@ def fetch_kegg_reactions(reaction_ids: List[str]) -> dict:
             response = requests.get(url, timeout=30, verify=False)
         except Exception as e:
             print(f"      Warning: Batch {query} failed: {e}")
-            continue
+            raise e
             
         if response.status_code != 200:
-            print(f"      Warning: Batch {query} failed.")
-            continue
+            raise RuntimeError(f"      Warning: Batch {query} failed with status {response.status_code}.")
             
         current_entry = None
         for line in response.text.split('\n'):
@@ -197,16 +202,10 @@ def run_kegg_enrichment():
             "products": prods_hmdb
         }
         
-    master_files = [
-        os.path.join(db_dir, 'human_database_merge_unique_metab_target_pairs.csv'),
-        os.path.join(db_dir, 'human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'),
-        os.path.join(db_dir, 'mouse_database_merge_unique_metab_target_pairs.csv'),
-        os.path.join(db_dir, 'mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'),
-        os.path.join(output_dir, 'human_database_merge_unique_metab_target_pairs.csv'),
-        os.path.join(output_dir, 'human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv'),
-        os.path.join(output_dir, 'mouse_database_merge_unique_metab_target_pairs.csv'),
-        os.path.join(output_dir, 'mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv')
-    ]
+    master_files = []
+    for _f in TARGET_PAIR_BASENAMES:
+        master_files.append(os.path.join(db_dir, _f))
+        master_files.append(os.path.join(output_dir, _f))
     
     for fpath in master_files:
         if not os.path.exists(fpath): continue

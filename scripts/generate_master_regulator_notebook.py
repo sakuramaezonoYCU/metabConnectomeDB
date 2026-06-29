@@ -56,11 +56,9 @@ import os
 
 sys.path.append(os.path.abspath(".."))
 from pan_cancer_config import CANCERS_TO_RUN as CANCERS
-ENRICHR_LIBRARIES = [
-    'ChEA_2022',
-    'ENCODE_and_ChEA_Consensus_TFs_from_ChIP-X',
-    'TRRUST_Transcription_Factors_2019'
-]
+import json
+with open("../input/pipeline.config.json") as __f:
+    ENRICHR_LIBRARIES = json.load(__f)["MASTER_REGULATOR"]["ENRICHR_LIBRARIES"]
 """))
 
 # 3. Compute code
@@ -70,6 +68,7 @@ ENRICHR_LIBRARIES = [
     except Exception as e:
         print(f"Warning: Could not load dynamic genes: {e}")
         genes = []
+        raise
 
     code_compute = f"""TARGET_GENES = {genes}
 print(f"Dynamically resolved {{len(TARGET_GENES)}} pan-cancer upregulated metabolic genes.")

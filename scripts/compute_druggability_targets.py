@@ -81,6 +81,7 @@ def query_dgidb_graphql(genes):
                         })
         except Exception as e:
             print(f"Error querying {chunk}: {e}")
+            raise
             
     df = pd.DataFrame(results, columns=['Gene', 'Drug', 'Database'])
     if not df.empty:

@@ -19,7 +19,7 @@ def get_dynamic_genes(base_dir=None):
     if base_dir is None:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
-    config_path = os.path.join(base_dir, 'pipeline.config.json')
+    config_path = os.path.join(base_dir, 'input', 'pipeline.config.json')
     override_genes = []
     if os.path.exists(config_path):
         with open(config_path, 'r') as f:

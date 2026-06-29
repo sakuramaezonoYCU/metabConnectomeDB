@@ -11,6 +11,13 @@ def fetch_reactome_pathway(pathway_id, key):
     genes = []
     
     try:
+        filename = f"reactome_{pathway_id}_{key}.json"
+        filepath = os.path.join(INPUT_DIR, filename)
+        
+        if os.path.exists(filepath):
+            print(f"Skipping {key} ({pathway_id}) - {filepath} already exists.")
+            return
+
         # Using curl via subprocess to bypass Python HTTP/2 protocol errors in urllib/requests
         result = subprocess.run(["curl", "-s", "-H", "Accept: application/json", url], capture_output=True, text=True, check=True)
         if not result.stdout.strip():
@@ -24,9 +31,6 @@ def fetch_reactome_pathway(pathway_id, key):
                 genes.append(item['name'][0])
         # Filter out Non-HGNC / None values and unique
         genes = list(set([str(g).upper() for g in genes if g]))
-        
-        filename = f"reactome_{pathway_id}_{key}.json"
-        filepath = os.path.join(INPUT_DIR, filename)
         with open(filepath, 'w') as f:
             json.dump(genes, f, indent=4)
         print(f"Successfully saved {len(genes)} genes for {key} ({pathway_id}) to {filepath}")

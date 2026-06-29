@@ -33,7 +33,7 @@ def compute_raw_counts():
                         d = pd.read_csv(f, sep=sep, low_memory=False, on_bad_lines='skip')
                         count += len(d)
                     except Exception:
-                        pass
+                        raise
             if count > 0:
                 db_counts[folder] = count
     return db_counts

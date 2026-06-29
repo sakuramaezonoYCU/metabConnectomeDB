@@ -23,7 +23,7 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
 
 - `[ ]` **0a. Curate and Merge Raw Databases**
   - **Command:** `bash scripts/merge_simplify_annotate.sh`
-  - **Purpose:** The master execution wrapper that ingests raw databases from `input/databases/`, runs `merge_dbs_claude.py` to standardize and deduplicate entries, refines and filters them with `generate_final_outputs.py`, enriches them via `annotate_with_hmdb.py`, and finally merges the annotations into the master CSV outputs via `annotate_with_databases.py`.
+  - **Purpose:** The master execution wrapper that ingests raw databases from `input/databases/`, runs `merge_dbs.py` to standardize and deduplicate entries, refines and filters them with `generate_final_outputs.py`, enriches them via `annotate_with_hmdb.py`, and finally merges the annotations into the master CSV outputs via `annotate_with_databases.py`.
   - **Output Location:** `output/human_database_merge_*.csv`
 
 ## Phase 1: Database Exploration and Reporting
@@ -68,17 +68,11 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
 *These scripts generate the unified signatures and single-cell subclone scoring.*
 
 - `[ ]` **5. Compute Pan-Cancer Metastatic Signature & CCC Interactome**
-  - **Command:** `python scripts/compute_pan_cancer_meta.py` (or through `generate_combined_pan_cancer_notebook.py`)
-  - **Purpose:** Intersects the differentially expressed targets across the cancers to identify the strictly conserved signature. **Methodology Note (MAX CANCER - 1 Rule):** If the strict intersection yields 0 genes, the pipeline automatically falls back to utilizing combinations of N-1 cancers to ensure a robust meta-signature is evaluated downstream. 
-  - **Fail-Safe Behavior (LIANA):** During Pan-Cancer Conserved CCC Links intersection, if any cancer is missing its `_cellxgene_liana_results.csv`, the notebook automatically invokes `patch_liana_csvs.py` on the fly to regenerate it and prevent pipeline failure.
-  - **Output Location:** `output/pan_cancer_meta_results/` (CSVs, upset plot png, network plot png, CCC bar charts, and `pan_cancer_conserved_ccc_links.csv`)
-  
-- `[ ]` **6. Pre-Metastatic Subclone Resolution**
-  - **Command:** `python scripts/generate_predictive_notebook.py`
-  - **Purpose:** Parses subset combination signatures and scores primary tumor cells directly to identify pre-metastatic subclones.
-  - **Output Location:** Generates `scripts/predictive_signature_biomarker.ipynb` (Executed later in Phase 6)
+  - **Command:** `python scripts/compute_pan_cancer_meta.py`
+  - **Purpose:** Intersects the differentially expressed targets across the cancers to identify the strictly conserved signature. Methodology Note (MAX CANCER - 1 Rule): If the strict intersection yields 0 or 1 gene, the pipeline automatically falls back to len(CANCERS)-1 dynamically until it finds >1 targets. It also computes the conserved Ligand-Receptor pairs across cancers.
+  - **Fail-Safe Behavior (LIANA):** During Pan-Cancer Conserved CCC Links intersection, if any cancer is missing its `_cellxgene_liana_results.csv`, this script automatically invokes `patch_liana_csvs.py` on the fly to regenerate it and prevent pipeline failure.
 
-- `[ ]` **7. Generate Unified Tabular Summaries**
+- `[ ]` **6. Generate Unified Tabular Summaries**
   - **Command:** `python scripts/generate_ai_summary_tables.py`
   - **Purpose:** Aggregates all the extracted outputs into formatted CSVs in `output/ai_summary_tables/`.
   - **Fail-Safe Behavior:** Automatically invokes `fetch_opentargets.py` and `fetch_uniprot_roles.py` if the respective annotation data is missing or incomplete for any newly derived pan-cancer signature genes. This ensures external knowledge graphs stay synchronized without manual intervention.
@@ -88,7 +82,7 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
 
 *This phase is orchestrator-led and validates all dynamically identified (N-1)-cancer combinations generated in Phase 4.*
 
-- `[ ]` **8. Validate Derived Signatures**
+- `[ ]` **7. Validate Derived Signatures**
   - **Command:** `python scripts/run_validation_phase.py`
   - **Purpose:** The master execution script that automatically identifies all output combination signatures and routes them through the following tests:
     - `massspec_metabolomics_analysis.py`: Verifies signature genes using mass-spectrometry clinical cohorts.
@@ -104,7 +98,7 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
 
 *This phase pulls advanced API data (Druggability) and exports finalized notebooks using the derived Pan-Cancer signatures.*
 
-- `[ ]` **9. Downstream Analysis & HTML Report Export**
+- `[ ]` **8. Downstream Analysis & HTML Report Export**
   - **Command:** `python scripts/execute_pancancer_notebooks.py`
   - **Purpose:** This script acts as the master driver for the entire downstream notebook compilation. It executes and exports the spatial, pan-cancer meta, and druggability notebooks into the final HTML reports required by the AI generation phase.
   - **Output Location:** `output/pan_cancer_meta_results/`, `output/druggability/`, and `output/` (HTML reports)
@@ -118,7 +112,9 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
     - `output/oxygen_tension_analysis_report.html` (Note: Requires `scripts/compute_metabolic_switching.py` to be present; do not archive this dependency)
     - `output/mitf_regulon_expansion_report.html`
     - `output/[cancer]_ml_prognostic_classifier_report.html`
-    - `output/pancancer_ml_prognostic_classifier_report.html`
+    - `output/pancancer_tcga_ml_prognostic_classifier_report.html`
+    - `output/metabric_ml_prognostic_classifier_report.html`
+    - `output/mbcproject_ml_prognostic_classifier_report.html`
     - `output/camp_pancancer_integration_report.html`
     - `output/master_regulator_analysis_report.html`
 
@@ -157,18 +153,4 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
 
 ## Recent Script Modifications (Changelog)
 
-| Date | Script | Change |
-| --- | --- | --- |
-| 2026-06-20 | `scripts/tmp_build_md.py` | **Phase 6 Summarization Refactor:** Replaced raw table dumping with aggregated Top-5/Top-3 summary tables for TCGA (6.1), Subclones (6.2), Spatial (6.3), MassSpec (6.4), and ML (6.6) sections |
-| 2026-06-20 | `scripts/tmp_build_md.py` | **Methodology Notes:** Added `**Methodology:**` context blocks to all Phase 6 subsections explaining metric derivation for AI summarizer guidance |
-| 2026-06-20 | `scripts/tmp_build_md.py` | **API Resilience:** Added `503 UNAVAILABLE` to retry loop with exponential backoff (up to 5 retries) |
-| 2026-06-20 | `scripts/tmp_build_md.py` | **Phase 3 Disease Counts:** Filtered out zero-count rows, stripped string artifacts (`...`), formatted as clean table |
-| 2026-06-20 | `scripts/generate_ai_summary_tables.py` | **pO2 Fix:** Added missing `normalize_cancer_name` import; fixed Tumor/Normal pO2 lookup logic via `CANCER_PO2_CSV_MAPPING` |
-| 2026-06-20 | `scripts/generate_ml_prognostic_classifier_notebook.py` | **CSV Export:** Notebook already saves `ml_metrics.csv` with schema: Signature, Train_Size, Test_Size, Optimal_Penalizer, CV_C_Index, Test_C_Index |
-| 2026-06-22 | `pipeline.config.json`, `cancer_cellxgene_integration.ipynb`, `run_cancer_pipeline.py` | **Dynamic KEGG & Plot Aesthetics Fix:** Replaced hardcoded immune-metabolic gene targets with dynamic config JSON mapping. Fixed `'ovary'` key mismatch. Implemented `sc.pl.stacked_violin` and mathematically scaled bubble plots/heatmaps to completely eliminate axis label overlap. Fixed redundant `OUTPUT_DIR` script injections. Added TCA Cycle (Fumarate) pathways. |
-| 2026-06-23 | `cancer_cellxgene_integration.ipynb`, `primary_vs_metastasis_comparison.ipynb`, `orphan_metabolic_immune_evasion.ipynb` | **Zero-Tolerance Provenance & Visual Exports Patch:** Removed hardcoded KEGG fallback in integration notebook to enforce hard crash. Split Section 9 squished dotplots into dynamically-sized, pathway-specific plots. Added explicit standalone PDF and CSV exports for previously inline-only visuals (Static Volcano, Niche UpSet, Orphan Multi-Panel Bar). |
-| 2026-06-23 | `generate_combined_pan_cancer_notebook.py` | **Phase 4 LIANA Integration:** Hooked up `immune_evasion_ccc_quantification` and `_cellxgene_liana_results.csv`. Implemented automatic fail-safe to execute `patch_liana_csvs.py` if LIANA results are missing during Pan-Cancer intersection. |
-| 2026-06-23 | `generate_final_outputs.py` | **HGNC Target Canonicalization Patch:** Added canonical resolution mapping via `input/hgnc_approved_genes.json` to process `Target_original` into official `Target` names. This completely eliminates obsolete Uniprot TrEMBL fragmentation downstream. |
-| 2026-06-24 | `run_cancer_pipeline.py`, `serotonin_config.py` | **Auto-Fetching & Self-Healing:** Configured the pipeline orchestrator to automatically discover and source all `fetch_*.py` scripts as STEP 0 with a hard-fail condition. Implemented an auto-healing subroutine in `serotonin_config.py` to trigger Reactome/API fetches dynamically if config JSONs are missing, completely removing the need for manual API script executions. |
-| 2026-06-25 | `tmp_build_md.py`, `compute_metabolic_switching.py`, `master_regulator_analysis.ipynb` | **Downstream Extraction Integrity Patch:** Rewrote the `tmp_build_md.py` scraper to explicitly extract statistical metrics (P-values, HRs, target counts) from actual CSV outputs rather than falsely reporting simple file existence. Fixed the computation script to properly save the oxygen tension results, and reverted the Master Regulator notebook back to its dynamically un-hardcoded state to ensure complete data provenance. |
-| 2026-06-25 | `tmp_build_md.py` | **Deep Research & PMID Verification Patch:** Integrated Gemini File API to upload `papers/*.pdf` reference literature and phase-specific Jupyter HTML reports for deep biological cross-referencing. Implemented a 3-stage PMID Verification Pipeline: (1) NCBI E-Fetch existence check, (2) semantic verification via secondary LLM call comparing the claim against the paper's abstract, (3) formatting verified PMIDs as clickable markdown links with titles. Hallucinated or unsupported citations are automatically flagged and removed. |
+Please see [CHANGELOG.md](CHANGELOG.md) for the history of script modifications.

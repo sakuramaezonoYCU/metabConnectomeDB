@@ -48,7 +48,7 @@ def query_string_ppi(genes):
         if not data:
             import warnings
             warnings.warn("[STRING PPI] No interactions found among these genes in STRING.")
-            df = pd.DataFrame()
+            df = pd.DataFrame(columns=[])
             df.to_csv(cache_file, index=False)
             return df
             
@@ -73,7 +73,8 @@ def query_string_ppi(genes):
         print(f"{msg}. Logged to {failures_file}.")
         with open(failures_file, "a") as f:
             f.write(msg + "\n")
-        return pd.DataFrame()
+        return pd.DataFrame(columns=[])
+        raise
 
 def query_tractability(genes):
     """
@@ -168,6 +169,7 @@ def query_tractability(genes):
             with open(failures_file, "a") as f:
                 f.write(msg + "\n")
             continue
+            raise
             
     # Save cache
     with open(cache_file, 'w') as f:

@@ -78,5 +78,6 @@ with open(out_file, 'w', encoding='utf-8') as out_f:
                     out_f.write("\n\n")
         except Exception as e:
             out_f.write(f"Error parsing: {e}\n\n")
+            raise
 
 print(f"Done parsing tables to {out_file}.")

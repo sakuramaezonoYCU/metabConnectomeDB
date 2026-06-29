@@ -173,7 +173,7 @@ def prepare_data(database, cancers, study_ids, profile_expr):
                 
             os.remove(tar_path_local)
 
-def generate_notebook(database, cancers, study_ids, profile_expr, genes_list, signature_name, genes_str, num_genes):
+def generate_notebook(database, cancers, study_ids, profile_expr, genes_list, signature_name, genes_str, num_genes, cancer_suffix):
     nb = nbf.v4.new_notebook()
     
     nb['metadata'] = {
@@ -193,7 +193,7 @@ def generate_notebook(database, cancers, study_ids, profile_expr, genes_list, si
 # ML Prognostic Classifier using Pan-Cancer Signatures ({database.upper()} - {cancers_str})
 
 ### Goal
-Build and validate Machine Learning Prognostic Classifiers evaluating **each 4-cancer combination separately**.
+Build and validate Machine Learning Prognostic Classifiers evaluating **each N-cancer combination separately**.
 
 ### Interpretation
 - **Cox Proportional Hazards C-index**: Establishes baseline linear survival predictive power.
@@ -231,9 +231,18 @@ plt.rcParams['figure.dpi'] = 300
 We load the cleaned {database.upper()} clinical and expression data and merge them into a unified dataset.
 """))
 
+    # Load default event values from config
+    default_events = {}
+    config_path = os.path.join(os.path.dirname(__file__), '..', 'input', 'pipeline.config.json')
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            cfg = json.load(f)
+            default_events = cfg.get("PHASE_5_VALIDATION", {}).get("DEFAULT_EVENT_VALUES", {})
+
     cells.append(nbf.v4.new_code_cell(f"""\
 database = "{database}"
 cancers = {repr(cancers)}
+default_events = {repr(default_events)}
 
 data_dir = '../input/{database}'
 if not os.path.exists(data_dir):
@@ -250,7 +259,49 @@ for cancer in cancers:
     e_df = pd.read_csv(expr_path, low_memory=False)
     
     c_df['CANCER_TYPE'] = cancer.upper()
-    
+
+    # --- Defensive normalization: handle stale cached CSVs ---
+    # If the cached clinical file still has raw cBioPortal columns instead
+    # of the standardized 'event' column, derive it here so all downstream
+    # code that does df['event'] works regardless of cache age.
+    if 'event' not in c_df.columns:
+        # Try OS_STATUS first (cBioPortal format: "0:LIVING" / "1:DECEASED")
+        _status_col = None
+        for _col in ['OS_STATUS', 'VITAL_STATUS', 'DFS_STATUS', 'PFS_STATUS']:
+            if _col in c_df.columns:
+                _status_col = _col
+                break
+        if _status_col is not None:
+            def _parse_event(x):
+                val = str(x).upper()
+                if any(kw in val for kw in ['DECEASED', 'PROGRESSION', 'RECURRENCE']):
+                    return 1
+                if val in ['1', '1.0', 'TRUE', 'YES']:
+                    return 1
+                return 0
+            c_df['event'] = c_df[_status_col].apply(_parse_event)
+        elif 'CALC_TIME_TO_METS_DX_MONTHS' in c_df.columns:
+            # For databases like MBCProject where we measure time to metastasis, apply the configured default event value
+            def_val = default_events.get(database.lower(), 1)
+            c_df['event'] = def_val
+        else:
+            print(f"⚠️ [{{cancer.upper()}}] Clinical file '{{clin_path}}' is missing recognizable status column. Skipping ML prognostic models for this cohort.")
+            continue
+
+    # Ensure OS_MONTHS is present (fallback: convert OS_DAYS)
+    if 'OS_MONTHS' not in c_df.columns:
+        if 'OS_DAYS' in c_df.columns:
+            c_df['OS_MONTHS'] = c_df['OS_DAYS'] / 30.44
+        elif 'CALC_TIME_TO_METS_DX_MONTHS' in c_df.columns:
+            c_df['OS_MONTHS'] = c_df['CALC_TIME_TO_METS_DX_MONTHS']
+        else:
+            print(f"⚠️ [{{cancer.upper()}}] Clinical file '{{clin_path}}' is missing 'OS_MONTHS'/'OS_DAYS'. Skipping ML prognostic models for this cohort.")
+            continue
+            
+    # Drop rows with NaN in survival metrics so CoxPH doesn't crash
+    c_df = c_df.dropna(subset=['OS_MONTHS', 'event'])
+    # --- End defensive normalization ---
+
     # Preprocessing Expression for ML format
     e_df = e_df.drop(columns=['Entrez_Gene_Id'], errors='ignore')
     if 'Hugo_Symbol' in e_df.columns:
@@ -269,6 +320,10 @@ for cancer in cancers:
     expr_dfs.append(e_df)
 
 # Pan-Cancer Merge
+if not clin_dfs:
+    print(f"❌ [CRITICAL] No clinical data available after defensive filtering. All {len(cancers)} cohorts were skipped.")
+    sys.exit(0)
+
 clin_df = pd.concat(clin_dfs, ignore_index=True)
 expr_df = pd.concat(expr_dfs, ignore_index=True)
 
@@ -497,9 +552,9 @@ try:
 except ImportError:
     ANALYSIS_SUFFIX = ''
 
-notebook_filename = 'ml_prognostic_classifier.ipynb'
+notebook_filename = f'ml_prognostic_classifier_{database}_{cancer_suffix}.ipynb'
 out_dir = f'../output/ml_prognostic_results/{database}/{"_".join(cancers)}'
-output_base = 'ml_prognostic_classifier_report_' + "_".join(cancers) + ANALYSIS_SUFFIX
+output_base = f'ml_prognostic_classifier_report_{database}_{cancer_suffix}' + ANALYSIS_SUFFIX
 
 jupyter_bin = os.path.join(os.path.dirname(sys.executable), 'jupyter')
 if not os.path.exists(jupyter_bin): jupyter_bin = 'jupyter'
@@ -516,7 +571,7 @@ else:
 """))
 
     nb['cells'] = cells
-    notebook_filename = 'scripts/ml_prognostic_classifier.ipynb'
+    notebook_filename = f'scripts/ml_prognostic_classifier_{database}_{cancer_suffix}.ipynb'
     with open(notebook_filename, 'w', encoding='utf-8') as f:
         nbf.write(nb, f)
     
@@ -572,8 +627,10 @@ Examples:
     # 1. Prepare and standardize all datasets before writing notebook
     prepare_data(database, cancers, study_ids, profile_expr)
 
+    cancer_suffix = "pancancer" if (len(args.cancer) == 1 and args.cancer[0].lower() == 'all') else "_".join(args.cancer)
+
     # 2. Generate the notebook
-    generate_notebook(database, cancers, study_ids, profile_expr, [], "Dynamic_Signature", "Dynamic", 0)
+    generate_notebook(database, cancers, study_ids, profile_expr, [], "Dynamic_Signature", "Dynamic", 0, cancer_suffix)
 
 if __name__ == "__main__":
     main()

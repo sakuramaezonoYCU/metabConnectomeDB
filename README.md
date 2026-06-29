@@ -15,7 +15,7 @@ Beyond data consolidation, this repository contains a comprehensive suite of com
 ```text
 metabConnectomeDB/
 ├── scripts/                            # Pipeline scripts and utilities
-│   ├── merge_dbs_claude.py             # Primary data ingestion and standardization
+│   ├── merge_dbs.py             # Primary data ingestion and standardization
 │   ├── annotate_with_hmdb.py
 │   ├── annotate_with_databases.py      # Final consolidation step mapping external databases
 │   ├── execute_and_export_notebooks.py # Exports notebooks to styled HTML reports
@@ -93,13 +93,104 @@ python -m ipykernel install --user --name metabConnectomeDB --display-name "Pyth
 
 ## ⏳ Pipeline Execution Architecture & Phases
 
-To guarantee 100% reproducible execution, the pipeline is strictly divided into logical phases.
+To guarantee 100% reproducible execution, the pipeline is strictly divided into logical phases. The following dependency graph illustrates exactly how each script relates to one another and the data flow between them.
+
+```mermaid
+flowchart TD
+    %% Global Configuration
+    CONFIG[[pipeline.config.json & pan_cancer_config.py]] -.-> ALL_PHASES
+
+    %% Phase 0
+    subgraph Phase 0: Data Curation
+        P0_SH(merge_simplify_annotate.sh) --> P0_FETCH[fetch_kegg_pathways.py]
+        P0_FETCH --> P0_MERGE[merge_dbs.py]
+        P0_MERGE --> P0_GEN[generate_final_outputs.py]
+        P0_GEN --> P0_HMDB[annotate_with_hmdb.py]
+        P0_HMDB --> P0_ANN[annotate_with_databases.py]
+    end
+
+    %% Phase 1
+    subgraph Phase 1: Database Exploration
+        P1_EXEC(execute_and_export_notebooks.py) --> P1_NB1[unique_metab_data_exploration.ipynb]
+        P1_EXEC --> P1_NB2[metab_targetPair_analysis.ipynb]
+    end
+    P0_ANN --> P1_EXEC
+
+    %% Phase 2
+    subgraph Phase 2: Single-Cell Integration
+        P2_ALL(run_all_cancers.py) --> P2_PIPE(run_cancer_pipeline.py)
+        P2_PIPE --> P2_NB1[cancer_cellxgene_integration.ipynb]
+        P2_NB1 --> P2_NB2[primary_vs_metastasis_comparison.ipynb]
+        P2_NB2 --> P2_NB3[orphan_metabolic_immune_evasion.ipynb]
+    end
+    P0_ANN --> P2_ALL
+
+    %% Phase 3
+    subgraph Phase 3: Meta-Analysis Extraction
+        P3_1[extract_dataset_metrics.py]
+        P3_2[count_met_cells.py]
+        P3_3[generate_ai_summary_tables.py]
+    end
+    P2_NB3 --> P3_1 & P3_2
+    P3_1 & P3_2 --> P3_3
+
+    %% Phase 4
+    subgraph Phase 4: Pan-Cancer Meta-Analysis
+        P4_COMP[compute_pan_cancer_meta.py]
+        P4_PATCH[patch_liana_csvs.py] -.->|Fail-safe| P4_COMP
+        P4_COMP --> P4_GEN[generate_combined_pan_cancer_notebook.py]
+        P4_GEN --> P4_NB[pan_cancer_meta_analysis.ipynb]
+    end
+    P2_PIPE --> P4_COMP
+
+    %% Phase 5
+    subgraph Phase 5: Signature Validation
+        P5_RUN(run_validation_phase.py)
+        P5_RUN --> P5_1[massspec_metabolomics_analysis.py]
+        P5_RUN --> P5_2[validate_tcga_signature.py]
+        P5_RUN --> P5_3[verify_spatial.py]
+        P5_RUN --> P5_4[generate_predictive_notebook.py]
+        P5_RUN --> P5_5[generate_ml_prognostic_classifier_notebook.py]
+        P5_RUN --> P5_6[create_camp_notebook.py]
+        P5_RUN --> P5_7[generate_master_regulator_notebook.py]
+    end
+    P4_COMP --> P5_RUN
+
+    %% Phase 6
+    subgraph Phase 6: Downstream Export
+        P6_EXEC(execute_pancancer_notebooks.py)
+        P6_OXY[compute_metabolic_switching.py] -.->|Dependency| P6_OXY_NB[oxygen_tension_analysis.ipynb]
+        P6_EXEC --> P6_OXY_NB
+        P6_EXEC --> P6_NB[All Other Downstream Notebooks...]
+    end
+    P5_RUN --> P6_EXEC
+    P4_NB --> P6_EXEC
+
+    %% Phase 7
+    subgraph Phase 7: AI Reporting
+        P7_MD(tmp_build_md.py)
+        P7_OUT((AI_summary_and_insights.md))
+    end
+    P3_3 --> P7_MD
+    P6_EXEC --> P7_MD
+    P7_MD --> P7_OUT
+
+    classDef script fill:#f9f9f9,stroke:#333,stroke-width:1px;
+    classDef orchestrator fill:#d4edda,stroke:#28a745,stroke-width:2px;
+    classDef notebook fill:#fff3cd,stroke:#ffc107,stroke-width:1px;
+    classDef config fill:#cce5ff,stroke:#007bff,stroke-width:1px,stroke-dasharray: 5 5;
+    
+    class P0_SH,P1_EXEC,P2_ALL,P2_PIPE,P5_RUN,P6_EXEC,P7_MD orchestrator;
+    class P1_NB1,P1_NB2,P2_NB1,P2_NB2,P2_NB3,P4_NB,P6_OXY_NB notebook;
+    class CONFIG config;
+```
+
 
 **Phase 0: Core Metabolite Database Curation (Infrequent Execution)**
 This phase curates the generic databases (KEGG, HMDB, CellChat) from `input/databases/`. Re-run only when your raw input datasets change or when you tweak the database merging logic.
 - `merge_simplify_annotate.sh`: The master execution wrapper that sequentially runs the data processing steps below.
 - `fetch_kegg_pathways.py`: Dynamically pulls pathway gene sets from the KEGG REST API based on `pipeline.config.json` specifications.
-- `merge_dbs_claude.py`: Ingests, normalizes, and merges raw `.csv`/`.txt` data.
+- `merge_dbs.py`: Ingests, normalizes, and merges raw `.csv`/`.txt` data.
 - `generate_final_outputs.py`: Filters invalid records and pairs metabolites with targets.
 - `annotate_with_hmdb.py`: Enriches datasets using the `HMDB_metabolites` reference.
 - `annotate_with_databases.py`: Final consolidation step utilizing cached Rhea enrichments.
@@ -117,8 +208,9 @@ This phase curates the generic databases (KEGG, HMDB, CellChat) from `input/data
 - `compute_pan_cancer_meta.py`: Computes the target intersection across multiple cancers to identify highly conserved combinations.
 - `generate_ai_summary_tables.py`: Generates the consolidated summary CSV files.
 
-**Phase 4: Pan-Cancer Notebook Compilation**
-- `generate_combined_pan_cancer_notebook.py`: Auto-generates the `pan_cancer_meta_analysis.ipynb` master notebook. This script integrates Phase 3 CCC and LIANA metrics to construct the Pan-Cancer Immune Evasion network. **Fail-safe:** If a cancer's `_cellxgene_liana_results.csv` is missing during the intersection process, the notebook automatically executes `scripts/patch_liana_csvs.py` on the fly to regenerate it without halting the pipeline.
+**Phase 4: Pan-Cancer Meta-Analysis & Notebook Compilation**
+- `compute_pan_cancer_meta.py`: Computes the target gene intersection across multiple cancers to identify highly conserved combinations and generates the metabolite-target network. It now strictly enforces exceptions on missing upstream data. Outputs are saved as `pan_cancer_conserved_genes*.csv` alongside a `conserved_target_genes.csv` alias for downstream reporting.
+- `generate_combined_pan_cancer_notebook.py`: Auto-generates the `pan_cancer_meta_analysis.ipynb` master notebook. This script integrates Phase 3 metrics and performs the Pan-Cancer Conserved CCC Links intersection to construct the Immune Evasion network. **Fail-safe:** If a cancer's `_cellxgene_liana_results.csv` is missing during the CCC intersection process, this script automatically executes `scripts/patch_liana_csvs.py` on the fly to regenerate it without halting the pipeline.
 - `execute_and_export_notebooks.py` (or manual execution): Runs the notebook to visualize the network graph and output standard plots.
 
 **Phase 5: Dynamic Gene Signature Validation (Frequent Execution)**
@@ -167,7 +259,7 @@ The following details the relationship between scripts, their inputs, internal p
 - **Input:** `input/pipeline.config.json` (specifically the `KEGG_PATHWAYS` block).
 - **Output:** `input/kegg_{id}_{name}.json` files containing lists of corresponding HGNC gene symbols.
 
-### `merge_dbs_claude.py`
+### `merge_dbs.py`
 
 - **Role:** The primary data ingestion and standardization script (optimized version). It crawls through all raw database subfolders, normalizes conflicting column names, standardizes data formats, deduplicates entries, and merges data separated by species (human and mouse).
 - **Input:** Raw database files (CSVs, TSVs, txts) from the `input/databases/` subfolders.
@@ -182,7 +274,7 @@ The following details the relationship between scripts, their inputs, internal p
 ### `generate_final_outputs.py`
 
 - **Role:** Refines and flattens the merged datasets. It filters out invalid records (e.g., `scCellFie_value == 0`), pairs metabolites with their targets (Receptors, Enzymes, Transporters), and calculates summary statistics.
-- **Input:** `merged_{species}_metabolites.csv` generated by `merge_dbs_claude.py`.
+- **Input:** `merged_{species}_metabolites.csv` generated by `merge_dbs.py`.
 - **Parameters:** Dynamic `PROJECT_ROOT` resolution.
 - **Output:**
   - `merged_{species}_metabolites_filtered_scCellfie_value_0.csv`
@@ -305,7 +397,7 @@ The following details the relationship between scripts, their inputs, internal p
 - **Key Scripts (Run in this exact order if you change cell counts or parameters in `pan_cancer_config.py`):**
   1. `run_all_cancers.py`: Re-runs the base pipeline for all configured cancers (generates individual cancer DE results).
   2. `compute_pan_cancer_meta.py`: Intersects the differentially expressed targets across the cancers, outputting `pan_cancer_signature_XXX.csv` combinations using the dynamic >3 intersection algorithm.
-  3. `generate_predictive_notebook_all5.py`: Scores the primary tumor cells of each cancer against their **OWN specific** metastatic signature to identify highly metastatic ("Right-Skewed") subclones present before dissemination.
+  3. `generate_predictive_notebook.py`: Scores the primary tumor cells of each cancer against their **OWN specific** metastatic signature to identify highly metastatic ("Right-Skewed") subclones present before dissemination.
   4. `generate_combined_pan_cancer_notebook.py`: Auto-generates the final `pan_cancer_meta_analysis.ipynb` notebook logic.
   5. Finally, execute `pan_cancer_meta_analysis.ipynb` top-to-bottom to render the final HTML report.
 - **Output:** Master pan-cancer meta-analysis notebook detailing the conserved genes, network graph, druggability analysis, and predictive scores, alongside all underlying CSV data files in `output/pan_cancer_meta_results/`.
@@ -375,6 +467,21 @@ Several targeted Jupyter notebooks dive deep into specific biological questions 
 - **`massspec_metabolomics_integration_*.ipynb`**: Integrates mass spectrometry metabolomics data with cross-cohort comparisons to validate metabolic signatures.
 - **`ml_prognostic_classifier.ipynb`**: Trains Cox Proportional Hazards, Random Forest, and MLP Neural Network classifiers on independent clinical cohorts (e.g., METABRIC breast cancer dataset) to evaluate the prognostic power of our derived metabolic gene signatures. Generates risk stratification models, ROC curves, and Kaplan-Meier plots.
 
+## 🛡 Quality Control & Auditing
+
+### `qc_hardcoding_audit.py`
+A routine Python script that scans all `.py` files in the `scripts/` directory to enforce strict anti-hardcoding invariants. It uses regex to flag:
+- Hardcoded arrays (e.g., specific cancer lists) that should be loaded from `pipeline.config.json`.
+- Algebraic string violations (e.g., using "4-cancer" instead of dynamic "(N-1)-cancer" logic).
+- Hardcoded statistical thresholds (e.g., `p_val = 0.05`).
+- Improper use of random mock data generation (outside of permitted algorithms like UMAP).
+- Hardcoded output paths that violate dynamic `{cancer}_results` conventions.
+
+**Usage:**
+```bash
+python scripts/qc_hardcoding_audit.py
+```
+
 ## 📊 Data Provenance & Metadata
 
 A critical aspect of this unified database is the tracking of metadata provenance.
@@ -418,3 +525,8 @@ Ensure that the `input/` directory is populated locally before running the pipel
 - **Issue:** The AI insights scraper (`tmp_build_md.py`) was passively skimming downstream meta-analyses notebooks (like Druggability, Oxygen Tension, Master Regulator, and Spatial Mapping) and reporting mere file existence instead of extracting real pipeline metrics. In addition, `master_regulator_analysis.ipynb` contained hardcoded target genes and plots instead of dynamically computing them.
 - **Fix:** Rewrote the `build_phase_6` scraper to deeply extract Adjusted P-values, Hazard Ratios, correlation R values, interaction counts, and specific metabolic genes/TFs directly from the target CSVs. Fixed `scripts/compute_metabolic_switching.py` to properly save the oxygen tension correlation results. Finally, reverted `scripts/master_regulator_analysis.ipynb` back to its pure dynamic state by deleting manually hardcoded target logic.
 - **Data Provenance Preservation:** Guarantees that the final `AI_summary_and_insights.md` exclusively reports genuine, data-backed metrics computed natively during the pipeline run without any missing extraction links or fallback hallucinations.
+
+**[2026-06-29] Meta-Analysis File Handling & QC Audit Hardening Patch**
+- **Issue:** The `compute_pan_cancer_meta.py` script was silently returning on missing input files instead of crashing, bypassing the `qc_hardcoding_audit.py` due to both a hardcoded whitelist and the fact that the audit script only scans for `try...except` blocks, not `if not os.path.exists()` conditionals. Additionally, downstream markdown reports explicitly expected a `conserved_target_genes.csv` file, but the generation script was only saving `pan_cancer_conserved_genes{ANALYSIS_SUFFIX}.csv`, leading to missing plots in the HTML exports.
+- **Fix:** Refactored `compute_pan_cancer_meta.py` to `raise FileNotFoundError` and `raise ValueError` instead of silently ignoring missing upstream inputs. Removed the legacy whitelist from `qc_hardcoding_audit.py` so it properly checks all scripts. Added a dual-export alias mechanism so the conserved genes are saved to both the dynamic suffix filename (for ML classifiers) and `conserved_target_genes.csv` (for markdown reports).
+- **Documentation:** Corrected `README.md` to accurately reflect that `generate_combined_pan_cancer_notebook.py` (not `compute_pan_cancer_meta.py`) handles the CCC Links intersection and `patch_liana_csvs.py` fail-safe.

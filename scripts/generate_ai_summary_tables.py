@@ -94,6 +94,7 @@ def generate_metastatic_enrichment_table():
                         o2_normal = 6.0
         except Exception:
             pass
+            raise
         
         data.append({
             'Cancer': cancer,

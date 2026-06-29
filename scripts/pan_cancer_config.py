@@ -162,3 +162,16 @@ def get_liana_csv_paths(cancer: str) -> dict:
 # Predictive subclone detection thresholds
 SKEW_THRESHOLD = _p45.get("SKEW_THRESHOLD", 0.5)
 SUBCLONE_SD_MULTIPLIER = _p45.get("SUBCLONE_SD_MULTIPLIER", 1.0)
+
+# ── CAMP Integration ──────────────────────────────────────────────────────────
+CAMP_TARGET_COHORTS = _cfg.get("CAMP_INTEGRATION", {}).get("TARGET_COHORTS", None)
+
+# ── Annotation Databases ──────────────────────────────────────────────────────
+_anno_cfg = _cfg.get("ANNOTATION_DATABASES", {})
+SPECIES_CONFIG = _anno_cfg.get("SPECIES_CONFIG", {})
+TARGET_PAIR_FILES = _anno_cfg.get("TARGET_PAIR_FILES", [])
+
+# ── Master Regulator Analysis ─────────────────────────────────────────────────
+_mr_cfg = _cfg.get("MASTER_REGULATOR", {})
+ENRICHR_LIBRARIES = _mr_cfg.get("ENRICHR_LIBRARIES", [])
+

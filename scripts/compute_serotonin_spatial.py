@@ -84,6 +84,7 @@ def compute_graph_proximity(adata, mask_a, mask_b, n_perms=1000, seed=42, h5ad_p
                 adata.write_h5ad(h5ad_path)
             except Exception as e:
                 print(f"  - Warning: Failed to save updated h5ad: {e}")
+                raise
                 
     adj = adata.obsp['connectivities']
     

@@ -145,6 +145,7 @@ def main():
             import traceback
             traceback.print_exc()
             print(f"Failed {sp}: {e}")
+            raise
             
     if results:
         df_res = pd.DataFrame(results)

@@ -98,29 +98,29 @@ def generate_upset_plot():
     pan_csv = os.path.join(META_RESULTS_DIR, f'pan_cancer_conserved_genes{ANALYSIS_SUFFIX}.csv')
     df_pan.to_csv(pan_csv, index=False)
     
+    # Save an explicitly named alias expected by the downstream markdown reports
+    conserved_csv = os.path.join(META_RESULTS_DIR, 'conserved_target_genes.csv')
+    df_pan.to_csv(conserved_csv, index=False)
+    
     return final_genes
 
 def generate_network_plot(pan_cancer_genes):
     if not pan_cancer_genes:
-        print("No pan-cancer genes to build network for.")
-        return
+        raise ValueError("No pan-cancer genes identified to build network for. UpSet plot generation likely failed.")
         
-    pairs_file = os.path.join(OUTPUT_DIR, 'human_metab_target_pairs_cancer_annotated.csv')
-    if not os.path.exists(pairs_file):
-        pairs_file = os.path.join(OUTPUT_DIR, 'human_database_merge_unique_metab_target_pairs.csv')
+    pairs_file = os.path.join(OUTPUT_DIR, 'human_database_merge_unique_metab_target_pairs.csv')
         
     if not os.path.exists(pairs_file):
-        print(f"Could not find pairs file to build network.")
-        return
+        raise FileNotFoundError(f"Could not find pairs file to build network. Checked: {pairs_file}")
 
-    df_pairs = pd.read_csv(pairs_file)
+    df_pairs = pd.read_csv(pairs_file, low_memory=False)
     
-    target_col = 'Target' if 'Target' in df_pairs.columns else 'Target_Gene'
-    metab_col = 'Metabolite' if 'Metabolite' in df_pairs.columns else 'Metabolite_Name'
+    target_col = 'Target'
+    metab_col = 'Metabolite_Name'
     
-    if target_col not in df_pairs.columns or metab_col not in df_pairs.columns:
-        target_col = df_pairs.columns[1]
-        metab_col = df_pairs.columns[0]
+    # Ensure targets are exploded if they are piped (e.g. 'A | B | C')
+    if df_pairs[target_col].astype(str).str.contains(r' \| ').any():
+        df_pairs = df_pairs.assign(**{target_col: df_pairs[target_col].astype(str).str.split(r' \| ')}).explode(target_col)
 
     df_net = df_pairs[df_pairs[target_col].isin(pan_cancer_genes)].copy()
     

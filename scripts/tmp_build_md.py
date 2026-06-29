@@ -1,3 +1,20 @@
+import os
+import sys
+
+# Ensure robust path resolution regardless of where the script is executed
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
+
+if SCRIPT_DIR not in sys.path:
+    sys.path.append(SCRIPT_DIR)
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
+
+def _resolve_path(rel_path):
+    # If the path starts with input/ or output/ or scripts/ or papers/ 
+    # resolve it relative to PROJECT_ROOT.
+    return os.path.join(PROJECT_ROOT, rel_path)
+
 import pandas as pd
 import os
 import sys
@@ -15,7 +32,7 @@ if 'scripts' not in sys.path and '.' not in sys.path:
 
 # Load explicit parameters from config
 try:
-    with open('input/pipeline.config.json', 'r') as cf:
+    with open(_resolve_path('input/pipeline.config.json'), 'r') as cf:
         pipeline_config = json.load(cf)
 except FileNotFoundError:
     print("Error: input/pipeline.config.json not found.")
@@ -27,14 +44,16 @@ SKEW_THRESHOLD = _p45["SKEW_THRESHOLD"]
 SUBCLONE_SD_MULTIPLIER = _p45["SUBCLONE_SD_MULTIPLIER"]
 
 try:
+    if os.path.join(PROJECT_ROOT, "input") not in sys.path:
+        sys.path.append(os.path.join(PROJECT_ROOT, "input"))
     from pan_cancer_config import ANALYSIS_SUFFIX, CANCER_CAP
     CANCERS = list(CANCER_CAP.keys())
 except Exception as e:
     raise ImportError(f"Failed to load dynamic parameters from pan_cancer_config. Hardcoding parameters is strictly prohibited. Error: {e}")
 
-MD_OUT_PATH = 'output/AI_summary_and_insights.md'
-PAPERS_DIR = 'papers'
-NCBI_API_KEY_FILE = 'input/ncbi_api_key.txt'
+MD_OUT_PATH = _resolve_path('output/AI_summary_and_insights.md')
+PAPERS_DIR = _resolve_path('papers')
+NCBI_API_KEY_FILE = _resolve_path('input/ncbi_api_key.txt')
 
 def df_to_markdown(df):
     header = '| ' + ' | '.join(df.columns) + ' |'
@@ -82,11 +101,12 @@ def scrape_notebook_output(html_path, extractors):
 CONTEXT_FILE = 'output/.cumulative_ai_context.json'
 cumulative_ai_context = []
 if os.path.exists(CONTEXT_FILE):
-    try:
+    # try:
+    if True: # Temporary replacement so pipeline crashes hard when file is missing
         with open(CONTEXT_FILE, 'r') as f:
             cumulative_ai_context = json.load(f)
-    except Exception as e:
-        print(f"Warning: Failed to load existing context: {e}")
+#    except Exception as e:
+#        print(f"Warning: Failed to load existing context: {e}")
 
 # ==============================================================================
 # 📄 GEMINI FILE API: Upload papers/ PDFs once and cache handles
@@ -95,12 +115,12 @@ _uploaded_paper_handles = None  # Global cache
 
 def _get_gemini_client():
     """Returns a configured Gemini client. Hard-crashes if secret is missing."""
-    secret_path = os.path.join('input', '.geminiSecret')
+    secret_path = _resolve_path(os.path.join('input', '.geminiSecret'))
     if not os.path.exists(secret_path):
         return None
     with open(secret_path, 'r') as f:
         api_key = f.read().strip()
-    if not api_key or "PASTE_YOUR_GEMINI_API_KEY_HERE" in api_key:
+    if not api_key:
         return None
     from google import genai
     return genai.Client(api_key=api_key)
@@ -124,13 +144,14 @@ def upload_papers_once(client):
     print(f"    [📄] Uploading {len(pdf_files)} reference PDFs to Gemini File API...")
     for pdf_name in pdf_files:
         pdf_path = os.path.join(PAPERS_DIR, pdf_name)
-        try:
+        # try:
+        if True: # Temporary replacement to enforce hard crash (No silent failsafes)
             handle = client.files.upload(file=pdf_path)
             _uploaded_paper_handles.append(handle)
             print(f"        ✓ Uploaded: {pdf_name}")
             time.sleep(4)  # Rate limit (15 RPM free tier)
-        except Exception as e:
-            print(f"        ✗ Failed to upload {pdf_name}: {e}")
+#        except Exception as e:
+#            print(f"        ✗ Failed to upload {pdf_name}: {e}")
     return _uploaded_paper_handles
 
 def _parse_html_to_text(html_path):
@@ -138,7 +159,8 @@ def _parse_html_to_text(html_path):
     Parses an HTML file locally using BeautifulSoup to extract only text and tables.
     Strips all scripts, styles, and embedded images (which consume millions of tokens).
     """
-    try:
+    # try:
+    if True: # Temporary replacement so pipeline crashes hard when file is missing
         from bs4 import BeautifulSoup
         with open(html_path, 'r', encoding='utf-8') as f:
             html_content = f.read()
@@ -149,9 +171,9 @@ def _parse_html_to_text(html_path):
         # Extract text with line breaks
         text = soup.get_text(separator='\n', strip=True)
         return text
-    except Exception as e:
-        print(f"        ✗ Failed to parse HTML {os.path.basename(html_path)}: {e}")
-        return ""
+#    except Exception as e:
+#        print(f"        ✗ Failed to parse HTML {os.path.basename(html_path)}: {e}")
+#        return ""
 
 
 # ==============================================================================
@@ -161,12 +183,13 @@ def _parse_html_to_text(html_path):
 def _load_ncbi_api_key():
     """Returns the NCBI API key if available, else None."""
     if os.path.exists(NCBI_API_KEY_FILE):
-        try:
+        # try:
+        if True: # Temporary replacement so pipeline crashes hard when file is missing
             with open(NCBI_API_KEY_FILE, 'r') as f:
                 key = f.read().strip()
             return key if key else None
-        except Exception:
-            return None
+#        except Exception:
+#            return None
     return None
 
 def _extract_pmid_claims(text):
@@ -216,7 +239,8 @@ def _fetch_pubmed_abstracts(pmid_list, ncbi_api_key=None):
         if ncbi_api_key:
             params["api_key"] = ncbi_api_key
         
-        try:
+        # try:
+        if True: # Temporary replacement to enforce hard crash (No silent failsafes)
             response = requests.get(base_url, params=params, timeout=20)
             response.raise_for_status()
             root = ET.fromstring(response.text)
@@ -243,11 +267,11 @@ def _fetch_pubmed_abstracts(pmid_list, ncbi_api_key=None):
                 if pmid not in found_pmids:
                     results[pmid] = None
                     
-        except Exception as e:
-            print(f"        [!] NCBI E-Fetch error: {e}")
-            for pmid in batch:
-                if pmid not in results:
-                    results[pmid] = None
+#        except Exception as e:
+#            print(f"        [!] NCBI E-Fetch error: {e}")
+#            for pmid in batch:
+#                if pmid not in results:
+#                    results[pmid] = None
         
         # Respect NCBI rate limits
         delay = 0.12 if ncbi_api_key else 0.35
@@ -281,7 +305,8 @@ def _batch_semantic_verify_pmids(client, items_to_verify):
     prompt += "Output your response as a valid JSON object where the keys are the PMIDs (as strings) and the values are boolean (true for YES, false for NO). "
     prompt += "Do not include markdown blocks or any other text. Output strict JSON only, e.g. {\"12345678\": true, \"87654321\": false}."
 
-    try:
+    # try:
+    if True: # Temporary replacement to enforce hard crash (No silent failsafes)
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,
@@ -302,10 +327,10 @@ def _batch_semantic_verify_pmids(client, items_to_verify):
         
         # Ensure all PMIDs are strings in the results
         return {str(k): bool(v) for k, v in results.items()}
-    except Exception as e:
-        print(f"        [!] Batch semantic verification failed: {e}")
-        # On failure, conservatively reject all
-        return {str(item['pmid']): False for item in items_to_verify}
+#    except Exception as e:
+#        print(f"        [!] Batch semantic verification failed: {e}")
+#        # On failure, conservatively reject all
+#        return {str(item['pmid']): False for item in items_to_verify}
 
 def verify_and_format_pmids(text, client):
     """
@@ -413,7 +438,8 @@ def ask_gemini_interpretation(markdown_text, phase, html_paths=None):
     if client is None:
         return "\n> [!WARNING]\n> **AI Interpretation Skipped**: `input/.geminiSecret` not found or invalid.\n"
          
-    try:
+    # try:
+    if True: # Temporary replacement to enforce hard crash (No silent failsafes)
         from google.genai import types
         
         # Upload reference papers (cached after first call)
@@ -496,7 +522,8 @@ Data to interpret:
         max_attempts = 5
         
         while attempt < max_attempts:
-            try:
+            # try:
+            if True: # Temporary replacement to enforce hard crash (No silent failsafes)
                 response = client.models.generate_content(
                     model='gemini-2.5-flash',
                     contents=contents,
@@ -510,16 +537,16 @@ Data to interpret:
                     )
                 )
                 break  # Success!
-            except Exception as e:
-                error_str = str(e)
-                attempt += 1
-                if any(code in error_str for code in ['403', '429', '503', '500', '502', '504']):
-                    backoff_time = min(15 * (2 ** (attempt - 1)), 300)
-                    print(f"    [!] Gemini API error ({e}). Retrying in {backoff_time}s (Attempt {attempt}/{max_attempts})...")
-                    time.sleep(backoff_time)
-                else:
-                    print(f"    [!] Gemini API Error ({e}). Retrying in 30s (Attempt {attempt}/{max_attempts})...")
-                    time.sleep(30)
+#            except Exception as e:
+#                error_str = str(e)
+#                attempt += 1
+#                if any(code in error_str for code in ['403', '429', '503', '500', '502', '504']):
+#                    backoff_time = min(15 * (2 ** (attempt - 1)), 300)
+#                    print(f"    [!] Gemini API error ({e}). Retrying in {backoff_time}s (Attempt {attempt}/{max_attempts})...")
+#                    time.sleep(backoff_time)
+#                else:
+#                    print(f"    [!] Gemini API Error ({e}). Retrying in 30s (Attempt {attempt}/{max_attempts})...")
+#                    time.sleep(30)
         
         if attempt == max_attempts:
             return f"\n> [!WARNING]\n> **AI Interpretation Failed**: Reached max attempts ({max_attempts}) due to API errors.\n"
@@ -536,187 +563,22 @@ Data to interpret:
             'data': markdown_text,
             'interpretation': raw_response
         })
-        try:
+        # try:
+        if True: # Temporary replacement so pipeline crashes hard when file is missing
             with open(CONTEXT_FILE, 'w') as f:
                 json.dump(cumulative_ai_context, f)
-        except Exception as e:
-            print(f"Warning: Failed to save context: {e}")
+#        except Exception as e:
+#            print(f"Warning: Failed to save context: {e}")
         
         # Prefix every line with '> ' for markdown alert block
         formatted_text = "> " + verified_response.replace('\n', '\n> ')
         verification_note = f"\n> \n> ---\n> *{verification_summary}*"
         return f"\n> [!NOTE]\n> **Data-Driven AI Interpretation (with PMID Verification)**\n{formatted_text}{verification_note}\n"
         
-    except ImportError:
-        return "\n> [!WARNING]\n> **AI Interpretation Skipped**: `google-genai` library not installed. Please run `pip install google-genai`.\n"
-    except Exception as e:
-        return f"\n> [!WARNING]\n> **AI Interpretation Failed**: Error calling Gemini API: {e}\n"
-
-
-def ask_gemini_batch_interpretation(phase_data_map):
-    """
-    Sends ALL phase data in a SINGLE API request and returns per-phase interpretations.
-    
-    phase_data_map: dict of {phase_num: (markdown_content, html_paths_list)}
-    Returns: dict of {phase_num: formatted_interpretation_string}
-    
-    This approach uses exactly 1 API request instead of 6, completely bypassing
-    the gemini-2.5-flash 20-request/day free tier limit.
-    """
-    client = _get_gemini_client()
-    if client is None:
-        return {p: "\n> [!WARNING]\n> **AI Interpretation Skipped**: `input/.geminiSecret` not found or invalid.\n" for p in phase_data_map}
-    
-    try:
-        from google.genai import types
-        
-        # Upload reference papers (cached after first call)
-        paper_handles = upload_papers_once(client)
-        
-        # Build the mega-prompt with all phase data
-        all_phases_text = ""
-        for phase_num in sorted(phase_data_map.keys()):
-            content, html_paths = phase_data_map[phase_num]
-            all_phases_text += f"\n\n{'='*80}\n"
-            all_phases_text += f"PHASE {phase_num} DATA\n"
-            all_phases_text += f"{'='*80}\n\n"
-            all_phases_text += content
-            
-            # Parse and append HTML text for this phase
-            if html_paths:
-                existing = [p for p in html_paths if os.path.exists(p)]
-                if existing:
-                    print(f"    [📊] Parsing {len(existing)} HTML reports for Phase {phase_num}...")
-                    for path in existing:
-                        parsed_text = _parse_html_to_text(path)
-                        if parsed_text:
-                            all_phases_text += f"\n--- EXTRACTED DATA FROM HTML REPORT: {os.path.basename(path)} ---\n"
-                            all_phases_text += parsed_text[:25000] + "\n"
-        
-        phase_numbers = sorted(phase_data_map.keys())
-        
-        file_context_note = ""
-        if paper_handles:
-            file_context_note += f"\nYou have been provided {len(paper_handles)} reference PDF papers (via File API). "
-            file_context_note += "Cross-reference your interpretation against findings in these papers. "
-            file_context_note += "When citing findings from these papers, use their actual PMIDs.\n"
-        
-        prompt = f"""You are an expert computational biologist analyzing single-cell metabolism and pan-cancer data.
-Below is the COMPLETE raw data from ALL {len(phase_numbers)} phases of our metabConnectomeDB pipeline.
-
-{file_context_note}
-
-YOUR TASK:
-For EACH phase, provide a deeply scientific, data-driven interpretation. You MUST:
-1. Synthesize the key quantitative findings for that phase (do NOT just copy tables — highlight the most significant results).
-2. Explain the biological significance, cross-referencing with the provided PDF literature where applicable.
-3. As you interpret later phases, actively reference and build upon findings from earlier phases (cumulative insight).
-4. When citing external literature, format PMIDs exactly as: PMID:12345678
-   - Only cite PMIDs you are confident are real and relevant.
-   - Every PMID you cite will be programmatically verified against PubMed.
-
-SCIENTIFIC INTEGRITY POLICY (ABSOLUTE):
-- DO NOT fabricate, guess, or mock any data, metrics, or biological mechanisms.
-- If the data is sparse or inconclusive, state that explicitly.
-- Do NOT claim causation from correlational data.
-- Only reference biological mechanisms that are directly supported by the data tables, the provided HTML reports, or the provided PDF literature.
-
-RESPONSE FORMAT (CRITICAL — you MUST use these exact delimiters for each phase):
-
-For each phase, output:
-
-=== PHASE N INTERPRETATION ===
-### 1. NOVEL FINDINGS
-[Synthesize the most important findings for this phase. Reference specific metrics. Cross-reference with literature.]
-
-### 2. PROPOSED RESEARCH QUESTIONS
-[List 2-3 deep biological questions raised by this phase's results.]
-
-### 3. SUGGESTED NEXT STEPS
-[Actionable computational or experimental next steps grounded in the data.]
-=== END PHASE N ===
-
-Replace N with the actual phase number ({', '.join(str(p) for p in phase_numbers)}).
-You MUST produce one delimited block for EACH phase listed above.
-
-{all_phases_text}
-"""
-        
-        contents = paper_handles + [prompt]
-        
-        print(f"    [🤖] Sending single batch request for {len(phase_numbers)} phases...")
-        attempt = 1
-        max_attempts = 5
-        
-        while attempt < max_attempts:
-            try:
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=contents,
-                    config=types.GenerateContentConfig(
-                        safety_settings=[
-                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                        ]
-                    )
-                )
-                break
-            except Exception as e:
-                error_str = str(e)
-                attempt += 1
-                if any(code in error_str for code in ['403', '429', '503', '500', '502', '504']):
-                    backoff_time = min(15 * (2 ** (attempt - 1)), 300)
-                    print(f"    [!] Gemini API error ({e}). Retrying in {backoff_time}s (Attempt {attempt}/{max_attempts})...")
-                    time.sleep(backoff_time)
-                else:
-                    print(f"    [!] Gemini API Error ({e}). Retrying in 30s (Attempt {attempt}/{max_attempts})...")
-                    time.sleep(30)
-        
-        if attempt == max_attempts:
-            return {p: "\n> [!WARNING]\n> **AI Interpretation Failed**: Reached max attempts due to API errors.\n" for p in phase_data_map}
-        
-        raw_response = response.text
-        print(f"    [✓] Received batch response ({len(raw_response)} chars)")
-        
-        # === PMID Verification Pass (single pass on entire response) ===
-        print(f"    [🔬] Running PMID verification pass on batch response...")
-        verified_response, verification_summary = verify_and_format_pmids(raw_response, client)
-        
-        # Split the response into per-phase blocks
-        results = {}
-        for phase_num in phase_numbers:
-            start_marker = f"=== PHASE {phase_num} INTERPRETATION ==="
-            end_marker = f"=== END PHASE {phase_num} ==="
-            
-            start_idx = verified_response.find(start_marker)
-            end_idx = verified_response.find(end_marker)
-            
-            if start_idx != -1 and end_idx != -1:
-                phase_text = verified_response[start_idx + len(start_marker):end_idx].strip()
-            elif start_idx != -1:
-                # End marker missing — grab until next phase or end
-                next_start = verified_response.find(f"=== PHASE", start_idx + len(start_marker))
-                if next_start != -1:
-                    phase_text = verified_response[start_idx + len(start_marker):next_start].strip()
-                else:
-                    phase_text = verified_response[start_idx + len(start_marker):].strip()
-            else:
-                phase_text = f"*Phase {phase_num} interpretation not found in batch response.*"
-            
-            # Format as markdown blockquote
-            formatted_text = "> " + phase_text.replace('\n', '\n> ')
-            verification_note = f"\n> \n> ---\n> *{verification_summary}*"
-            results[phase_num] = f"\n> [!NOTE]\n> **Data-Driven AI Interpretation (with PMID Verification)**\n{formatted_text}{verification_note}\n"
-        
-        return results
-        
-    except ImportError:
-        return {p: "\n> [!WARNING]\n> **AI Interpretation Skipped**: `google-genai` library not installed.\n" for p in phase_data_map}
-    except Exception as e:
-        return {p: f"\n> [!WARNING]\n> **AI Interpretation Failed**: Error calling Gemini API: {e}\n" for p in phase_data_map}
-
+#    except ImportError:
+#        return "\n> [!WARNING]\n> **AI Interpretation Skipped**: `google-genai` library not installed. Please run `pip install google-genai`.\n"
+#    except Exception as e:
+#        return f"\n> [!WARNING]\n> **AI Interpretation Failed**: Error calling Gemini API: {e}\n"
 
 def append_to_md(content):
     if not os.path.exists(MD_OUT_PATH):
@@ -797,7 +659,9 @@ def build_phase_1():
         'output/metab_targetPair_analysis_full_report.html',
         'output/unique_metab_data_exploration_full_report.html',
     ]
-    return content, phase1_htmls
+    interpretation = ask_gemini_interpretation(content, phase=1, html_paths=phase1_htmls)
+    content += interpretation + '\n---\n'
+    append_to_md(content)
 
 
 def build_phase_2():
@@ -869,7 +733,9 @@ def build_phase_2():
         cap = CANCER_CAP[c]
         phase2_htmls += glob.glob(f"output/{c}_results/primary_vs_metastasis_*_{cap}.html")
         phase2_htmls += glob.glob(f"output/{c}_results/orphan_immune_*_{cap}.html")
-    return content, phase2_htmls
+    interpretation = ask_gemini_interpretation(content, phase=2, html_paths=phase2_htmls)
+    content += interpretation + '\n---\n'
+    append_to_md(content)
 
 def build_phase_3():
     # Because Phase 2 & 3 are conceptually merged in the output as requested by the user,
@@ -934,7 +800,9 @@ def build_phase_3():
     phase3_htmls = [
         f'output/pan_cancer_meta_results/pan_cancer_meta_analysis_report.html',
     ]
-    return content, phase3_htmls
+    interpretation = ask_gemini_interpretation(content, phase=3, html_paths=phase3_htmls)
+    content += interpretation + '\n---\n'
+    append_to_md(content)
 
 def build_phase_4():
     print("Building Phase 4 Summary...")
@@ -1032,7 +900,9 @@ def build_phase_4():
     phase4_htmls = [
         'output/pan_cancer_meta_results/pan_cancer_meta_analysis_report.html',
     ] + glob.glob(f'output/pan_cancer_meta_results/predictive_signature_biomarker_*.html')
-    return content, phase4_htmls
+    interpretation = ask_gemini_interpretation(content, phase=4, html_paths=phase4_htmls)
+    content += interpretation + '\n---\n'
+    append_to_md(content)
 
 def build_phase_5():
     print("Building Phase 5 Summary...")
@@ -1102,7 +972,9 @@ def build_phase_5():
     print("Querying Gemini API for Phase 5 Interpretation...")
     import glob
     phase5_htmls = glob.glob('output/druggability/druggability_axis_*.html')
-    return content, phase5_htmls
+    interpretation = ask_gemini_interpretation(content, phase=5, html_paths=phase5_htmls)
+    content += interpretation + '\n---\n'
+    append_to_md(content)
 
 
 def build_phase_6():
@@ -1380,7 +1252,7 @@ def build_phase_6():
     # --- Specific Extraction for Ovarian Serotonin Immune Evasion ---
     ov_html = 'output/ovarian_serotonin_immune_evasion_report.html'
     content += "### 6.7 Ovarian Serotonin Immune Evasion\n\n"
-    content += 'Source: `output/ovarian_results/` and Serotonin/TAM annotations\n'
+    content += 'Source: `output/serotonin_axis_spatial_mapping/` and Serotonin/TAM annotations\n'
     content += 'Script: `scripts/ovarian_serotonin_immune_evasion.ipynb`\n'
     content += 'Scraper: `scripts/tmp_build_md.py`\n'
     content += f'Output: `{ov_html}`\n\n'
@@ -1402,7 +1274,8 @@ def build_phase_6():
         df_macs = pd.read_csv(macs_csv)
         df_tnk = pd.read_csv(tnk_csv)
         
-        try:
+        # try:
+        if True: # Temporary replacement to enforce hard crash (No silent failsafes)
             plot_config = pipeline_config.get("SEROTONIN_AXIS", {}).get("PLOTTING_CONFIG", [])
             if plot_config:
                 for p_cfg in plot_config:
@@ -1418,8 +1291,8 @@ def build_phase_6():
                 content += "\n"
             else:
                 content += "*(No PLOTTING_CONFIG found in pipeline config)*\n\n"
-        except Exception as e:
-            content += f"*(Error computing summary statistics: {e})*\n\n"
+#        except Exception as e:
+#            content += f"*(Error computing summary statistics: {e})*\n\n"
     else:
         content += "*(Pending: plot_data_macs.csv and plot_data_tnk.csv)*\n\n"
 
@@ -1446,7 +1319,9 @@ def build_phase_6():
         'output/camp_pancancer_integration_report.html',
         'output/deepdive_conserved_metabGeneSig/deepdive_conserved_metabGeneSig_report.html',
     ] + glob.glob('output/*_ml_prognostic_classifier_report.html')
-    return content, phase6_htmls
+    interpretation = ask_gemini_interpretation(content, phase=6, html_paths=phase6_htmls)
+    content += interpretation + '\n---\n'
+    append_to_md(content)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Modular AI Summary & Insight Builder")
@@ -1497,38 +1372,15 @@ if __name__ == '__main__':
                 os.remove(CONTEXT_FILE)
         phases_to_run = ['all'] if args.phase == 'all' else [args.phase]
 
-    phase_data = {}
     if '1' in phases_to_run or 'all' in phases_to_run:
-        phase_data[1] = build_phase_1()
+        build_phase_1()
     if '2' in phases_to_run or 'all' in phases_to_run:
-        phase_data[2] = build_phase_2()
+        build_phase_2()
     if '3' in phases_to_run or 'all' in phases_to_run:
-        phase_data[3] = build_phase_3()
+        build_phase_3()
     if '4' in phases_to_run or 'all' in phases_to_run:
-        phase_data[4] = build_phase_4()
+        build_phase_4()
     if '5' in phases_to_run or 'all' in phases_to_run:
-        phase_data[5] = build_phase_5()
+        build_phase_5()
     if '6' in phases_to_run or 'all' in phases_to_run:
-        phase_data[6] = build_phase_6()
-    
-    if not phase_data:
-        print("No phase data collected. Exiting.")
-        sys.exit(1)
-    
-    # === SINGLE BATCH API CALL ===
-    print(f"\n{'='*60}")
-    print(f"Sending ALL {len(phase_data)} phases to Gemini in a SINGLE API request...")
-    print(f"{'='*60}")
-    
-    interpretations = ask_gemini_batch_interpretation(
-        {p: (content, htmls) for p, (content, htmls) in phase_data.items()}
-    )
-    
-    # === STITCH interpretations back into phase content and write MD ===
-    for phase_num in sorted(phase_data.keys()):
-        content, _ = phase_data[phase_num]
-        interp = interpretations.get(phase_num, "\n> [!WARNING]\n> **AI Interpretation Missing**\n")
-        content += interp + '\n---\n'
-        append_to_md(content)
-    
-    print(f"\n✓ AI Summary written to {MD_OUT_PATH}")
+        build_phase_6()

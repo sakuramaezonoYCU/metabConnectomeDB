@@ -19,6 +19,7 @@ def create_notebook(signature_name, genes):
             num_matches = len(df)
         except Exception:
             pass
+            raise
             
     nb = nbf.v4.new_notebook()
     
@@ -142,6 +143,7 @@ print(f"==========================================")
         print(f"Notebook exported to HTML: ../output/massspec_metabolomics/massspec_metabolomics_integration.html")
     except subprocess.CalledProcessError as e:
         print(f"Failed to execute and export notebook: {e}")
+        sys.exit(1)
 
 if __name__ == '__main__':
     import pandas as pd

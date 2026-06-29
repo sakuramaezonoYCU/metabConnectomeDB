@@ -21,7 +21,7 @@ def find_file(folder, suffix):
 def parse_disease_counts(html_file, cancer, cap):
     """Parses the disease_counts table from the integration HTML."""
     if not os.path.exists(html_file):
-        return pd.DataFrame()
+        return pd.DataFrame(columns=[])
     
     try:
         tables = pd.read_html(html_file)
@@ -37,7 +37,8 @@ def parse_disease_counts(html_file, cancer, cap):
                 return clean_df
     except Exception as e:
         print(f"[{cancer.capitalize()}] Warning: Could not parse disease table from {html_file}: {e}")
-        return pd.DataFrame()
+        return pd.DataFrame(columns=[])
+        raise
 
 def scrape_integration_html(html_file, ccc_file):
     """Scrapes cancer_cellxgene_integration HTML for missing metrics."""
@@ -54,6 +55,7 @@ def scrape_integration_html(html_file, ccc_file):
             metrics['Total_Inferred_CCC_Links'] = str(len(df))
         except Exception as e:
             pass
+            raise
             
     if not os.path.exists(html_file):
         return metrics
@@ -102,6 +104,7 @@ def scrape_pvm_html(html_file, cancer):
             metrics['Meta_LIANA_Targets'] = str(len(meta_targs))
     except Exception as e:
         print(f"[{cancer.capitalize()}] Warning: Could not read LIANA CSVs: {e}")
+        raise
         
     if not os.path.exists(html_file):
         return metrics

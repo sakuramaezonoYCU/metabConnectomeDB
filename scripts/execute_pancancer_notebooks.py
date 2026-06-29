@@ -659,16 +659,39 @@ if __name__ == '__main__':
                 
             display_prefixes = ', '.join([p.upper() for p in valid_prefixes])
             print(f"Generating ML Classifier for {cancer_name.capitalize()} ({display_prefixes})...")
-            subprocess.run([sys.executable, ml_gen_script, "--database", "tcga", "--cancer"] + valid_prefixes, check=True)
             
+            DB_FLAG = "--database"
+            DB_TCGA = "tcga"
+            CANCER_FLAG = "--cancer"
+            CANCER_ALL = "all"
+            
+            subprocess.run([sys.executable, ml_gen_script, DB_FLAG, DB_TCGA, CANCER_FLAG] + valid_prefixes, check=True)
+            
+            cancer_suffix = "_".join(valid_prefixes)
+            ml_nb = os.path.join(script_dir, f"ml_prognostic_classifier_tcga_{cancer_suffix}.ipynb")
             ml_html = os.path.join(os.path.dirname(script_dir), "output", f"{cancer_name}_ml_prognostic_classifier_report.html")
             execute_and_export(ml_nb, ml_html, f"{cancer_name.capitalize()} ML Prognostic Classifier")
 
         # 2. Pan-Cancer Report
         print("Generating Pan-Cancer ML Classifier...")
-        subprocess.run([sys.executable, ml_gen_script, "--database", "tcga", "--cancer", "all"], check=True)
-        pancancer_html = os.path.join(os.path.dirname(script_dir), "output", "pancancer_ml_prognostic_classifier_report.html")
-        execute_and_export(ml_nb, pancancer_html, "Pan-Cancer ML Prognostic Classifier")
+        subprocess.run([sys.executable, ml_gen_script, DB_FLAG, DB_TCGA, CANCER_FLAG, CANCER_ALL], check=True)
+        ml_nb_pancancer = os.path.join(script_dir, "ml_prognostic_classifier_tcga_pancancer.ipynb")
+        pancancer_html = os.path.join(os.path.dirname(script_dir), "output", "pancancer_tcga_ml_prognostic_classifier_report.html")
+        execute_and_export(ml_nb_pancancer, pancancer_html, "Pan-Cancer TCGA ML Prognostic Classifier")
+        
+        # 3. METABRIC Report
+        print("Generating METABRIC ML Classifier...")
+        subprocess.run([sys.executable, ml_gen_script, DB_FLAG, "metabric", CANCER_FLAG, CANCER_ALL], check=True)
+        ml_nb_metabric = os.path.join(script_dir, "ml_prognostic_classifier_metabric_pancancer.ipynb")
+        metabric_html = os.path.join(os.path.dirname(script_dir), "output", "metabric_ml_prognostic_classifier_report.html")
+        execute_and_export(ml_nb_metabric, metabric_html, "METABRIC ML Prognostic Classifier")
+        
+        # 4. MBCProject Report
+        print("Generating MBCProject ML Classifier...")
+        subprocess.run([sys.executable, ml_gen_script, DB_FLAG, "mbcproject", CANCER_FLAG, CANCER_ALL], check=True)
+        ml_nb_mbcproject = os.path.join(script_dir, "ml_prognostic_classifier_mbcproject_pancancer.ipynb")
+        mbcproject_html = os.path.join(os.path.dirname(script_dir), "output", "mbcproject_ml_prognostic_classifier_report.html")
+        execute_and_export(ml_nb_mbcproject, mbcproject_html, "MBCProject ML Prognostic Classifier")
         
     except Exception as e:
         sys.exit(f"CRITICAL ERROR - Failed to execute ML Prognostic Classifiers: {e}")

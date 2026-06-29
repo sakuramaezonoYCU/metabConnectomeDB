@@ -30,6 +30,12 @@ import numpy as np
 from annotate_enzyme_rhea import run_rhea_enrichment
 from annotate_enzyme_kegg import run_kegg_enrichment
 
+# Load config to get TARGET_PAIR_FILES
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "input", "pipeline.config.json"), "r") as f:
+    PIPELINE_CONFIG = json.load(f)
+
+TARGET_PAIR_BASENAMES = PIPELINE_CONFIG.get("ANNOTATION_DATABASES", {}).get("TARGET_PAIR_FILES", [])
+
 # ==============================================================================
 # ⚙️ CONFIGURATION & PATHS
 # ==============================================================================
@@ -40,18 +46,11 @@ INPUT_DATABASES_DIR = os.path.join(PROJECT_ROOT, "input", "databases")
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 
 # The 8 target-pair CSV files to enrich
-TARGET_PAIR_FILES = [
-    # input/databases/ copies
-    os.path.join(INPUT_DATABASES_DIR, "human_database_merge_unique_metab_target_pairs.csv"),
-    os.path.join(INPUT_DATABASES_DIR, "human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv"),
-    os.path.join(INPUT_DATABASES_DIR, "mouse_database_merge_unique_metab_target_pairs.csv"),
-    os.path.join(INPUT_DATABASES_DIR, "mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv"),
-    # output/ files
-    os.path.join(OUTPUT_DIR, "human_database_merge_unique_metab_target_pairs.csv"),
-    os.path.join(OUTPUT_DIR, "human_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv"),
-    os.path.join(OUTPUT_DIR, "mouse_database_merge_unique_metab_target_pairs.csv"),
-    os.path.join(OUTPUT_DIR, "mouse_database_merge_unique_metab_target_pairs_with_HMDB_Info.csv")
-]
+target_pair_files = []
+for _f in TARGET_PAIR_BASENAMES:
+    target_pair_files.append(os.path.join(INPUT_DATABASES_DIR, _f))
+    target_pair_files.append(os.path.join(OUTPUT_DIR, _f))
+TARGET_PAIR_FILES = target_pair_files
 
 # Cache file paths in the input/ directory
 GTOPDB_MAPPING_CACHE = os.path.join(PROJECT_ROOT, "input", "GtP_to_HGNC_mapping.csv")
@@ -91,6 +90,7 @@ def download_file_with_retry(url, dest_path, headers=None, is_json=False):
                         print(f"JSON parsing error, writing raw content. Error: {json_err}")
                         with open(dest_path, "wb") as f:
                             f.write(response.content)
+                            raise
                 else:
                     with open(dest_path, "wb") as f:
                         for chunk in response.iter_content(chunk_size=8192):
@@ -196,6 +196,7 @@ def run_uniprot_caching(all_symbols):
         except Exception as e:
             print(f"Warning: could not parse UniProt cache. Re-initializing. Error: {e}")
             cache = {}
+            raise
             
     # Find symbols not in cache
     missing_symbols = [sym for sym in all_symbols if sym not in cache]
@@ -505,13 +506,12 @@ def load_gtopdb_interactions():
     Loads Guide to Pharmacology target-ligand interactions.
     Returns a dictionary mapping: TARGET_GENE_SYMBOL (uppercase) -> list of ligand interaction entries.
     """
-    gtopdb_interactions_path = "input/interactions.csv"
-    if not os.path.exists(gtopdb_interactions_path):
-        print(f"⚠️ GtoPdb interactions file not found at '{gtopdb_interactions_path}'!")
+    if not os.path.exists(GTOPDB_INTERACTIONS):
+        print(f"⚠️ GtoPdb interactions file not found at '{GTOPDB_INTERACTIONS}'!")
         return {}
         
     try:
-        df_gtp = pd.read_csv(gtopdb_interactions_path, skiprows=1, low_memory=False)
+        df_gtp = pd.read_csv(GTOPDB_INTERACTIONS, skiprows=1, low_memory=False)
         gtp_by_symbol = {}
         for _, row in df_gtp.iterrows():
             sym = str(row.get("Target Gene Symbol", "")).upper().strip()
@@ -532,7 +532,7 @@ def load_gtopdb_interactions():
         return gtp_by_symbol
     except Exception as e:
         print(f"⚠️ Error loading GtoPdb interactions: {e}")
-        return {}
+        raise e
 
 def map_gtopdb_action_to_interaction(type_str, action_str):
     """
@@ -733,6 +733,7 @@ def main():
                         all_targets.add(sym)
             except Exception as e:
                 print(f"  Warning reading '{file_path}': {e}")
+                raise e
                 
     sorted_targets = sorted(list(all_targets))
     print(f"-> Extracted {len(sorted_targets):,} unique individual target gene symbols.")
@@ -758,14 +759,14 @@ def main():
         run_rhea_enrichment(TARGET_PAIR_FILES)
     except Exception as e:
         print(f"⚠️ Rhea enrichment encountered an error (non-fatal): {e}")
-        print("   Continuing without Rhea annotations...")
+        raise e
         
     print("Running KEGG enzyme product/substrate enrichment pipeline...")
     try:
         run_kegg_enrichment()
     except Exception as e:
         print(f"⚠️ KEGG enrichment encountered an error (non-fatal): {e}")
-        print("   Continuing without KEGG annotations...")
+        raise e
     
     # Step 6: Process and overwrite each of the 8 master target-pair datasets
     print("Processing and overwriting master datasets...")

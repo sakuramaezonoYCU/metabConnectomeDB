@@ -57,9 +57,9 @@ for cf in combo_files:
             combo_signatures[cname] = genes
 
 if len(signature_genes_strict) > 0:
-    print(f"Loaded strict 5-cancer signature with {len(signature_genes_strict)} genes.")
+    print(f"Loaded strict N-cancer signature with {len(signature_genes_strict)} genes.")
 else:
-    print(f"Strict 5-cancer signature is empty. Falling back to {len(combo_signatures)} subset combinations.")
+    print(f"Strict N-cancer signature is empty. Falling back to {len(combo_signatures)} subset combinations.")
     if not combo_signatures:
         raise ValueError("No subset combinations found either. Cannot proceed.")
 """

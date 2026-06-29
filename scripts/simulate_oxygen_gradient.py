@@ -33,6 +33,7 @@ def simulate_oxygen_gradient():
         except Exception as e:
             print(f"Error loading {h5ad_path}: {e}")
             continue
+            raise
         
         # Define signatures
         hypoxia_sig = ["VEGFA", "SLC2A1", "BNIP3"]

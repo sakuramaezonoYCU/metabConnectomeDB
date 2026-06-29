@@ -77,6 +77,7 @@ def analyze_depmap_synergy(genes):
     except Exception as e:
         print(f"[DepMap Error] Failed to analyze DepMap data: {e}")
         return None
+        raise
 
 if __name__ == "__main__":
     from dynamic_genes import get_dynamic_genes

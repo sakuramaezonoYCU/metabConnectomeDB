@@ -105,6 +105,7 @@ def validate_tcga_signature(signature_csv):
         except Exception as e:
             print(f"  Error reading {exp_file}: {e}")
             continue
+            raise
             
         # 2. Load Survival Data
         try:
@@ -117,6 +118,7 @@ def validate_tcga_signature(signature_csv):
         except Exception as e:
             print(f"  Error reading {surv_file}: {e}")
             continue
+            raise
             
         # 3. Merge and Compute
         merged = pd.merge(exp_df[['sample', 'signature_score']], surv_df, on='sample', how='inner')
@@ -157,6 +159,7 @@ def validate_tcga_signature(signature_csv):
             hr = np.nan
             p_val = np.nan
             notes = "FAILED DUE TO COLLINEARITY ISSUES"
+            raise
             
         all_cancer_metrics.append({
             'TCGA_Cohort': cancer,
