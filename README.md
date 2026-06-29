@@ -219,10 +219,13 @@ This phase is orchestrator-led and validates all dynamically identified (N-1)-ca
   - `massspec_metabolomics_analysis.py`: Verifies signature genes using mass-spectrometry clinical cohorts.
   - `validate_tcga_signature.py`: Runs Cox Proportional Hazard regressions on TCGA survival datasets.
   - `verify_spatial.py`: Applies spatial enrichment scoring and calculates Moran's I on high-resolution Visium slides.
+  - `summarize_gene_expression.py`: Dynamically extracts and summarizes expression metrics (Bulk, Single-Cell, Immune Evasion) for each individual gene within the pan-cancer signatures.
   - `generate_predictive_notebook.py`: Scores primary tumor cells directly to identify left/right skewed pre-metastatic subclones.
   - `generate_ml_prognostic_classifier_notebook.py`: Generates the Per-Cancer and Pan-Cancer ML Prognostic Classifier notebooks.
   - `create_camp_notebook.py`: Generates the CAMP Pan-Cancer metabolomics integration notebook.
   - `generate_master_regulator_notebook.py`: Generates the Master Regulator TF analysis notebook.
+  - `generate_ov_spatial_integration_notebook.py`: Generates the OV spatial transcriptomics and mass spectrometry metabolomics integration notebook.
+  - `generate_kidney_spatial_integration_notebook.py`: Generates the Kidney spatial transcriptomics (CosMx) and mass spectrometry metabolomics integration notebook.
 
 **Phase 6: Advanced Downstream Validation & HTML Export**
 - `execute_pancancer_notebooks.py`: The master driver for the downstream notebook compilation. Executes the following into final HTML reports required by the AI generation phase:
@@ -438,6 +441,18 @@ The following details the relationship between scripts, their inputs, internal p
 - **Input:** Automatically detects signatures.
 - **Output:** Generates `predictive_signature_biomarker.ipynb`.
 
+### `generate_ov_spatial_integration_notebook.py`
+
+- **Role:** Generates a downstream validation notebook mapping altered metabolites from Ovarian bulk mass spectrometry to target genes, and projects them onto Visium spatial transcriptomics.
+- **Input:** `output/pan_cancer_meta_results/pan_cancer_signature_Ovarian.csv`
+- **Output:** Generates `ov_spatial_massspec_integration.ipynb`.
+
+### `generate_kidney_spatial_integration_notebook.py`
+
+- **Role:** Generates a downstream validation notebook mapping altered metabolites from Kidney bulk mass spectrometry to target genes, and projects them onto CosMx spatial transcriptomics. Features strict failure handling.
+- **Input:** `output/pan_cancer_meta_results/pan_cancer_signature_Kidney.csv`
+- **Output:** Generates `kidney_spatial_massspec_integration.ipynb`.
+
 ### `execute_pancancer_notebooks.py`
 
 - **Role:** Downstream master script that builds all final HTML reports from the spatial, pan-cancer, and druggability notebooks.
@@ -463,6 +478,8 @@ Several targeted Jupyter notebooks dive deep into specific biological questions 
 - **`oxygen_tension_analysis.ipynb`**: Computationally simulates and models the impact of intratumoral oxygen gradients (e.g., via HIF-1 pathway profiling) on metabolic signatures. *(Note: This notebook strictly depends on `scripts/compute_metabolic_switching.py`; do not archive it).*
 - **`serotonin_axis_spatial_mapping.ipynb`**: Maps the spatial distribution of the serotonin axis within specific tissue microenvironments.
 - **`visium_spatial_validation.ipynb`**: Validates the spatial axis involving HTR7+ tumor-associated macrophages (TAMs) and HR-repair genes using Visium spatial transcriptomics via spatial co-localization analysis.
+- **`ov_spatial_massspec_integration.ipynb`**: Maps altered metabolites from Ovarian (OV) bulk mass spectrometry to target genes and projects them onto OV spatial transcriptomics (Visium).
+- **`kidney_spatial_massspec_integration.ipynb`**: Maps altered metabolites from Kidney (KIRC/KIRP) bulk mass spectrometry to target genes and projects them onto Kidney spatial transcriptomics (COSMx).
 - **`camp_pancancer_integration_*.ipynb`**: Investigates pan-cancer integration for Directed Metastatic Signatures.
 - **`massspec_metabolomics_integration_*.ipynb`**: Integrates mass spectrometry metabolomics data with cross-cohort comparisons to validate metabolic signatures.
 - **`ml_prognostic_classifier.ipynb`**: Trains Cox Proportional Hazards, Random Forest, and MLP Neural Network classifiers on independent clinical cohorts (e.g., METABRIC breast cancer dataset) to evaluate the prognostic power of our derived metabolic gene signatures. Generates risk stratification models, ROC curves, and Kaplan-Meier plots.
@@ -530,3 +547,8 @@ Ensure that the `input/` directory is populated locally before running the pipel
 - **Issue:** The `compute_pan_cancer_meta.py` script was silently returning on missing input files instead of crashing, bypassing the `qc_hardcoding_audit.py` due to both a hardcoded whitelist and the fact that the audit script only scans for `try...except` blocks, not `if not os.path.exists()` conditionals. Additionally, downstream markdown reports explicitly expected a `conserved_target_genes.csv` file, but the generation script was only saving `pan_cancer_conserved_genes{ANALYSIS_SUFFIX}.csv`, leading to missing plots in the HTML exports.
 - **Fix:** Refactored `compute_pan_cancer_meta.py` to `raise FileNotFoundError` and `raise ValueError` instead of silently ignoring missing upstream inputs. Removed the legacy whitelist from `qc_hardcoding_audit.py` so it properly checks all scripts. Added a dual-export alias mechanism so the conserved genes are saved to both the dynamic suffix filename (for ML classifiers) and `conserved_target_genes.csv` (for markdown reports).
 - **Documentation:** Corrected `README.md` to accurately reflect that `generate_combined_pan_cancer_notebook.py` (not `compute_pan_cancer_meta.py`) handles the CCC Links intersection and `patch_liana_csvs.py` fail-safe.
+
+**[2026-06-29] Spatial Metabolomics Integration & Exception Handling Patch**
+- **Issue:** The pipeline lacked validation workflows for spatial mass spectrometry metabolomics data in Ovarian and Kidney cancers. Additionally, newly introduced spatial validation scripts contained overly broad `except Exception:` blocks that failed silently, violating the strict anti-hardcoding and data provenance policies.
+- **Fix:** Introduced `generate_ov_spatial_integration_notebook.py` and `generate_kidney_spatial_integration_notebook.py` to construct Visium/CosMx integration notebooks. Refactored the `try...except` blocks in the kidney spatial notebook generator to explicitly catch `pd.errors.EmptyDataError` and `FileNotFoundError`, and to either fall back to robust alternative loading methods or raise a hard crash, ensuring no downstream models are trained on incomplete data.
+- **Documentation:** Updated the README and pipeline execution checklist to include the new OV and Kidney spatial integration workflows.

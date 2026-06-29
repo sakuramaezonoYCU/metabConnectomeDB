@@ -88,10 +88,13 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
     - `massspec_metabolomics_analysis.py`: Verifies signature genes using mass-spectrometry clinical cohorts.
     - `validate_tcga_signature.py`: Runs Cox Proportional Hazard regressions on TCGA survival datasets.
     - `verify_spatial.py`: Applies spatial enrichment scoring and calculates Moran's I on high-resolution Visium slides.
+    - `summarize_gene_expression.py`: Dynamically extracts and summarizes expression metrics (Bulk, Single-Cell, Immune Evasion) for each individual gene within the pan-cancer signatures.
     - `generate_predictive_notebook.py`: Scores primary tumor cells directly to identify left/right skewed pre-metastatic subclones.
     - `generate_ml_prognostic_classifier_notebook.py`: Generates the ML Prognostic Classifier notebook.
     - `create_camp_notebook.py`: Generates the CAMP Pan-Cancer metabolomics integration notebook.
     - `generate_master_regulator_notebook.py`: Generates the Master Regulator TF analysis notebook.
+    - `generate_ov_spatial_integration_notebook.py`: Generates the OV spatial transcriptomics and mass spectrometry metabolomics integration notebook.
+    - `generate_kidney_spatial_integration_notebook.py`: Generates the Kidney spatial transcriptomics (CosMx) and mass spectrometry metabolomics integration notebook.
   - **Output Location:** `output/pan_cancer_meta_results/`, `output/tcga_validation/`, `output/spatial_verification/`, and `scripts/` (Validation CSVs, plots, and generated notebooks)
 
 ## Phase 6: Advanced Downstream Validation & Export
@@ -117,6 +120,8 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
     - `output/mbcproject_ml_prognostic_classifier_report.html`
     - `output/camp_pancancer_integration_report.html`
     - `output/master_regulator_analysis_report.html`
+    - `output/ov_spatial_massspec_integration_report.html`
+    - `output/kidney_spatial_massspec_integration_report.html`
 
 ## Phase 7: Dynamic AI Insights Report Generation
 

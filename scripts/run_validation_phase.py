@@ -17,6 +17,7 @@ def run_validation_phase():
     print(f"==================================================")
     
     signatures = []
+    summarized_genes = set()
     
     # Strictly conserved signature
     strict_sig = os.path.join(META_RESULTS_DIR, f"pan_cancer_conserved_genes{ANALYSIS_SUFFIX}.csv")
@@ -64,6 +65,21 @@ def run_validation_phase():
             subprocess.run(["python", "scripts/verify_spatial.py", "--signature_csv", sig], check=True, cwd=BASE_DIR)
         except subprocess.CalledProcessError as e:
             print(f"CRITICAL ERROR: verify_spatial.py failed on {sig_name}. Halting.")
+            sys.exit(1)
+            
+        # Gene Expression Summarization
+        import pandas as pd
+        try:
+            df_sig = pd.read_csv(sig)
+            if not df_sig.empty:
+                gene_col = df_sig.columns[0]
+                for g in df_sig[gene_col].dropna().unique():
+                    if g not in summarized_genes:
+                        print(f"  Summarizing gene expression for {g}...")
+                        subprocess.run(["python", "scripts/summarize_gene_expression.py", "--gene", str(g)], check=True, cwd=BASE_DIR)
+                        summarized_genes.add(g)
+        except subprocess.CalledProcessError as e:
+            print(f"CRITICAL ERROR: summarize_gene_expression.py failed on {sig_name}. Halting.")
             sys.exit(1)
             
     # 3. Generate ALL downstream notebooks
@@ -124,6 +140,16 @@ def run_validation_phase():
             "Visium Spatial Validation Notebook",
             [],
             "scripts/generate_visium_notebook.py"
+        ),
+        (
+            "OV Spatial Mass Spec Integration Notebook",
+            [],
+            "scripts/generate_ov_spatial_integration_notebook.py"
+        ),
+        (
+            "Kidney Spatial Mass Spec Integration Notebook",
+            [],
+            "scripts/generate_kidney_spatial_integration_notebook.py"
         ),
     ]
 
