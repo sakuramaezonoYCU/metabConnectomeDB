@@ -78,7 +78,16 @@ def process_species(species: str, in_file):
         if os.path.exists(ref_file):
             print(f"  Mapping HMDB_IDs directly from clean reference file: {os.path.basename(ref_file)}...")
             df_ref = pd.read_csv(ref_file)
-            df_ref['clean_name'] = df_ref['Metabolite_Name'].astype(str).str.lower().str.strip()
+            
+            # Use Original_Name if it exists, otherwise fallback to Metabolite_Name
+            if 'Original_Name' in df_ref.columns:
+                df_ref['Original_Name'] = df_ref['Original_Name'].astype(str).str.split('|')
+                df_ref = df_ref.explode('Original_Name')
+                ref_name_col = 'Original_Name'
+            else:
+                ref_name_col = 'Metabolite_Name'
+                
+            df_ref['clean_name'] = df_ref[ref_name_col].astype(str).str.lower().str.strip()
             
             # Map each clean name to its list of HMDB_IDs from the reference
             ref_map = df_ref.dropna(subset=['HMDB_ID']).groupby('clean_name')['HMDB_ID'].apply(lambda x: sorted(list(set(x)))).to_dict()
@@ -166,6 +175,12 @@ def process_species(species: str, in_file):
             df[c] = df[x_col].fillna(df[y_col])
             df = df.drop(columns=[x_col, y_col])
             
+    # Standardize Metabolite_Name using the official HMDB_Name to prevent naming discrepancies
+    # where multiple target pairs or unique metabolites resolve to different fallback HMDB_IDs
+    mask = df['HMDB_Name'].notna()
+    if 'Original_Name' not in df.columns:
+        df['Original_Name'] = df['Metabolite_Name']
+    df.loc[mask, 'Metabolite_Name'] = df.loc[mask, 'HMDB_Name'].str.lower()
     print(f"  After HMDB annotation join and coalescing: {len(df):,} rows")
     matched = df['HMDB_Name'].notna().sum()
     print(f"  Rows with matched HMDB_Name: {matched:,}")
@@ -192,6 +207,28 @@ def process_species(species: str, in_file):
     if 'Sub_Class' in df.columns:
         from standardize_categories import standardize_subclass
         df['Sub_Class'] = df['Sub_Class'].apply(standardize_subclass)
+
+    if "target_pairs" not in in_file:
+        # Deduplicate unique_metabs because multiple original names might have converged onto the same HMDB_ID
+        def extract_dbs(series):
+            st = set()
+            for item in series.dropna().astype(str):
+                for slash_split in item.split('/'):
+                    for comma_split in slash_split.split(','):
+                        c = comma_split.strip()
+                        if c: st.add(c)
+            return ', '.join(sorted(list(st))) if st else np.nan
+
+        if 'database' in df.columns:
+            db_map = df.groupby('HMDB_ID', dropna=False)['database'].apply(extract_dbs)
+            df['database'] = df['HMDB_ID'].map(db_map)
+            df['databases_count'] = df['database'].apply(lambda x: len([i for i in str(x).split(',') if i.strip()]) if pd.notna(x) else 0)
+        
+        if 'Original_Name' in df.columns:
+            orig_map = df.groupby('HMDB_ID', dropna=False)['Original_Name'].apply(lambda x: '|'.join(sorted(list(set(x.dropna().astype(str))))))
+            df['Original_Name'] = df['HMDB_ID'].map(orig_map)
+            
+        df = df.drop_duplicates(subset=['HMDB_ID']).reset_index(drop=True)
 
     # ------------------------------------------------------------------
     # Step 4 — Save

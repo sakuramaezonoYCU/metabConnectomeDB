@@ -23,7 +23,7 @@ This checklist guarantees a 100% reproducible execution of the pipeline from end
 
 - `[ ]` **0a. Curate and Merge Raw Databases**
   - **Command:** `bash scripts/merge_simplify_annotate.sh`
-  - **Purpose:** The master execution wrapper that ingests raw databases from `input/databases/`, runs `merge_dbs.py` to standardize and deduplicate entries, refines and filters them with `generate_final_outputs.py`, enriches them via `annotate_with_hmdb.py`, and finally merges the annotations into the master CSV outputs via `annotate_with_databases.py`.
+  - **Purpose:** The master execution wrapper that ingests raw databases from `input/databases/`, runs `merge_dbs.py` to standardize and deduplicate entries, refines and filters them with `generate_final_outputs.py` (which exhaustively melts targets, establishes strict 1:1 dictionary-based metabolite name mapping, and canonically maps to HGNC), enriches them via `annotate_with_hmdb.py` to backfill `HMDB_ID` mappings, perfectly standardize all `Metabolite_Name` fields to their official HMDB name while preserving original mappings to ensure downstream target fidelity, deduplicates multi-hit molecules by `HMDB_ID`, and finally merges external network annotations (Rhea/UniProt) into the master CSV outputs via `annotate_with_databases.py`.
   - **Output Location:** `output/human_database_merge_*.csv`
 
 ## Phase 1: Database Exploration and Reporting

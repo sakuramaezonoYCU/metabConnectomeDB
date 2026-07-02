@@ -4,9 +4,9 @@ This repository processes and merges multiple metabolite and protein databases (
 
 Beyond data consolidation, this repository contains a comprehensive suite of computational pipelines and analytical notebooks for multi-omics cancer research. Key capabilities include:
 
-- **Pan-Cancer Meta-Analysis:** Cross-cancer identification of conserved metabolic gene signatures (e.g., the 21-gene Directed Metastatic Signature and the 12-gene STAT3 Core Axis) using large-scale single-cell RNA-seq integration (CellxGene).
+- **Pan-Cancer Meta-Analysis:** Cross-cancer identification of conserved metabolic gene signatures (e.g., the strictly conserved 1-gene CCR9 pan-cancer signature and dynamic (N-1)-cancer combinations) using large-scale single-cell RNA-seq integration (CellxGene).
 - **Prognostic and Predictive Modeling:** Machine learning classifiers (Random Forest, Cox Proportional Hazards, MLP Neural Networks) trained on clinical cohorts (e.g., METABRIC, TCGA) to evaluate the prognostic power of metabolic signatures.
-- **Spatial Transcriptomics & Metabolomics Integration:** Validation of metabolic interactions (like the Serotonin-TAM immune evasion axis) using physical mass-spectrometry metabolomics and high-resolution spatial transcriptomics (Visium).
+- **Spatial Transcriptomics & Metabolomics Integration:** Validation of metabolic interactions (like the Serotonin-TAM immune evasion axis) using physical mass-spectrometry metabolomics and high-resolution spatial transcriptomics (Visium, CosMx).
 - **In Silico Microenvironment Analysis:** Computationally simulating intratumoral oxygen gradients, mapping macrophage immunometabolism (CAMP Integration), and modeling directional cell-cell communication networks.
 - **Therapeutic Target Discovery:** Cross-referencing identified metabolic targets against pharmacological databases (DGIdb, Open Targets) to profile druggability and guide synthetic lethality strategies.
 
@@ -21,16 +21,23 @@ metabConnectomeDB/
 │   ├── execute_and_export_notebooks.py # Exports notebooks to styled HTML reports
 │   ├── run_cancer_pipeline.py          # Executes full single-cancer pipeline
 │   ├── run_all_cancers.py              # Queries CellxGene Census and runs multi-cancer pipeline
+│   ├── compute_pan_cancer_meta.py      # Computes multi-cancer conserved signature intersection
 │   ├── run_validation_phase.py         # Automates downstream signature validations
 │   ├── massspec_metabolomics_analysis.py # Verifies signatures via mass-spectrometry
 │   ├── validate_tcga_signature.py      # TCGA Cox Proportional Hazard regressions
 │   ├── verify_spatial.py               # Visium spatial enrichment scoring
 │   ├── generate_predictive_notebook.py # Pre-metastatic subclone scoring
+│   ├── generate_ml_prognostic_classifier_notebook.py
+│   ├── create_camp_notebook.py
+│   ├── generate_master_regulator_notebook.py
+│   ├── generate_ov_spatial_integration_notebook.py
+│   ├── generate_kidney_spatial_integration_notebook.py
 │   ├── compute_metabolic_switching.py  # DO NOT ARCHIVE: Required dependency for oxygen_tension_analysis.ipynb
 │   ├── execute_pancancer_notebooks.py  # Downstream HTML report compiler
 │   ├── generate_final_outputs.py
 │   ├── merge_simplify_annotate.sh
 │   ├── parse_md_tables.py              # Utility to extract Markdown tables
+│   ├── md2html.py                      # Utility to convert Markdown reports into styled HTML
 │   ├── standardize_categories.py       # Standardizes metabolite classifications
 │   ├── query_advanced_analysis.py      # Queries external APIs for gene interactions/druggability
 │   ├── cancer_cellxgene_integration.ipynb         # CellxGene cancer scRNA-seq integration
@@ -244,6 +251,7 @@ This phase is orchestrator-led and validates all dynamically identified (N-1)-ca
   
 **Phase 7: AI Reporting**
 - `tmp_build_md.py`: Scrapes the results of Phases 1 through 6 and leverages the Gemini API to produce the final `AI_summary_and_insights.md` pipeline document.
+- `md2html.py`: Converts markdown output files into styled HTML documents for easier sharing and viewing.
 
 ## 📜 Detailed Scripts Overview
 
@@ -393,6 +401,12 @@ The following details the relationship between scripts, their inputs, internal p
 
 - **Role:** Scrapes the exact numbers directly from the generated HTML reports to dynamically build the `AI_summary_and_insights.md`.
 - **Output:** The final `output/AI_summary_and_insights.md` guaranteeing zero hallucinated metrics.
+
+### `md2html.py`
+
+- **Role:** A standalone utility that takes any generated Markdown file (such as `AI_summary_and_insights.md`) and converts it into a clean, modern HTML file. Can be used via CLI arguments or interactive prompts.
+- **Input:** Any `.md` file path.
+- **Output:** A self-contained `.html` file saved in the same directory as the input.
 
 ### `pan_cancer_meta_analysis.ipynb` & Generators
 
@@ -552,3 +566,8 @@ Ensure that the `input/` directory is populated locally before running the pipel
 - **Issue:** The pipeline lacked validation workflows for spatial mass spectrometry metabolomics data in Ovarian and Kidney cancers. Additionally, newly introduced spatial validation scripts contained overly broad `except Exception:` blocks that failed silently, violating the strict anti-hardcoding and data provenance policies.
 - **Fix:** Introduced `generate_ov_spatial_integration_notebook.py` and `generate_kidney_spatial_integration_notebook.py` to construct Visium/CosMx integration notebooks. Refactored the `try...except` blocks in the kidney spatial notebook generator to explicitly catch `pd.errors.EmptyDataError` and `FileNotFoundError`, and to either fall back to robust alternative loading methods or raise a hard crash, ensuring no downstream models are trained on incomplete data.
 - **Documentation:** Updated the README and pipeline execution checklist to include the new OV and Kidney spatial integration workflows.
+
+**[2026-07-02] Target Edge Flattening & HMDB Propagation Patch**
+- **Issue:** Multi-target cells were outputting merged, comma-separated symbols in the `Sensor_Gene` column when aggregating identical edges from multiple source databases. Additionally, downstream steps assumed that raw edge files already contained complete `HMDB_ID` mappings, causing missing data when some source databases didn't provide HMDB IDs natively.
+- **Fix:** Refactored `generate_final_outputs.py` to exhaustively melt all target-related columns into a raw `Sensor_Gene` column, split any comma-separated symbols before 1-to-1 HGNC mapping, and enforced strict dictionary-based metabolite name mapping via `metab_dict.csv`. Established `scripts/annotate_with_hmdb.py` as a mandatory post-processing sequence step to universally backfill `HMDB_ID` values, perfectly standardize all `Metabolite_Name` fields to their official HMDB name while tracking original aliases in `Original_Name`, and fundamentally deduplicate `unique_metabs` by `HMDB_ID` to merge molecules that collided from different source names.
+- **Data Provenance Preservation:** Every distinct biological interaction edge now perfectly maintains a strict 1-to-1 canonical map to an HGNC-approved target and a cleanly standardized HMDB-annotated metabolite without any merged alias collisions or ghost duplicates.

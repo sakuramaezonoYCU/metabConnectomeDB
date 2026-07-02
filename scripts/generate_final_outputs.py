@@ -22,17 +22,21 @@ def normalize_empty(df: pd.DataFrame) -> pd.DataFrame:
 
 def compute_raw_counts():
     db_counts = {}
-    for folder in os.listdir('.'):
-        if os.path.isdir(folder) and folder not in ['.', '..', '.DS_Store']:
-            folder_files = glob.glob(f'{folder}/*.*')
+    base_dir = os.path.join('input', 'databases')
+    if not os.path.exists(base_dir): return db_counts
+    for folder in os.listdir(base_dir):
+        folder_path = os.path.join(base_dir, folder)
+        if os.path.isdir(folder_path) and folder not in ['.', '..', '.DS_Store']:
+            folder_files = glob.glob(f'{folder_path}/*.*')
             count = 0
             for f in folder_files:
                 if f.endswith('.csv') or f.endswith('.txt') or f.endswith('.tsv'):
                     try:
                         sep = '\t' if f.endswith('.txt') or f.endswith('.tsv') else ','
-                        d = pd.read_csv(f, sep=sep, low_memory=False, on_bad_lines='skip')
+                        d = pd.read_csv(f, sep=sep, low_memory=False, on_bad_lines='skip', encoding_errors='ignore')
                         count += len(d)
-                    except Exception:
+                    except Exception as e:
+                        print(f"Error reading {f}: {e}")
                         raise
             if count > 0:
                 db_counts[folder] = count
@@ -110,24 +114,48 @@ def process_species(species, out_dir):
 
     out1 = os.path.join(out_dir, f'merged_{species}_metabolites_filtered_scCellfie_value_0.csv')
     df_filtered.to_csv(out1, index=False)
-    print(f"  -> Saved {out1} ({filtered_rows} rows)")
-
-    # 2. Group by unique Metabolite-Target Pairs
-    target_cols = ['Gene_Name', 'Receptor_Gene_Symbol', 'Ligand_Gene_Symbol', 'Uniprot', 'Target_Gene', 'Transporter', 'Enzyme']
-    avail_targets = [c for c in target_cols if c in df_filtered.columns]
-
+    # We will build Target_original using a prioritization strategy
     df_pairs = df_filtered.copy()
     df_pairs['Target_original'] = np.nan
-    for tc in avail_targets:
-        df_pairs['Target_original'] = df_pairs['Target_original'].fillna(df_pairs[tc])
+    
+    # Standard priority for all databases:
+    standard_cols = ['Gene_Name', 'Receptor_Gene_Symbol', 'Ligand_Gene_Symbol', 'Target_Gene', 'Transporter', 'Enzyme', 'Uniprot', 'uniprot']
+    target_cols = ['Uniprot', 'uniprot', 'Gene_Name', 'Receptor_Gene_Symbol', 'Ligand_Gene_Symbol', 'Target_Gene', 'Transporter', 'Enzyme']
+    avail_targets = [c for c in target_cols if c in df_filtered.columns]
+
+    for tc in standard_cols:
+        if tc in avail_targets:
+            df_pairs['Target_original'] = df_pairs['Target_original'].fillna(df_pairs[tc])
+            
+    # For CellPhoneDB, prefer uniprot over Gene_Name because CellPhoneDB's Gene_Name is often complex components
+    if 'database' in df_pairs.columns:
+        mask = df_pairs['database'].astype(str).str.contains('CellPhoneDB', case=False, na=False)
+        for tc in ['Uniprot', 'uniprot']:
+            if tc in avail_targets:
+                df_pairs.loc[mask, 'Target_original'] = df_pairs.loc[mask, tc].fillna(df_pairs.loc[mask, 'Target_original'])
 
     df_pairs = df_pairs.dropna(subset=['Metabolite_Name', 'Target_original'])
+    
+    # 1. Explode Metabolite_Name (split by | or ;)
+    df_pairs['Metabolite_Name'] = df_pairs['Metabolite_Name'].astype(str).str.split(r'\s*[;|]\s*')
+    df_pairs = df_pairs.explode('Metabolite_Name')
+    
+    # 2. Explode Target_original (split by , or / or ; or |)
+    df_pairs['Target_original'] = df_pairs['Target_original'].astype(str).str.split(r'\s*[,/;|]+\s*')
+    df_pairs = df_pairs.explode('Target_original')
+    
+    # Clean up empty strings
+    df_pairs['Metabolite_Name'] = df_pairs['Metabolite_Name'].str.strip().str.lower()
+    df_pairs['Target_original'] = df_pairs['Target_original'].str.strip()
+    df_pairs = df_pairs[(df_pairs['Metabolite_Name'] != '') & (df_pairs['Target_original'] != '')]
 
     import json
     import re
     hgnc_path = os.path.join(out_dir, '..', 'input', 'hgnc_approved_genes.json')
     alias_map = {}
     uniprot_map = {}
+    uniprot_to_hgnc = {}
+    hgnc_canonical = set()
     if os.path.exists(hgnc_path):
         with open(hgnc_path, "r", encoding="utf-8") as f:
             hgnc_data = json.load(f)
@@ -135,6 +163,7 @@ def process_species(species, out_dir):
             canon = doc.get("symbol")
             if not canon: continue
             
+            hgnc_canonical.add(canon)
             alias_map[str(canon).upper()] = canon
             for alias in doc.get("alias_symbol", []):
                 alias_map[str(alias).upper()] = canon
@@ -144,29 +173,38 @@ def process_species(species, out_dir):
             u_ids = doc.get("uniprot_ids", [])
             if u_ids:
                 uniprot_map[canon] = str(u_ids[0])
+                for uid in u_ids:
+                    uniprot_to_hgnc[str(uid).upper()] = canon
+
+
+    unmapped_targets = set()
 
     def map_hgnc_target(raw_val):
         if pd.isna(raw_val): return np.nan
-        parts = re.split(r'[,/;|]+', str(raw_val))
-        mapped_parts = []
-        for p in parts:
-            p = p.strip()
-            if not p: continue
-            mapped = alias_map.get(p.upper(), p)
-            mapped_parts.append(mapped)
-        if not mapped_parts: return np.nan
-        return " | ".join(sorted(list(set(mapped_parts))))
+        p = str(raw_val).strip()
+        if not p: return np.nan
+        p_up = p.upper()
+        
+        # Check uniprot first
+        if p_up in uniprot_to_hgnc:
+            return uniprot_to_hgnc[p_up]
+        
+        # Check alias
+        if p_up in alias_map:
+            return alias_map[p_up]
+            
+        # Unmapped case
+        unmapped_targets.add(p)
+        if '_' not in p:
+            return p.upper()
+        return p
 
     def map_target_uniprot(canon_val):
         if pd.isna(canon_val): return np.nan
-        parts = str(canon_val).split(" | ")
-        u_ids = []
-        for p in parts:
-            p = p.strip()
-            if p in uniprot_map:
-                u_ids.append(uniprot_map[p])
-        if not u_ids: return np.nan
-        return " | ".join(sorted(list(set(u_ids))))
+        if canon_val in uniprot_map:
+            return uniprot_map[canon_val]
+        return np.nan
+
 
     print("  Canonicalizing Target symbols against HGNC mappings...")
     df_pairs['Target'] = df_pairs['Target_original'].apply(map_hgnc_target)
@@ -187,16 +225,15 @@ def process_species(species, out_dir):
             
         return ' | '.join(sorted(list(st)))
 
-    group_keys = ['Metabolite_Name', 'Target']
+    group_keys = ['Metabolite_Name', 'Target_original']
     agg_dict = {c: flatten_unique for c in df_pairs.columns if c not in group_keys}
 
     df_grouped = df_pairs.groupby(group_keys, as_index=False, dropna=False).agg(agg_dict)
 
     # Normalize metabolite names
-    df_grouped['Metabolite_Name'] = df_grouped['Metabolite_Name'].str.strip().str.lower()
-    df_grouped['Metabolite_Name'] = df_grouped['Metabolite_Name'].str.split(';')
-    df_grouped = df_grouped.explode('Metabolite_Name')
+    df_grouped['Metabolite_Name'] = df_grouped['Metabolite_Name'].str.strip()
     df_grouped = df_grouped.reset_index(drop=True)
+
     
 
     # Clean up duplicated target columns
@@ -212,17 +249,33 @@ def process_species(species, out_dir):
     
     df_grouped['databases_count'] = df_grouped['database'].apply(count_dbs)
 
+    # --- Apply the exact same HMDB mapping as unique_metabs to target pairs ---
+    # This prevents fragmentation (e.g. fumarate mapping to 131,134 here but 134 in unique_metabs)
+    # and fills all missing HMDB_IDs perfectly.
+    mapped_hmdb_pairs = df_grouped['Metabolite_Name'].str.lower().map(
+        HMDB_dict.assign(Metabolite_Name=HMDB_dict['Metabolite_Name'].str.lower())
+                 .drop_duplicates(subset=['Metabolite_Name'])
+                 .set_index('Metabolite_Name')['HMDB_ID']
+    )
+    df_grouped['HMDB_ID'] = mapped_hmdb_pairs
+
     out2 = os.path.join(out_dir, f'{species}_database_merge_unique_metab_target_pairs.csv')
     df_grouped.to_csv(out2, index=False)
     unique_pairs = len(df_grouped)
     print(f"  -> Saved {out2} ({unique_pairs} rows)")
+    
+    # Save unmapped targets to a CSV
+    unmapped_targets_file = os.path.join(out_dir, f'{species}_unmapped_targets.csv')
+    pd.DataFrame({'Unmapped_Target': sorted(list(unmapped_targets))}).to_csv(unmapped_targets_file, index=False)
+    print(f"  -> Saved unmapped HGNC targets to {unmapped_targets_file} ({len(unmapped_targets)} targets)")
+
 
     # 3. Unique Metabolites dictionary
     df_db = df_filtered.dropna(subset=['Metabolite_Name']).copy()
     
     # Normalize metabolite names
     df_db['Metabolite_Name'] = df_db['Metabolite_Name'].str.strip().str.lower()
-    df_db['Metabolite_Name'] = df_db['Metabolite_Name'].str.split(';')
+    df_db['Metabolite_Name'] = df_db['Metabolite_Name'].str.split(r'\s*[;|]\s*')
     df_db = df_db.explode('Metabolite_Name')
     df_db = df_db.reset_index(drop=True)
     
@@ -237,21 +290,40 @@ def process_species(species, out_dir):
                     if c: all_db.append(c)
         return ', '.join(sorted(list(set(all_db))))
     
-    df_met_db = df_db.groupby('Metabolite_Name', as_index=False, dropna=False).agg({'database': extract_dbs})
-    # df_met_db = df_met_db.rename(columns={'Metabolite_Name': 'metabolite'})
+    def extract_hmdbs(series):
+        all_ids = []
+        for v in series.dropna().astype(str):
+            for c in v.replace(';', ',').replace('|', ',').split(','):
+                c = c.strip()
+                if c and c.upper().startswith('HMDB'):
+                    all_ids.append(c.upper())
+        return ','.join(sorted(list(set(all_ids)))) if all_ids else np.nan
+
+    agg_dict = {'database': extract_dbs}
+    if 'HMDB_ID' in df_db.columns:
+        agg_dict['HMDB_ID'] = extract_hmdbs
+
+    df_met_db = df_db.groupby('Metabolite_Name', as_index=False, dropna=False).agg(agg_dict)
     
     df_met_db['databases_count'] = df_met_db['database'].apply(count_dbs)
-    # One-liner mapping (case-insensitive)
-    df_met_db['HMDB_ID'] = df_met_db['Metabolite_Name'].map(
+    
+    # One-liner mapping (case-insensitive) - strictly 1:1 mapping!
+    df_met_db['HMDB_ID'] = df_met_db['Metabolite_Name'].str.lower().map(
         HMDB_dict.assign(Metabolite_Name=HMDB_dict['Metabolite_Name'].str.lower())
                  .drop_duplicates(subset=['Metabolite_Name'])
                  .set_index('Metabolite_Name')['HMDB_ID']
     )
+
     
     out3 = os.path.join(out_dir, f'{species}_database_merge_unique_metab.csv')
     df_met_db.to_csv(out3, index=False)
     unique_metabs = len(df_met_db)
     print(f"  -> Saved {out3} ({unique_metabs} rows)")
+    
+    unmapped_hmdb = df_met_db[df_met_db['HMDB_ID'].isna()]['Metabolite_Name'].dropna().unique()
+    unmapped_hmdb_file = os.path.join(out_dir, f'{species}_unmapped_hmdb.csv')
+    pd.DataFrame({'Unmapped_Metabolite': sorted(list(unmapped_hmdb))}).to_csv(unmapped_hmdb_file, index=False)
+    print(f"  -> Saved unmapped HMDB metabolites to {unmapped_hmdb_file} ({len(unmapped_hmdb)} metabolites)")
 
     # 4. Generate the dedicated Statistics File
     raw_counts = compute_raw_counts()
